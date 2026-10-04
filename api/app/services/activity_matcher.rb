@@ -14,6 +14,7 @@ module ActivityMatcher
     "run" => "Running",
     "running" => "Running",
     "virtualrun" => "Running",
+    "trailrun" => "Running",
     "swim" => "Swimming",
     "swimming" => "Swimming",
     "openwaterswim" => "Swimming",

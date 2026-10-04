@@ -7,7 +7,7 @@ class Intervals < ApplicationService
   SPORT_TYPES = {
     swim_distance: %w[Swim OpenWaterSwim],
     bike_distance: %w[Ride VirtualRide],
-    run_distance:  %w[Run VirtualRun]
+    run_distance:  %w[Run VirtualRun TrailRun]
   }.freeze
 
   def initialize
@@ -54,6 +54,22 @@ class Intervals < ApplicationService
       query: { oldest: oldest.to_s, newest: newest.to_s },
       basic_auth: auth
     )
+  end
+
+  # The A, B, and C races of the calendar on a date. The cache holds them for 5 minutes, and an
+  # empty answer too, because a date with no race is the usual answer.
+  # @param date [Date] The local date.
+  # @return [Array<Hash>] The raw events, with `name`, `type`, and `distance`.
+  # @raise [ApplicationService::HttpError] If it fails.
+  def race_events(date)
+    events = cached_json("intervals.icu:races:#{@athlete_id}:#{date}", expires_in: 5.minutes, empty_expires_in: 5.minutes) do
+      get_json!(
+        "#{INTERVALS_ICU_API_URL}/athlete/#{@athlete_id}/events",
+        query: { oldest: date.to_s, newest: date.to_s, category: "RACE_A,RACE_B,RACE_C" },
+        basic_auth: auth
+      )
+    end
+    Array(events)
   end
 
   # @return [Hash] One raw activity.

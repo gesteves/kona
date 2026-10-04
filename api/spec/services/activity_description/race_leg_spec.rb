@@ -73,6 +73,47 @@ RSpec.describe ActivityDescription::RaceLeg do
     end
   end
 
+  describe ".run_race" do
+    let(:race) { { name: "Grand Teton Half Marathon", type: "Run", distance: 21_097.0 } }
+    let(:day) do
+      [
+        { id: "warmup", type: "Run", distance: 3_000.0 },
+        { id: "race", type: "Run", distance: 21_300.0 },
+        { id: "cooldown", type: "Run", distance: 2_000.0 },
+        { id: "ride", type: "Ride", distance: 30_000.0 }
+      ]
+    end
+
+    def run_name(activity, races: [ race ], activities: day)
+      described_class.run_race(activity, day_activities: activities, races: races)&.name
+    end
+
+    it "names the run nearest to the distance of the race, with the race name alone" do
+      expect(day.map { |activity| run_name(activity) }).to eq([ nil, "Grand Teton Half Marathon", nil, nil ])
+    end
+
+    # ⚠️ The warm-up uploads first. With a distance on the race, it never gets the name.
+    it "gives the warm-up no name while the race run is not there yet" do
+      expect(run_name(day.first, activities: day.first(1))).to be_nil
+    end
+
+    it "names the longest run when the race has no distance" do
+      expect(run_name(day[1], races: [ race.merge(distance: nil) ])).to eq("Grand Teton Half Marathon")
+      expect(run_name(day[0], races: [ race.merge(distance: nil) ])).to be_nil
+    end
+
+    it "takes a trail run, and a trail race" do
+      trail = day.map { |activity| activity[:type] == "Run" ? activity.merge(type: "TrailRun") : activity }
+
+      expect(run_name(trail[1], races: [ race.merge(type: "TrailRun") ], activities: trail)).to eq("Grand Teton Half Marathon")
+    end
+
+    it "gives nil with no running race, or with two" do
+      expect(run_name(day[1], races: [ race.merge(type: "Ride") ])).to be_nil
+      expect(run_name(day[1], races: [ race, race.merge(name: "Another") ])).to be_nil
+    end
+  end
+
   it "gives nil for an activity that is not a leg" do
     day = [ leg("x", "Run", "2026-09-20T20:00:00Z", external_id: "other") ]
 

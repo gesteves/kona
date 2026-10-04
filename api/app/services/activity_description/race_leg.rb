@@ -11,11 +11,18 @@ module ActivityDescription
   #   There is no transition. The run is the first run that starts after a ride, and the bike is the
   #   last ride that starts before that run. Thus a warm-up run before the bike, a ride to the
   #   start, and a cool-down run after the race keep their usual names.
+  #
+  # A running race is different: its name comes from an A, B, or C race of the Intervals.icu
+  # calendar, and the run gets that name alone. Refer to .run_race.
   module RaceLeg
     # @!attribute name [String] The name of the leg.
     # @!attribute partner_id [String, nil] The other leg of a pair of separate files. Its own run
     #   came before this leg arrived, thus it needs one more run to get its name.
     Leg = Data.define(:name, :partner_id)
+
+    # A run with a distance within this share of the distance of the race is the race. Thus a
+    # warm-up or a cool-down run is out, even when it uploads first.
+    DISTANCE_TOLERANCE = 0.25
 
     # The label of each leg that is not a transition, from the standard type of ActivityMatcher.
     LABELS = { "Swimming" => "Swim", "Cycling" => "Bike", "Running" => "Run" }.freeze
@@ -85,6 +92,36 @@ module ActivityDescription
       elsif activity[:id] == run[:id]
         Leg.new(name: "#{race_name} – Run", partner_id: ride[:id])
       end
+    end
+
+    # The name of a running race for a run. With a distance on the race, it is the run nearest to
+    # that distance, inside DISTANCE_TOLERANCE. With no distance, it is the longest run of the day.
+    # ⚠️ Without a distance, a warm-up that uploads before the race ends is the longest run at that
+    # moment, and it keeps the name.
+    # @param activity [Hash] The Intervals.icu activity.
+    # @param day_activities [Array<Hash>] The Intervals.icu activities of its date.
+    # @param races [Array<Hash>] The A, B, and C races of that date, from Intervals#race_events.
+    # @return [Leg, nil] The leg, or nil when the activity is not the race run, or with no running
+    #   race, or with more than one.
+    def run_race(activity, day_activities:, races:)
+      return unless sport(activity) == "Running"
+
+      running = races.select { |race| sport(race) == "Running" && race[:name].present? }
+      return unless running.one?
+
+      race = running.first
+      runs = day_activities.select { |candidate| sport(candidate) == "Running" }
+      target = race[:distance].to_f
+
+      chosen =
+        if target.positive?
+          runs.select { |run| (run[:distance].to_f - target).abs <= target * DISTANCE_TOLERANCE }
+              .min_by { |run| (run[:distance].to_f - target).abs }
+        else
+          runs.max_by { |run| run[:distance].to_f }
+        end
+
+      Leg.new(name: race[:name].strip, partner_id: nil) if chosen && chosen[:id] == activity[:id]
     end
 
     def transition?(activity) = activity[:type].to_s.casecmp("transition").zero?

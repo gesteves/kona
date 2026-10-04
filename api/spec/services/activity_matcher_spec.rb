@@ -7,6 +7,7 @@ RSpec.describe ActivityMatcher do
       expect(described_class.normalize_type("VirtualRide")).to eq("Cycling")
       expect(described_class.normalize_type("spin")).to eq("Cycling")
       expect(described_class.normalize_type("OpenWaterSwim")).to eq("Swimming")
+      expect(described_class.normalize_type("TrailRun")).to eq("Running")
       expect(described_class.normalize_type("WeightTraining")).to eq("Strength")
       expect(described_class.normalize_type("Functional Fitness")).to eq("Strength")
       expect(described_class.normalize_type("HIIT")).to eq("Strength")

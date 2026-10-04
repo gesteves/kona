@@ -116,8 +116,9 @@ module ActivityDescription
       )
     end
 
-    # The leg of a triathlon on race day, for example "<race> – T1". Refer to RaceLeg. It asks
-    # TrainerRoad first, and it lists the activities of the date only on a race day.
+    # The race name of an activity on race day. Refer to RaceLeg. A triathlon comes from
+    # TrainerRoad, for example "<race> – T1", and a running race comes from the Intervals.icu
+    # calendar, as the race name alone. The code lists the activities of the date only on a race day.
     # @return [RaceLeg::Leg, nil] Nil on each other day, and when a source fails.
     def find_race_leg(activity)
       date = activity_date(activity)
@@ -125,10 +126,18 @@ module ActivityDescription
 
       swallow("race name") do
         race_name = trainer_road.race_name(date)
-        next if race_name.nil?
+        if race_name
+          day = @intervals.activities!(oldest: date, newest: date)
+          next RaceLeg.find(activity, day_activities: day, race_name: race_name)
+        end
+
+        next unless ActivityMatcher.normalize_type(activity[:type]) == "Running"
+
+        races = @intervals.race_events(date)
+        next if races.empty?
 
         day = @intervals.activities!(oldest: date, newest: date)
-        RaceLeg.find(activity, day_activities: day, race_name: race_name)
+        RaceLeg.run_race(activity, day_activities: day, races: races)
       end
     end
 

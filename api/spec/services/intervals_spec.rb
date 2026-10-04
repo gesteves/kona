@@ -16,12 +16,13 @@ RSpec.describe Intervals do
         { "type" => "Ride",         "distance" => 20000 },
         { "type" => "VirtualRide",  "distance" => 10000 },
         { "type" => "Run",          "distance" => 5000 },
+        { "type" => "TrailRun",     "distance" => 8000 },
         { "type" => "Walk",         "distance" => 3000 } # ignored
       ]
       allow(service).to receive(:get_json).and_return(activities)
 
       expect(service.stats).to eq(
-        swim_distance: 2500, bike_distance: 30000, run_distance: 5000, total_activities: 5
+        swim_distance: 2500, bike_distance: 30000, run_distance: 13000, total_activities: 6
       )
     end
 
@@ -34,6 +35,18 @@ RSpec.describe Intervals do
       allow(service).to receive(:get_json).and_return(nil)
       expect(service.stats).to be_nil
       expect($redis).to have_received(:setex).with("intervals.icu:stats:#{service.instance_variable_get(:@athlete_id)}", 60, ApplicationService::EMPTY_SENTINEL)
+    end
+  end
+
+  describe "#race_events" do
+    it "asks for the A, B, and C races of the date" do
+      allow(service).to receive(:get_json!).and_return([ { name: "Grand Teton Half Marathon", type: "Run" } ])
+
+      expect(service.race_events(Date.new(2026, 10, 4))).to eq([ { name: "Grand Teton Half Marathon", type: "Run" } ])
+      expect(service).to have_received(:get_json!).with(
+        a_string_ending_with("/events"),
+        hash_including(query: { oldest: "2026-10-04", newest: "2026-10-04", category: "RACE_A,RACE_B,RACE_C" })
+      )
     end
   end
 

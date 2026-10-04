@@ -493,6 +493,13 @@ Thus that shared window is safe.
       second leg queues the first one again, one time, below the key `activity:race_pair:<ids>`.
   - A transition gets its name and no description. ⚠️ The race name wins over a name that the owner
     typed in Strava.
+- **A running race comes from the Intervals.icu calendar, and NOT from TrainerRoad**, because the
+  owner puts only triathlons in TrainerRoad. On a date with no TrainerRoad race and ONE A, B, or C
+  race of type `Run` (`Intervals#race_events`), one run gets the race name alone
+  (`RaceLeg.run_race`). With a distance on the race, it is the run nearest to that distance, inside
+  25%. With no distance, it is the longest run. ⚠️ Give the race its distance: without one, a
+  warm-up that uploads before the race ends is the longest run at that moment, and it keeps the
+  name.
 - **The weather line comes from WeatherKit, and not from Intervals.icu.**
   `ActivityDescription::Weather` takes a sample of the GPS track each 10 minutes, gets the past
   hours of each area, and aggregates them over the full activity. The LLM writes the sentence

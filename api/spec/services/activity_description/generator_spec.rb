@@ -11,6 +11,7 @@ RSpec.describe ActivityDescription::Generator do
       temperature_unit: :celsius,
       activity_streams: nil,
       wellness: nil,
+      race_events: [],
       update_activity!: nil
     )
   end
@@ -259,6 +260,19 @@ RSpec.describe ActivityDescription::Generator do
 
         expect(ActivityDescriptionJob.jobs).to be_empty
       end
+    end
+
+    it "gives a running race the name of the Intervals.icu race, when TrainerRoad has none" do
+      run = activity.merge(type: "Run", distance: 21_300.0, icu_average_watts: nil)
+      allow(trainer_road).to receive(:race_name).and_return(nil)
+      allow(intervals).to receive(:activity!).and_return(run)
+      allow(intervals).to receive(:race_events).with(Date.new(2026, 7, 9))
+        .and_return([ { name: "Grand Teton Half Marathon", type: "Run", distance: 21_097.0 } ])
+      allow(intervals).to receive(:activities!).and_return([ run ])
+
+      generator.generate!("i1")
+
+      expect(strava).to have_received(:update_activity!).with("s1", name: "Grand Teton Half Marathon")
     end
 
     it "still skips a transition on a day with no race" do
