@@ -56,13 +56,15 @@ module ActivityDescription
     def run(activity_id)
       activity = @intervals.activity!(activity_id)
       sport = ActivityMatcher.normalize_type(activity[:type])
+      race_leg = find_race_leg(activity)
+      race_name = race_leg&.name
+      requeue_partner(activity, race_leg)
 
-      unless ELIGIBLE_SPORTS.include?(sport)
-        log_info("activity #{activity_id} is not swim/bike/run (type=#{activity[:type] || 'unknown'}) — skipping")
-        return
-      end
-      if activity[:pool_length].present?
-        log_info("activity #{activity_id} is a pool swim — skipping")
+      # A leg of a race always gets its name, and a transition gets its name and no description.
+      describe = ELIGIBLE_SPORTS.include?(sport) && activity[:pool_length].blank?
+      unless describe || race_name
+        reason = ELIGIBLE_SPORTS.include?(sport) ? "is a pool swim" : "is not swim/bike/run (type=#{activity[:type] || 'unknown'})"
+        log_info("activity #{activity_id} #{reason} — skipping")
         return
       end
 
@@ -82,18 +84,9 @@ module ActivityDescription
       # headline and the name come from Strava.
       current = @strava.activity(strava_id)
 
-      swim = sport == "Swimming"
-      description = Composer.compose(
-        headline: Composer.headline(current[:description]),
-        planned: planned_summary_line(activity, sport),
-        weather: weather_line(activity, swim),
-        water_temp: water_temp_line(activity, swim),
-        power: Composer.power_block(activity),
-        heat: heat_line(activity, swim),
-        whoop: Composer.whoop_block(whoop_strain(activity, swim), swim: swim)
-      )
-
-      name = Composer.clean_name(current[:name])
+      description = compose_description(activity, sport, current) if describe
+      # ⚠️ The race name wins over a name that the owner typed: a race leg has one correct name.
+      name = race_name || Composer.clean_name(current[:name])
 
       fields = {}
       fields[:name] = name if name.present? && name != current[:name]
@@ -106,6 +99,47 @@ module ActivityDescription
 
       @strava.update_activity!(strava_id, **fields)
       log_info("activity #{activity_id} (Strava #{strava_id}): updated #{fields.keys.join(', ')}")
+    end
+
+    # @param current [Hash] The name and the description of the Strava copy.
+    # @return [String, nil]
+    def compose_description(activity, sport, current)
+      swim = sport == "Swimming"
+      Composer.compose(
+        headline: Composer.headline(current[:description]),
+        planned: planned_summary_line(activity, sport),
+        weather: weather_line(activity, swim),
+        water_temp: water_temp_line(activity, swim),
+        power: Composer.power_block(activity),
+        heat: heat_line(activity, swim),
+        whoop: Composer.whoop_block(whoop_strain(activity, swim), swim: swim)
+      )
+    end
+
+    # The leg of a triathlon on race day, for example "<race> – T1". Refer to RaceLeg. It asks
+    # TrainerRoad first, and it lists the activities of the date only on a race day.
+    # @return [RaceLeg::Leg, nil] Nil on each other day, and when a source fails.
+    def find_race_leg(activity)
+      date = activity_date(activity)
+      return if date.nil?
+
+      swallow("race name") do
+        race_name = trainer_road.race_name(date)
+        next if race_name.nil?
+
+        day = @intervals.activities!(oldest: date, newest: date)
+        RaceLeg.find(activity, day_activities: day, race_name: race_name)
+      end
+    end
+
+    # The two legs of a race in separate files arrive at different times, thus the first one ran
+    # before the second one existed and got no race name. The second one queues it again, one time.
+    # ⚠️ The key holds the pair, thus the run that the queue starts does not queue this leg again.
+    def requeue_partner(activity, race_leg)
+      return if race_leg&.partner_id.nil?
+
+      key = "activity:race_pair:#{[ activity[:id], race_leg.partner_id ].map(&:to_s).sort.join(':')}"
+      ActivityDescriptionJob.perform_async(race_leg.partner_id) if $redis.set(key, "1", nx: true, ex: 1.day.to_i)
     end
 
     # The strain of the Whoop workout that matches the activity, for the 🔥 line. The code asks
@@ -182,9 +216,13 @@ module ActivityDescription
         date = activity_date(activity)
         next [] if date.nil?
 
-        trainer_road = @trainer_road || TrainerRoad.new(@location.time_zone)
         trainer_road.planned_workouts(date) || []
       end
+    end
+
+    # @return [TrainerRoad]
+    def trainer_road
+      @trainer_road ||= TrainerRoad.new(@location.time_zone)
     end
 
     # The weather line ("{emoji} {sentence}"), from WeatherKit over the full GPS track. The emoji

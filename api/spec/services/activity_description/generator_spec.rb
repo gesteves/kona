@@ -19,7 +19,7 @@ RSpec.describe ActivityDescription::Generator do
   end
   let(:whoop) { instance_double(Whoop, valid_credentials?: true, connected?: true, workouts_between: []) }
   let(:location) { instance_double(Location, time_zone: "America/Denver") }
-  let(:trainer_road) { instance_double(TrainerRoad, planned_workouts: []) }
+  let(:trainer_road) { instance_double(TrainerRoad, planned_workouts: [], race_name: nil) }
 
   # A scored Whoop workout that matches the activity below.
   def whoop_workout(strain)
@@ -172,6 +172,98 @@ RSpec.describe ActivityDescription::Generator do
 
     it "skips when Strava is not connected" do
       allow(strava).to receive(:connected?).and_return(false)
+
+      generator.generate!("i1")
+
+      expect(strava).not_to have_received(:update_activity!)
+    end
+  end
+
+  describe "the race-day names" do
+    let(:race) { "Ironman 70.3 Washington Tri-Cities" }
+    let(:legs) do
+      [
+        { id: "i0", type: "OpenWaterSwim", start_date: "2026-07-09T13:00:00Z", external_id: "f1" },
+        { id: "i2", type: "Transition", start_date: "2026-07-09T13:30:00Z", external_id: "f1" },
+        activity.merge(external_id: "f1", trainer: false),
+        { id: "i4", type: "Transition", start_date: "2026-07-09T16:00:00Z", external_id: "f1" },
+        { id: "i5", type: "Run", start_date: "2026-07-09T16:05:00Z", external_id: "f1" }
+      ]
+    end
+
+    before do
+      allow(trainer_road).to receive(:race_name).with(Date.new(2026, 7, 9)).and_return(race)
+      allow(intervals).to receive(:activities!).with(oldest: Date.new(2026, 7, 9), newest: Date.new(2026, 7, 9)).and_return(legs)
+    end
+
+    it "gives a leg the race name, with its description" do
+      allow(intervals).to receive(:activity!).and_return(legs[2])
+
+      generator.generate!("i1")
+
+      expect(strava).to have_received(:update_activity!).with("s1", name: "#{race} – Bike", description: "⚡️ Avg 200 W")
+    end
+
+    # A transition gets no description, and it still gets its name.
+    it "gives a transition its name alone" do
+      allow(intervals).to receive(:activity!).and_return(legs[1].merge(strava_id: "s2", start_date_local: "2026-07-09T07:30:00"))
+
+      generator.generate!("i1")
+
+      expect(strava).to have_received(:update_activity!).with("s2", name: "#{race} – T1")
+    end
+
+    it "changes nothing on a day with no race" do
+      allow(trainer_road).to receive(:race_name).and_return(nil)
+      allow(intervals).to receive(:activity!).and_return(legs[2])
+
+      generator.generate!("i1")
+
+      expect(intervals).not_to have_received(:activities!)
+      expect(strava).to have_received(:update_activity!).with("s1", description: "⚡️ Avg 200 W")
+    end
+
+    it "keeps the usual name when TrainerRoad fails" do
+      allow(trainer_road).to receive(:race_name).and_raise("feed down")
+      allow(intervals).to receive(:activity!).and_return(legs[2])
+
+      generator.generate!("i1")
+
+      expect(strava).to have_received(:update_activity!).with("s1", description: "⚡️ Avg 200 W")
+    end
+
+    # The swim was cancelled, and the bike and the run are separate files that arrive at different
+    # times. The run queues the bike again, one time, thus the bike gets its name too.
+    context "with the legs in separate files" do
+      let(:legs) do
+        [
+          activity.merge(external_id: "bike-file", trainer: false),
+          { id: "i9", type: "Run", start_date: "2026-07-09T16:05:00Z", external_id: "watch-file" }
+        ]
+      end
+
+      before { allow(intervals).to receive(:activity!).and_return(legs.first) }
+
+      it "names the bike and queues the run one time" do
+        generator.generate!("i1")
+
+        expect(strava).to have_received(:update_activity!).with("s1", name: "#{race} – Bike", description: "⚡️ Avg 200 W")
+        expect($redis).to have_received(:set).with("activity:race_pair:i1:i9", "1", nx: true, ex: 1.day.to_i)
+        expect(ActivityDescriptionJob).to have_enqueued_sidekiq_job("i9")
+      end
+
+      it "does not queue the other leg a second time" do
+        allow($redis).to receive(:set).with("activity:race_pair:i1:i9", "1", nx: true, ex: 1.day.to_i).and_return(false)
+
+        generator.generate!("i1")
+
+        expect(ActivityDescriptionJob.jobs).to be_empty
+      end
+    end
+
+    it "still skips a transition on a day with no race" do
+      allow(trainer_road).to receive(:race_name).and_return(nil)
+      allow(intervals).to receive(:activity!).and_return(legs[1].merge(strava_id: "s2", start_date_local: "2026-07-09T07:30:00"))
 
       generator.generate!("i1")
 

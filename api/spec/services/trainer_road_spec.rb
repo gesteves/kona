@@ -311,4 +311,42 @@ RSpec.describe TrainerRoad do
       expect(service.workouts).to eq([])
     end
   end
+  describe "#race_name" do
+    let(:date) { Date.new(2026, 7, 9) }
+
+    it "gives the all-day event that has a leg with its name" do
+      stub_calendar([
+        { all_day: true, summary: "Escape from Alcatraz" },
+        { all_day: true, summary: "0:45 - Escape from Alcatraz" },
+        { all_day: true, summary: "1:00 - Petit" }
+      ])
+
+      expect(service.race_name(date)).to eq("Escape from Alcatraz")
+    end
+
+    # ⚠️ An annotation is an all-day event with no duration too. Only a leg makes a race.
+    it "gives nil for an annotation with no leg" do
+      stub_calendar([ { all_day: true, summary: "Rest Week" }, { all_day: true, summary: "1:00 - Petit" } ])
+
+      expect(service.race_name(date)).to be_nil
+    end
+
+    it "gives nil for two races on one date" do
+      stub_calendar([
+        { all_day: true, summary: "Race A" }, { all_day: true, summary: "1:00 - Race A" },
+        { all_day: true, summary: "Race B" }, { all_day: true, summary: "1:00 - Race B" }
+      ])
+
+      expect(service.race_name(date)).to be_nil
+    end
+
+    it "gives nil for a race on another date" do
+      stub_calendar([
+        { all_day: true, date: "20260710", summary: "Escape from Alcatraz" },
+        { all_day: true, date: "20260710", summary: "0:45 - Escape from Alcatraz" }
+      ])
+
+      expect(service.race_name(date)).to be_nil
+    end
+  end
 end

@@ -81,6 +81,29 @@ class TrainerRoad < ApplicationService
     end
   end
 
+  # The name of the race on a date, for the names of the legs of a triathlon.
+  #
+  # ⚠️ A race is an all-day event with no duration that has at least one leg on that date: an
+  # all-day event "H:MM - <same name>". The leg is what separates a race from an annotation, for
+  # example "Rest Week", which is also an all-day event with no duration.
+  # @param date [Date] The calendar date.
+  # @param timezone [String] The IANA timezone for a timed event.
+  # @return [String, nil] The name, or nil with no race, or with more than one race on that date.
+  def race_name(date, timezone: @timezone)
+    return if @calendar_url.blank?
+
+    cache_key = "trainerroad:race:#{date}:#{timezone}:#{calendar_version}"
+    # A date with no race is the usual answer, thus the cache holds that too.
+    names = cached_json(cache_key, expires_in: 5.minutes, empty_expires_in: 5.minutes) do
+      events_on_date = fetch_calendar_events.select { |event| event_on_date?(event, date, timezone) }
+      leg_names = events_on_date.select { |event| all_day?(event) && parse_duration_prefix(event.summary.to_s.strip) }
+                                .map { |event| strip_duration_prefix(event.summary.to_s.strip) }
+      race_names_of(events_on_date).select { |name| leg_names.include?(name) }.sort
+    end
+
+    names.first if names&.one?
+  end
+
   private
 
   # The workouts of one date, in the shape of #planned_workouts.

@@ -476,6 +476,23 @@ Thus that shared window is safe.
     same description, and the run that comes last has the 🔥 line.
   - ⚠️ **A second run gives `:busy` and runs again, and it does not skip.** The two webhooks can
     arrive close together, and the second run can be the one with the strain.
+- **On race day each leg of a triathlon gets the name `<race> – Swim|T1|Bike|T2|Run`**
+  (`ActivityDescription::RaceLeg`). Two things must be true:
+  - **TrainerRoad has ONE race on that date** (`TrainerRoad#race_name`): an all-day event with no
+    duration that has a leg, which is an all-day event `H:MM - <same name>`. ⚠️ The leg is what
+    separates a race from an annotation, for example "Rest Week".
+  - **The activity is a leg**, in one of two shapes:
+    - **One multisport file.** ⚠️ The legs of one Garmin multisport file share one `external_id`,
+      and that group, in the order of the start times, gives each label. A `Transition` after the
+      swim is T1, and after the bike is T2.
+    - **Separate files**, when the swim is cancelled: a ride and a run, from one device or from two,
+      with no transition. The run is the first run that starts after a ride, and the bike is the
+      last ride that starts before that run, whatever the time between them. Thus a warm-up run, a
+      ride to the start, and a cool-down run keep their usual names. ⚠️ The two files arrive at
+      different times, thus the first leg runs before the second one exists and gets no name. The
+      second leg queues the first one again, one time, below the key `activity:race_pair:<ids>`.
+  - A transition gets its name and no description. ⚠️ The race name wins over a name that the owner
+    typed in Strava.
 - **The weather line comes from WeatherKit, and not from Intervals.icu.**
   `ActivityDescription::Weather` takes a sample of the GPS track each 10 minutes, gets the past
   hours of each area, and aggregates them over the full activity. The LLM writes the sentence
