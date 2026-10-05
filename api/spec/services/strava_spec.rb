@@ -23,20 +23,21 @@ RSpec.describe Strava do
 
   describe ".granted_scopes?" do
     it "is true only when each scope came back" do
-      expect(described_class.granted_scopes?("read,activity:read_all,activity:write")).to be(true)
-      expect(described_class.granted_scopes?("read,activity:write")).to be(false)
+      expect(described_class.granted_scopes?("read,activity:read_all,activity:write,profile:write")).to be(true)
+      expect(described_class.granted_scopes?("read,activity:read_all,activity:write")).to be(false)
+      expect(described_class.granted_scopes?("read,activity:write,profile:write")).to be(false)
       expect(described_class.granted_scopes?(nil)).to be(false)
     end
   end
 
   describe "#authorization_url" do
-    it "asks for both scopes, with the state and the callback of the request" do
+    it "asks for each scope, with the state and the callback of the request" do
       url = described_class.new.authorization_url("the-state", redirect_uri: redirect_uri)
       query = Rack::Utils.parse_query(URI(url).query)
 
       expect(url).to start_with(Strava::AUTHORIZE_URL)
       expect(query).to include("client_id" => "client-id", "redirect_uri" => redirect_uri,
-                               "scope" => "activity:read_all,activity:write", "state" => "the-state")
+                               "scope" => "activity:read_all,activity:write,profile:write", "state" => "the-state")
     end
 
     it "gives nil without the app credentials" do
@@ -107,6 +108,27 @@ RSpec.describe Strava do
 
     it "raises with no connected athlete" do
       expect { described_class.new.update_activity!("123", description: "x") }.to raise_error(/No Strava access token/)
+    end
+  end
+
+  describe "#update_athlete_weight!" do
+    it "PUTs the weight with the stored token" do
+      connect!
+      allow(HTTParty).to receive(:put).and_return(http_response({ id: 42 }))
+
+      described_class.new.update_athlete_weight!(72.4)
+
+      expect(HTTParty).to have_received(:put).with(
+        "#{Strava::API_URL}/athlete",
+        hash_including(body: { weight: 72.4 }, headers: hash_including("Authorization" => "Bearer an-access-token"))
+      )
+    end
+
+    it "raises on a failure, thus the job does the work again" do
+      connect!
+      allow(HTTParty).to receive(:put).and_return(http_response({}, success: false, code: 500))
+
+      expect { described_class.new.update_athlete_weight!(72.4) }.to raise_error(ApplicationService::HttpError)
     end
   end
 

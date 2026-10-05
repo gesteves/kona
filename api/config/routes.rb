@@ -28,6 +28,9 @@ Rails.application.routes.draw do
     # Sets the current location and sends it to Intervals.icu.
     post "location" => "location#create"
 
+    # Sends a body weight to Intervals.icu and to Strava.
+    post "weight" => "weight#create"
+
     # The contact form of the public site, through the web proxy. A browser can reach it, and it
     # cannot reach the other /api/* paths.
     post "contact" => "contact#create"

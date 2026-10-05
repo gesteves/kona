@@ -45,6 +45,7 @@ edge serves a cached copy before it gets a new one.
 | GET | `/widgets/whoop` | sleep/recovery/strain | 5 min |
 | GET | `/widgets/plausible/pageviews/:id` | pageview count by Contentful id | 5 min |
 | POST | `/api/location` | sets Redis `location:current` + enqueues `LocationSyncJob`, via `Location.store` | — |
+| POST | `/api/weight` | `weight`, `unit` (`kg` or `lb`, default `kg`), `date` (default: today in the location time zone). Enqueues `IntervalsWeightJob` and `StravaWeightJob`; 204 or 422 | — |
 | POST | `/api/contact` | drops honeypot hits + enqueues `ContactMailJob`; JSON → 204/422, HTML → 303 | — |
 | POST | `/api/build` | enqueues `SiteBuildJob`; 202, or 429 inside the 60s dedupe lock, which `POST /republish` shares | — |
 | POST | `/api/icons` | resolves the web build's Font Awesome allowlist to SVGs | — |
@@ -426,6 +427,8 @@ Thus that shared window is safe.
 | `StravaActivityJob(strava_id, event_time)` | finds the Intervals.icu activity of a new Strava activity, then adds its description job. A miss raises and retries |
 | `ActivityDescriptionJob(activity_id)` | (re)generates an activity's description and tidies its name, and PUTs both to Strava |
 | `LocationSyncJob(latitude, longitude)` | propagates the current location to Intervals.icu |
+| `IntervalsWeightJob(kg, date)` | writes the weight to the Intervals.icu wellness record of that day. ⚠️ The controller gives the day, thus a retry after midnight does not move it |
+| `StravaWeightJob(kg)` | writes the weight to the Strava profile. With no connection or no `profile:write` scope, it fails permanently |
 | `BlueskyPostJob(posts, index, reply)` | posts one post of a thread to Bluesky, then adds the job of the next. ⚠️ The three post jobs inherit from `SocialPostJob`, which holds the enqueue lock: a retry after the enqueue must not add the next job a second time, and Threads has no idempotency on its side |
 | `MastodonPostJob(posts, index, in_reply_to_id)` | the same, for Mastodon |
 | `ThreadsPostJob(posts, index, reply_to_id)` | the same, for Threads |
@@ -1006,9 +1009,10 @@ hangs gives a 500 in place of the message of the page, and a disconnect never re
   - ⚠️ **The Authorization Callback Domain of the Strava app must be the admin host.** Strava checks
     the host only, and an app has ONE domain. Thus use a second Strava app with `localhost` for
     local work.
-  - ⚠️ **The scopes are `activity:read_all` and `activity:write`, and the callback checks both.**
-    Strava permits an edit only of an activity that the read scope can see, and the athlete can
-    clear a scope on the Strava screen. A token without both cannot do its one job.
+  - ⚠️ **The scopes are `activity:read_all`, `activity:write`, and `profile:write`, and the
+    callback checks each one.** Strava permits an edit only of an activity that the read scope can
+    see, and the athlete can clear a scope on the Strava screen. `POST /api/weight` needs
+    `profile:write`. A token from before that scope must connect again, or `StravaWeightJob` fails.
   - **The access token lasts 6 hours, and the code refreshes it when it needs one.** ⚠️ Strava can
     give a new refresh token at each refresh, thus `StravaCredentials.store_tokens` replaces both,
     and a Redis lock lets one refresh run at a time. An idle refresh token does not expire, thus

@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe "Admin Strava connection", type: :request do
   let(:owner_email) { "owner@example.com" }
   let(:redirect_uri) { "http://www.example.com/connected-apps/strava/callback" }
-  let(:scope) { "read,activity:read_all,activity:write" }
+  let(:scope) { "read,activity:read_all,activity:write,profile:write" }
 
   before do
     allow(ENV).to receive(:[]).and_call_original
