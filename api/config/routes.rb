@@ -31,6 +31,9 @@ Rails.application.routes.draw do
     # Sends a body weight to Intervals.icu and to Strava.
     post "weight" => "weight#create"
 
+    # Sends a cycling FTP to Intervals.icu and to Strava.
+    post "ftp" => "ftp#create"
+
     # The contact form of the public site, through the web proxy. A browser can reach it, and it
     # cannot reach the other /api/* paths.
     post "contact" => "contact#create"

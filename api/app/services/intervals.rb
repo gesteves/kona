@@ -127,6 +127,20 @@ class Intervals < ApplicationService
     )
   end
 
+  # Updates part of the sport settings of one activity type. Only the given fields change.
+  # @param type [String] An activity type, for example "Ride". Intervals.icu finds the settings that
+  #   include it.
+  # @param fields [Hash] The fields to set.
+  # @raise [ApplicationService::HttpError] If it fails.
+  def update_sport_settings!(type, fields)
+    put_json!(
+      "#{INTERVALS_ICU_API_URL}/athlete/#{@athlete_id}/sport-settings/#{type}?recalcHrZones=false",
+      body: fields.to_json,
+      headers: { "Content-Type" => "application/json" },
+      basic_auth: auth
+    )
+  end
+
   # The profile of the athlete, read new each time. The location sync reads it to decide if a
   # write is necessary, thus no cache must hold it.
   # @return [Hash]

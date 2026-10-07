@@ -15,7 +15,7 @@ Copy `.env.example` to `.env` for local development; in production set these as 
 - **Google Maps** — geocodes the location and powers pollen/AQI lookups. Set `GOOGLE_API_KEY` for a project with the Geocoding, Time Zone, Maps Elevation, Air Quality, and Pollen APIs enabled.
 - **WeatherKit** — current weather and forecast. Follow Apple's [WeatherKit REST setup](https://developer.apple.com/documentation/weatherkitrestapi/request_authentication_for_weatherkit_rest_api) and set `WEATHERKIT_KEY_ID`, `WEATHERKIT_TEAM_ID`, `WEATHERKIT_SERVICE_ID`, and `WEATHERKIT_PRIVATE_KEY` (the base64-encoded `.p8` key).
 - **Whoop** — sleep/recovery/strain. Create a Whoop OAuth app and set `WHOOP_CLIENT_ID`, `WHOOP_CLIENT_SECRET`, and `WHOOP_REDIRECT_URI` (must match the app, e.g. `https://<your-app-host>/whoop/callback`). `GET /whoop/auth` is gated by HTTP Basic Auth (`WHOOP_AUTH_USERNAME`, `WHOOP_AUTH_PASSWORD`); visit it once to connect your account, after which tokens are stored in Redis.
-- **API token** — set `API_TOKEN`, the bearer token required by `POST /api/location` and `POST /api/weight`.
+- **API token** — set `API_TOKEN`, the bearer token required by `POST /api/location`, `POST /api/weight`, and `POST /api/ftp`.
 - **Site URL** — set `SITE_URL`, the public site root (used for the `/` redirect and the standard.site publication URL).
 
 ### Optional services
@@ -43,6 +43,16 @@ Copy `.env.example` to `.env` for local development; in production set these as 
   ```
 
   A successful POST returns `204 No Content`; an invalid weight, unit, or date returns `422`.
+- **FTP** — POST a cycling FTP in watts to write it to the Ride sport settings of Intervals.icu (both the FTP and the indoor FTP) and to the Strava profile. Strava needs the same `profile:write` scope as the weight:
+
+  ```bash
+  curl -X POST https://<your-app-host>/api/ftp \
+    -H "Authorization: Bearer $API_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d '{"ftp": 265}'
+  ```
+
+  A successful POST returns `204 No Content`; an invalid FTP returns `422`.
 - **standard.site / Bluesky** — publishes posts to the AT Protocol PDS, webhook-driven (no-ops until connected). Connect an account on the admin's Connected apps page; `BLUESKY_PDS_URL` optionally overrides the default PDS host.
 - **Other**: `TIME_ZONE` (fallback timezone), `FONT_AWESOME_VERSION` (defaults to `7.2.0`), `WHOOP_REFERRAL_URL` (shown under the Whoop widget).
 

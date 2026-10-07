@@ -23,7 +23,7 @@ class Strava < ApplicationService
   # ⚠️ Strava permits an edit only of an activity that the read scope can see. Thus an activity that
   # only the athlete can see needs `activity:read_all`, and `activity:write` alone is not enough.
   # The athlete can clear a scope on the Strava authorization screen, thus the callback checks the
-  # scopes that came back. `profile:write` lets POST /api/weight set the weight of the athlete.
+  # scopes that came back. `profile:write` lets POST /api/weight and POST /api/ftp change the profile.
   SCOPES = %w[activity:read_all activity:write profile:write].freeze
 
   # The seconds that each call to Strava can take. ⚠️ `connect!` runs in the OAuth callback, which is
@@ -165,6 +165,18 @@ class Strava < ApplicationService
   def update_athlete_weight!(kg)
     put_json!("#{API_URL}/athlete", body: { weight: kg }, headers: auth_headers, timeout: REQUEST_TIMEOUT)
     nil
+  end
+
+  # Sets the FTP of the athlete. This needs the `profile:write` scope.
+  #
+  # ⚠️ Strava documents `weight` only for this PUT. Thus the caller must compare the return value
+  # with the value that it sent.
+  # @param watts [Integer] The FTP in watts.
+  # @return [Integer, nil] The FTP that Strava gives back.
+  # @raise [ApplicationService::HttpError] On a failure. A 401 or a 403 means that the scope is absent.
+  def update_athlete_ftp!(watts)
+    body = put_json!("#{API_URL}/athlete", body: { ftp: watts }, headers: auth_headers, timeout: REQUEST_TIMEOUT)
+    body&.dig(:ftp)
   end
 
   # Makes the webhook subscription of this app, or finds the one that exists, and stores its id.

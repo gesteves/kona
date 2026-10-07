@@ -111,6 +111,26 @@ RSpec.describe Strava do
     end
   end
 
+  describe "#update_athlete_ftp!" do
+    it "PUTs the FTP with the stored token and gives the FTP of the response" do
+      connect!
+      allow(HTTParty).to receive(:put).and_return(http_response({ id: 42, ftp: 265 }))
+
+      expect(described_class.new.update_athlete_ftp!(265)).to eq(265)
+      expect(HTTParty).to have_received(:put).with(
+        "#{Strava::API_URL}/athlete",
+        hash_including(body: { ftp: 265 }, headers: hash_including("Authorization" => "Bearer an-access-token"))
+      )
+    end
+
+    it "raises on a failure, thus the job does the work again" do
+      connect!
+      allow(HTTParty).to receive(:put).and_return(http_response({}, success: false, code: 500))
+
+      expect { described_class.new.update_athlete_ftp!(265) }.to raise_error(ApplicationService::HttpError)
+    end
+  end
+
   describe "#update_athlete_weight!" do
     it "PUTs the weight with the stored token" do
       connect!

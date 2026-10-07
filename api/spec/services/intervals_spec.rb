@@ -111,6 +111,18 @@ RSpec.describe Intervals do
         hash_including(body: { description: "new" }.to_json)
       )
     end
+
+    it "PUTs partial sport settings by activity type, and keeps the HR zones" do
+      response = instance_double(HTTParty::Response, success?: true, code: 200, body: "{}", request: nil)
+      allow(HTTParty).to receive(:put).and_return(response)
+
+      service.update_sport_settings!("Ride", ftp: 265, indoor_ftp: 265)
+
+      expect(HTTParty).to have_received(:put).with(
+        %r{/athlete/.*/sport-settings/Ride\?recalcHrZones=false\z},
+        hash_including(body: { ftp: 265, indoor_ftp: 265 }.to_json, basic_auth: hash_including(username: "API_KEY"))
+      )
+    end
   end
 
   describe "location sync reads and writes" do
