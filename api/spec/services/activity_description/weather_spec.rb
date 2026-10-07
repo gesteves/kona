@@ -138,7 +138,7 @@ RSpec.describe ActivityDescription::Weather do
   end
 
   describe "the precipitation" do
-    # 150 minutes: about 120 minutes of the first condition, then about 30 of the second.
+    # 150 minutes: about 90 minutes of the first condition, then about 60 of the second.
     def spell(first, second)
       allow(weather_kit).to receive(:hourly).and_return(
         [ hour(0, conditionCode: first), hour(1, conditionCode: first), hour(2, conditionCode: second), hour(3, conditionCode: second) ]
@@ -150,7 +150,7 @@ RSpec.describe ActivityDescription::Weather do
       result = spell("Cloudy", "Rain")
 
       expect(result[:condition]).to eq("Cloudy")
-      expect(result[:precipitation]).to include(condition: "rain", minutes: be_within(10).of(30))
+      expect(result[:precipitation]).to eq(condition: "rain")
     end
 
     it "counts a storm code as rain" do
@@ -220,17 +220,74 @@ RSpec.describe ActivityDescription::Weather do
     expect(summary(streams_for(north(61)))[:humidity_percent]).to eq(80)
   end
 
-  # WeatherKit gives the condition for the hour that starts at `forecastStart`.
-  it "takes the condition of the hour that holds the sample, and not of the nearest hour" do
+  # ⚠️ The stamp convention of WeatherKit history is not certain, thus the error is the same on each side.
+  it "takes the condition of the nearest hour" do
     allow(weather_kit).to receive(:hourly).and_return([ hour(0, conditionCode: "Cloudy"), hour(1, conditionCode: "Rain") ])
 
-    # 12:35 to 12:55, in the dry hour.
+    # 12:35 to 12:55, nearer to the wet hour.
     result = described_class.new(
       { start_date: (start + 35.minutes).iso8601 }, streams_for(north(21)), unit: :celsius, weather_kit: weather_kit, air_quality: air_quality
     ).summary
 
-    expect(result[:condition]).to eq("Cloudy")
-    expect(result).not_to have_key(:precipitation)
+    expect(result[:condition]).to eq("Rain")
+  end
+
+  describe "the rate of precipitation" do
+    # 30 minutes in one hour, thus each sample has the same rate.
+    def code_with(code: "Cloudy", **fields)
+      allow(weather_kit).to receive(:hourly).and_return((0..2).map { |offset| hour(offset, conditionCode: code, **fields) })
+      summary(streams_for(north(30)))[:condition]
+    end
+
+    it "gives a wet code to a dry hour with a measurable rate" do
+      expect(code_with(precipitationType: "rain", precipitationIntensity: 0.3)).to eq("Drizzle")
+      expect(code_with(precipitationType: "rain", precipitationIntensity: 2.0)).to eq("Rain")
+      expect(code_with(precipitationType: "rain", precipitationIntensity: 6.0)).to eq("Heavy rain")
+      expect(code_with(precipitationType: "snow", precipitationIntensity: 0.3)).to eq("Flurries")
+      expect(code_with(precipitationType: "snow", precipitationIntensity: 2.0)).to eq("Snow")
+      expect(code_with(precipitationType: "sleet", precipitationIntensity: 1.0)).to eq("Sleet")
+      expect(code_with(precipitationType: "hail", precipitationIntensity: 1.0)).to eq("Hail")
+      expect(code_with(precipitationType: "mixed", precipitationIntensity: 1.0)).to eq("Mixed rainfall")
+    end
+
+    it "keeps the dry code below MIN_PRECIPITATION_MM_PER_HOUR, or with a clear type" do
+      expect(code_with(precipitationType: "rain", precipitationIntensity: 0.05)).to eq("Cloudy")
+      expect(code_with(precipitationType: "clear", precipitationIntensity: 1.0)).to eq("Cloudy")
+    end
+
+    it "never changes a code that is already precipitation" do
+      expect(code_with(code: "Snow", precipitationType: "rain", precipitationIntensity: 2.0)).to eq("Snow")
+    end
+
+    it "interpolates the rate between the hours" do
+      allow(weather_kit).to receive(:hourly).and_return(
+        [ hour(0, conditionCode: "Cloudy", precipitationType: "rain", precipitationIntensity: 0.0),
+          hour(1, conditionCode: "Cloudy", precipitationType: "rain", precipitationIntensity: 0.3),
+          hour(2, conditionCode: "Cloudy", precipitationType: "rain", precipitationIntensity: 0.3) ]
+      )
+
+      # Dry until about 12:40, then drizzle for the rest of the 100 minutes.
+      result = summary(streams_for(north(100)))
+      expect(result[:condition]).to eq("Drizzle")
+      expect(result[:precipitation]).to be_nil
+    end
+  end
+
+  describe "the sky-cover families" do
+    def main_of(codes)
+      allow(weather_kit).to receive(:hourly).and_return(codes.each_with_index.map { |code, offset| hour(offset, conditionCode: code) })
+      summary(streams_for(north((codes.size - 1) * 60)))[:condition]
+    end
+
+    # Clear 90 minutes, mostly clear 120, partly cloudy 150: the clear family has 210.
+    it "names the family with the most time, by its code with the most time" do
+      expect(main_of(%w[Clear Clear MostlyClear MostlyClear PartlyCloudy PartlyCloudy PartlyCloudy])).to eq("Mostly clear")
+    end
+
+    # Cloudy 150 minutes, partly cloudy 120, mostly cloudy 90.
+    it "keeps a code outside the families as a family of its own" do
+      expect(main_of(%w[Cloudy Cloudy Cloudy PartlyCloudy PartlyCloudy MostlyCloudy MostlyCloudy])).to eq("Partly cloudy")
+    end
   end
 
   it "names the condition with the most time, with the phrase of config/conditions.yml" do
@@ -246,8 +303,7 @@ RSpec.describe ActivityDescription::Weather do
     allow(weather_kit).to receive(:hourly).and_return([ hour(0, conditionCode: "MostlyClear"), hour(1), hour(2) ])
     streams = [ { type: "time", data: [ 0, 1649, 1659 ] }, { type: "latlng", data: [ 46.0, 46.0, 46.0 ], data2: [ -119.0, -119.0, -119.0 ] } ]
 
-    # 12:46 in the MostlyClear hour, then 13:13 in the Clear hour.
-    result = described_class.new({ start_date: (start + 46.minutes).iso8601 }, streams, unit: :celsius, weather_kit: weather_kit, air_quality: air_quality).summary
+    result = described_class.new({ start_date: (start + 26.minutes).iso8601 }, streams, unit: :celsius, weather_kit: weather_kit, air_quality: air_quality).summary
 
     expect(result[:condition]).to eq("Mostly clear")
   end

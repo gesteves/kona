@@ -1,6 +1,6 @@
 module ActivityDescription
   # Writes the weather line of an activity description from the summary of Weather, for example
-  # "Cloudy with 25 minutes of rain · 11°C–13°C (feels like 8°C–10°C) · 12–18 km/h SSE wind with
+  # "Cloudy with some rain · 11°C–13°C (feels like 8°C–10°C) · 12–18 km/h SSE wind with
   # 24 km/h gusts (62% headwind) · AQI 54". The emoji is not here: Weather#emoji gives it.
   #
   # ⚠️ This writes words and decides nothing. Weather already selected each part and rounded each
@@ -28,14 +28,14 @@ module ActivityDescription
       ].compact.join(SEPARATOR)
     end
 
-    # "Cloudy", or "Cloudy with 25 minutes of rain" for precipitation during part of the activity.
+    # "Cloudy", or "Cloudy with some rain" for precipitation during part of the activity.
     # @return [String, nil] Nil with no condition, thus the line does not start with a separator.
     def conditions(summary)
       condition = summary[:condition].presence
       return if condition.nil?
 
       spell = summary[:precipitation]
-      spell ? "#{condition} with #{duration(spell[:minutes])} of #{spell[:condition]}" : condition
+      spell ? "#{condition} with some #{spell[:condition]}" : condition
     end
 
     # "3–5 mph W wind with 8 mph gusts (55% headwind)".
@@ -72,15 +72,5 @@ module ActivityDescription
 
     # "3–5", or the top alone when the range starts at zero or has one value: "3", not "0–3".
     def span(min, max) = min.zero? || min == max ? max.to_s : "#{min}–#{max}"
-
-    # "25 minutes", "1 hour", "1 hour 20 minutes", "2 hours".
-    # @return [String]
-    def duration(minutes)
-      hours, rest = minutes.divmod(60)
-      return "#{rest} #{'minute'.pluralize(rest)}" if hours.zero?
-
-      text = "#{hours} #{'hour'.pluralize(hours)}"
-      rest.zero? ? text : "#{text} #{rest} #{'minute'.pluralize(rest)}"
-    end
   end
 end

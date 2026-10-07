@@ -23,16 +23,16 @@ RSpec.describe ActivityDescription::WeatherSentence do
 
   it "keeps the precipitation with the condition, and the headwind after the wind" do
     expect(described_class.call(
-      units: metric, condition: "Cloudy", precipitation: { condition: "rain", minutes: 25 },
+      units: metric, condition: "Cloudy", precipitation: { condition: "rain" },
       wind: { direction: "SSE", speed: { min: 12, max: 18 }, gust: 24 }, headwind_percent: 62,
       temperature: { min: 11, max: 13 }, feels_like: { min: 8, max: 10 }
-    )).to eq("Cloudy with 25 minutes of rain · 11°C–13°C (feels like 8°C–10°C) · " \
+    )).to eq("Cloudy with some rain · 11°C–13°C (feels like 8°C–10°C) · " \
              "12–18 km/h SSE wind with 24 km/h gusts (62% headwind)")
   end
 
-  it "writes the time of the precipitation" do
-    expect(sentence(condition: "Rain", precipitation: { condition: "snow", minutes: 80 }, temperature: { min: 30, max: 34 }))
-      .to eq("Rain with 1 hour 20 minutes of snow · 30°F–34°F")
+  it "writes the precipitation with no time" do
+    expect(sentence(condition: "Rain", precipitation: { condition: "snow" }, temperature: { min: 30, max: 34 }))
+      .to eq("Rain with some snow · 30°F–34°F")
   end
 
   it "writes the top of a wind range that starts at zero" do
@@ -55,12 +55,5 @@ RSpec.describe ActivityDescription::WeatherSentence do
   it "writes a negative range with a minus sign and \"to\"" do
     expect(described_class.call(units: metric, condition: "Snow", temperature: { min: -2, max: 2 }, feels_like: { min: -9, max: -5 }))
       .to eq("Snow · −2°C to 2°C (feels like −9°C to −5°C)")
-  end
-
-  describe ".duration" do
-    it "writes minutes, hours, or both" do
-      expect([ 1, 25, 60, 80, 120 ].map { |minutes| described_class.duration(minutes) })
-        .to eq([ "1 minute", "25 minutes", "1 hour", "1 hour 20 minutes", "2 hours" ])
-    end
   end
 end

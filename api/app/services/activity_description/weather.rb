@@ -51,7 +51,23 @@ module ActivityDescription
     HUMID_CELSIUS = 24
 
     # The values that WeatherKit gives for each hour, and that the code interpolates in time.
-    LINEAR_FIELDS = %i[temperature temperatureApparent windSpeed windGust humidity].freeze
+    LINEAR_FIELDS = %i[temperature temperatureApparent windSpeed windGust humidity precipitationIntensity].freeze
+    # The rate of precipitation, in mm/h, from which a sample is wet. Below it, the precipitation
+    # is not measurable.
+    MIN_PRECIPITATION_MM_PER_HOUR = 0.1
+    # The condition code for a wet sample whose hour has a dry code, from the `precipitationType`
+    # of WeatherKit. Each type has steps of [the rate below which the code applies, the code].
+    # ⚠️ The condition codes of WeatherKit miss light rain: an hour with 0.4 mm/h can be "Cloudy".
+    PRECIPITATION_CODES = {
+      "rain" => [ [ 0.5, "Drizzle" ], [ 4.0, "Rain" ], [ Float::INFINITY, "HeavyRain" ] ],
+      "snow" => [ [ 0.5, "Flurries" ], [ 4.0, "Snow" ], [ Float::INFINITY, "HeavySnow" ] ],
+      "sleet" => [ [ Float::INFINITY, "Sleet" ] ],
+      "hail" => [ [ Float::INFINITY, "Hail" ] ],
+      "mixed" => [ [ Float::INFINITY, "MixedRainfall" ] ]
+    }.freeze
+    # The sky-cover codes that are almost the same. The main condition is the family with the most
+    # time, named by its code with the most time. Each other code is a family of its own.
+    SKY_FAMILIES = { "Clear" => :clear, "MostlyClear" => :clear, "PartlyCloudy" => :cloudy, "MostlyCloudy" => :cloudy }.freeze
     COMPASS = %w[N NNE NE ENE E ESE SE SSE S SSW SW WSW W WNW NW NNW].freeze
     EARTH_RADIUS_METERS = 6_371_000.0
 
@@ -377,13 +393,31 @@ module ActivityDescription
         a + ((b - a) * fraction)
       end
 
-      # ⚠️ The condition and the daylight come from the hour that holds the moment, and not from the
-      # nearest hour. WeatherKit gives them for the period that starts at `forecastStart`, thus the
-      # nearest hour moves each rain window 30 minutes too early.
+      # ⚠️ The codes come from the nearest hour, and the rates are linear. Thus the time of each
+      # hour has the same error on each side. Apple says that an hour starts at `forecastStart`,
+      # but its history gives the rain of Open-Meteo at the same stamp, and Open-Meteo stamps the
+      # end of the hour.
+      nearest = fraction < 0.5 ? first : second
       values[:windDirection] = interpolate_direction(first, second, fraction)
-      values[:conditionCode] = first[:conditionCode]
-      values[:daylight] = first[:daylight]
+      values[:conditionCode] = wet_code(nearest[:conditionCode], nearest[:precipitationType], values[:precipitationIntensity])
+      values[:daylight] = nearest[:daylight]
       values
+    end
+
+    # The condition code of a sample. A dry code with a measurable rate of precipitation becomes a
+    # code of PRECIPITATION_CODES. A code that is already precipitation stays the same.
+    # @param code [String, nil] The condition code of the hour.
+    # @param type [String, nil] The `precipitationType` of the hour, for example "rain".
+    # @param intensity [Float, nil] The rate of precipitation, in mm/h.
+    # @return [String, nil]
+    def wet_code(code, type, intensity)
+      return code if code.present? && precipitation_type(code)
+      return code if intensity.to_f < MIN_PRECIPITATION_MM_PER_HOUR
+
+      steps = PRECIPITATION_CODES[type.to_s.downcase]
+      return code if steps.nil?
+
+      steps.find { |limit, _code| intensity < limit }.last
     end
 
     # ⚠️ A direction is an angle, thus the code interpolates it as a vector. A plain average of 350°
@@ -404,14 +438,17 @@ module ActivityDescription
       (Math.atan2(x, y) * 180 / Math::PI) % 360
     end
 
-    # The condition code with the most time in the runs, and whether most of that time was in
-    # daylight. ⚠️ It reads the runs and not the samples, thus a short run that joined its neighbor
+    # The condition code of the SKY_FAMILIES family with the most time in the runs, and whether most
+    # of that time was in daylight. Thus 30% clear and 25% mostly clear win against 45% partly
+    # cloudy. ⚠️ It reads the runs and not the samples, thus a short run that joined its neighbor
     # cannot be the main condition.
     # @return [Hash, nil] { code:, daylight: }
     def main_condition(runs)
       return if runs.empty?
 
-      code, group = runs.group_by { |run| run[:code] }.max_by { |_code, same| same.sum { |run| run[:seconds] } }
+      seconds_of = ->(group) { group.sum { |run| run[:seconds] } }
+      _family, family_runs = runs.group_by { |run| SKY_FAMILIES.fetch(run[:code], run[:code]) }.max_by { |_key, same| seconds_of.call(same) }
+      code, group = family_runs.group_by { |run| run[:code] }.max_by { |_code, same| seconds_of.call(same) }
       seconds = group.sum { |run| run[:seconds] }
       night = group.sum { |run| run[:night] }
       { code: code, daylight: night * 2 <= seconds }
@@ -558,8 +595,8 @@ module ActivityDescription
     end
 
     # The precipitation of another TYPE than the main condition, for part of the activity, as
-    # { condition:, minutes: }. Its time is the total time of that type, and its word is the longest
-    # condition of that type. With more than one such type, the one with the most time.
+    # { condition: }. Its word is the longest condition of that type. With more than one such type,
+    # the one with the most time. The line gives no time: an hourly code cannot give minutes.
     # ⚠️ The type is what stops a repeat: rain with 20 minutes of drizzle is one type, thus the line
     # says "Rain" alone. The type comes from `precipitation` in config/conditions.yml, and not from
     # `adverse_weather`, which also marks wind, haze, smoke, fog, and cold.
@@ -572,7 +609,7 @@ module ActivityDescription
 
       _type, spell = by_type.max_by { |_key, group| group.sum { |run| run[:seconds] } }
       code, = spell.group_by { |run| run[:code] }.max_by { |_key, group| group.sum { |run| run[:seconds] } }
-      { condition: condition_phrase(code).downcase, minutes: (spell.sum { |run| run[:seconds] } / 60.0).round }
+      { condition: condition_phrase(code).downcase }
     end
 
     def precipitation_type(code) = CONDITIONS.dig(code.to_sym, :precipitation)

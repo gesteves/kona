@@ -519,19 +519,28 @@ Thus that shared window is safe.
   hours of each area, and makes each decision: the condition, the rounded numbers, the units, and
   what to omit. `WeatherSentence` only writes the words: the conditions, the temperature, the
   humidity, the wind, and the AQI, with a middot between them, as in the other stat lines. For
-  example `Cloudy with 25 minutes of rain · 11°C–13°C (feels like 8°C–10°C) · 12–18 km/h SSE wind
+  example `Cloudy with some rain · 11°C–13°C (feels like 8°C–10°C) · 12–18 km/h SSE wind
   with 24 km/h gusts (62% headwind) · AQI 54`. A wind range that starts at zero gives its top
   alone, and the gust is the highest one alone. Put a change to what the line holds in `Weather`, and not in the sentence.
   - The main condition is the `simplified` phrase of `config/conditions.yml`, and its `emoji` is
-    there too, with a day and a night variant from the `daylight` of WeatherKit.
+    there too, with a day and a night variant from the `daylight` of WeatherKit. It is the
+    `SKY_FAMILIES` family with the most time, named by its code with the most time. Thus clear and
+    mostly clear count as one, and so do partly cloudy and mostly cloudy.
     ⚠️ A code that the file does not have gets `Weather::FALLBACK_EMOJI`. The line must start
     with a `Composer::STAT_EMOJIS` member, or the next run keeps it as text of the owner and adds
     a second weather line. Add each new WeatherKit code to the file.
-  - ⚠️ **The condition of a sample comes from the hour that holds it**, and not from the nearest
-    hour. WeatherKit gives it for the period that starts at `forecastStart`.
-  - ⚠️ **Precipitation for part of the activity gives only its time**, and only for a TYPE other
-    than the main condition, from `precipitation` in `config/conditions.yml` (rain, snow, ice,
-    mixed). Thus "Rain with 25 minutes of snow", and never "Rain with 20 minutes of heavy rain".
+  - ⚠️ **The condition of a sample comes from the nearest hour, and each rate is linear in
+    time.** Thus the error is the same on each side of an hour. Apple says that an hour starts at
+    `forecastStart`, but the history of WeatherKit gives the rain of Open-Meteo at the same stamp,
+    and Open-Meteo stamps the END of the hour.
+  - ⚠️ **The condition codes of WeatherKit miss light rain**: an hour with 0.4 mm/h can be
+    "Cloudy". Thus a dry code with a `precipitationIntensity` of `MIN_PRECIPITATION_MM_PER_HOUR`
+    or more gets a code of `PRECIPITATION_CODES`, from its `precipitationType` and its rate. A code
+    that is already precipitation does not change.
+  - ⚠️ **Precipitation for part of the activity gives no time**, and only a TYPE other than the
+    main condition gets it, from `precipitation` in `config/conditions.yml` (rain, snow, ice,
+    mixed). Thus "Rain with some snow", and never "Rain with some heavy rain". An hourly code
+    cannot give minutes.
     That flag is not `adverse_weather`, which also marks wind, haze, smoke, fog, and cold.
   - The headwind shows on a bike ride only, at `HEADWIND_MIN_PERCENT` (50) or more, and with a
     mean wind of `HEADWIND_MIN_KPH`. It reads each GPS point, in legs of `LEG_METERS`, and it
