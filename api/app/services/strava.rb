@@ -169,14 +169,14 @@ class Strava < ApplicationService
 
   # Sets the FTP of the athlete. This needs the `profile:write` scope.
   #
-  # ⚠️ Strava documents `weight` only for this PUT. Thus the caller must compare the return value
-  # with the value that it sent.
+  # ⚠️ Strava documents `weight` only for this PUT, but it saves the FTP. The response gives a nil
+  # `ftp`, thus do not read the response to check the write.
   # @param watts [Integer] The FTP in watts.
-  # @return [Integer, nil] The FTP that Strava gives back.
+  # @return [void]
   # @raise [ApplicationService::HttpError] On a failure. A 401 or a 403 means that the scope is absent.
   def update_athlete_ftp!(watts)
-    body = put_json!("#{API_URL}/athlete", body: { ftp: watts }, headers: auth_headers, timeout: REQUEST_TIMEOUT)
-    body&.dig(:ftp)
+    put_json!("#{API_URL}/athlete", body: { ftp: watts }, headers: auth_headers, timeout: REQUEST_TIMEOUT)
+    nil
   end
 
   # Makes the webhook subscription of this app, or finds the one that exists, and stores its id.

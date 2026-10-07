@@ -112,11 +112,12 @@ RSpec.describe Strava do
   end
 
   describe "#update_athlete_ftp!" do
-    it "PUTs the FTP with the stored token and gives the FTP of the response" do
+    it "PUTs the FTP with the stored token" do
       connect!
-      allow(HTTParty).to receive(:put).and_return(http_response({ id: 42, ftp: 265 }))
+      allow(HTTParty).to receive(:put).and_return(http_response({ id: 42, ftp: nil }))
 
-      expect(described_class.new.update_athlete_ftp!(265)).to eq(265)
+      described_class.new.update_athlete_ftp!(265)
+
       expect(HTTParty).to have_received(:put).with(
         "#{Strava::API_URL}/athlete",
         hash_including(body: { ftp: 265 }, headers: hash_including("Authorization" => "Bearer an-access-token"))

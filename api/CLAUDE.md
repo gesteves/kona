@@ -435,7 +435,7 @@ Thus that shared window is safe.
 | `IntervalsWeightJob(kg, date)` | writes the weight to the Intervals.icu wellness record of that day. ⚠️ The controller gives the day, thus a retry after midnight does not move it |
 | `StravaWeightJob(kg)` | writes the weight to the Strava profile. With no connection or no `profile:write` scope, it fails permanently |
 | `IntervalsFtpJob(watts)` | writes the FTP and the indoor FTP to the Ride sport settings of Intervals.icu. ⚠️ It sets both. The indoor FTP has a value, and Intervals.icu uses it for an indoor ride |
-| `StravaFtpJob(watts)` | writes the FTP to the Strava profile. ⚠️ Strava documents `weight` only for that PUT, thus the job compares the FTP in the response and fails permanently when Strava ignores it |
+| `StravaFtpJob(watts)` | writes the FTP to the Strava profile. ⚠️ Strava documents `weight` only for that PUT, but it saves the FTP. The response gives a nil `ftp`, thus the job does not check it |
 | `BlueskyPostJob(posts, index, reply)` | posts one post of a thread to Bluesky, then adds the job of the next. ⚠️ The three post jobs inherit from `SocialPostJob`, which holds the enqueue lock: a retry after the enqueue must not add the next job a second time, and Threads has no idempotency on its side |
 | `MastodonPostJob(posts, index, in_reply_to_id)` | the same, for Mastodon |
 | `ThreadsPostJob(posts, index, reply_to_id)` | the same, for Threads |
