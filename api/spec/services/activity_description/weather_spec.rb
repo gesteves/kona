@@ -27,6 +27,12 @@ RSpec.describe ActivityDescription::Weather do
 
   def south(minutes) = Array.new(minutes) { [ -0.001, 0.0 ] }
 
+  def east(minutes) = Array.new(minutes) { [ 0.0, 0.001 ] }
+
+  def west(minutes) = Array.new(minutes) { [ 0.0, -0.001 ] }
+
+  def stop(minutes) = Array.new(minutes) { [ 0.0, 0.0 ] }
+
   def hour(offset, **fields)
     {
       forecastStart: (start + offset.hours).iso8601, temperature: 10.0, temperatureApparent: 10.0,
@@ -84,6 +90,17 @@ RSpec.describe ActivityDescription::Weather do
 
   it "omits a headwind below HEADWIND_MIN_PERCENT" do
     expect(summary(streams_for(south(30)))).not_to have_key(:headwind_percent)
+    # A square loop: one side of four is into the wind.
+    expect(summary(streams_for(north(15) + east(15) + south(15) + west(15)))).not_to have_key(:headwind_percent)
+  end
+
+  it "gives half of an out-and-back into the wind" do
+    expect(summary(streams_for(north(30) + south(30)))[:headwind_percent]).to be_within(2).of(50)
+  end
+
+  # A stop at a café is not wind from any direction.
+  it "counts the moving time only" do
+    expect(summary(streams_for(north(20) + stop(40) + south(20)))[:headwind_percent]).to be_within(2).of(50)
   end
 
   it "gives the highest gust, only when it is more than the top of the wind range" do
@@ -121,7 +138,7 @@ RSpec.describe ActivityDescription::Weather do
   end
 
   describe "the precipitation" do
-    # 150 minutes: about 90 minutes of the first condition, then about 60 of the second.
+    # 150 minutes: about 120 minutes of the first condition, then about 30 of the second.
     def spell(first, second)
       allow(weather_kit).to receive(:hourly).and_return(
         [ hour(0, conditionCode: first), hour(1, conditionCode: first), hour(2, conditionCode: second), hour(3, conditionCode: second) ]
@@ -133,7 +150,11 @@ RSpec.describe ActivityDescription::Weather do
       result = spell("Cloudy", "Rain")
 
       expect(result[:condition]).to eq("Cloudy")
-      expect(result[:precipitation]).to include(condition: "rain", minutes: be_within(10).of(60))
+      expect(result[:precipitation]).to include(condition: "rain", minutes: be_within(10).of(30))
+    end
+
+    it "counts a storm code as rain" do
+      expect(spell("Cloudy", "ScatteredThunderstorms")[:precipitation]).to include(condition: "scattered thunderstorms")
     end
 
     it "gives a precipitation of another type than the main condition" do
@@ -199,6 +220,19 @@ RSpec.describe ActivityDescription::Weather do
     expect(summary(streams_for(north(61)))[:humidity_percent]).to eq(80)
   end
 
+  # WeatherKit gives the condition for the hour that starts at `forecastStart`.
+  it "takes the condition of the hour that holds the sample, and not of the nearest hour" do
+    allow(weather_kit).to receive(:hourly).and_return([ hour(0, conditionCode: "Cloudy"), hour(1, conditionCode: "Rain") ])
+
+    # 12:35 to 12:55, in the dry hour.
+    result = described_class.new(
+      { start_date: (start + 35.minutes).iso8601 }, streams_for(north(21)), unit: :celsius, weather_kit: weather_kit, air_quality: air_quality
+    ).summary
+
+    expect(result[:condition]).to eq("Cloudy")
+    expect(result).not_to have_key(:precipitation)
+  end
+
   it "names the condition with the most time, with the phrase of config/conditions.yml" do
     allow(weather_kit).to receive(:hourly).and_return(
       [ hour(0, conditionCode: "MostlyCloudy"), hour(1, conditionCode: "MostlyCloudy"), hour(2, conditionCode: "Rain"), hour(3) ]
@@ -212,7 +246,8 @@ RSpec.describe ActivityDescription::Weather do
     allow(weather_kit).to receive(:hourly).and_return([ hour(0, conditionCode: "MostlyClear"), hour(1), hour(2) ])
     streams = [ { type: "time", data: [ 0, 1649, 1659 ] }, { type: "latlng", data: [ 46.0, 46.0, 46.0 ], data2: [ -119.0, -119.0, -119.0 ] } ]
 
-    result = described_class.new({ start_date: (start + 26.minutes).iso8601 }, streams, unit: :celsius, weather_kit: weather_kit, air_quality: air_quality).summary
+    # 12:46 in the MostlyClear hour, then 13:13 in the Clear hour.
+    result = described_class.new({ start_date: (start + 46.minutes).iso8601 }, streams, unit: :celsius, weather_kit: weather_kit, air_quality: air_quality).summary
 
     expect(result[:condition]).to eq("Mostly clear")
   end
@@ -230,12 +265,22 @@ RSpec.describe ActivityDescription::Weather do
     expect(weather(streams_for(north(61))).emoji).to eq("🌧️")
   end
 
-  it "gives no emoji for a condition that config/conditions.yml does not have" do
+  # ⚠️ The line must start with a stat emoji, or the next run keeps it and adds a second one.
+  it "gives FALLBACK_EMOJI for a condition that config/conditions.yml does not have" do
     allow(weather_kit).to receive(:hourly).and_return((0..3).map { |offset| hour(offset, conditionCode: "Unknown") })
 
     result = weather(streams_for(north(61)))
-    expect(result.emoji).to be_nil
+    expect(result.emoji).to eq(described_class::FALLBACK_EMOJI)
     expect(result.summary[:condition]).to eq("Unknown")
+    expect(ActivityDescription::Composer.stat_line?("#{result.emoji} Unknown")).to be(true)
+  end
+
+  it "gives FALLBACK_EMOJI and no condition when WeatherKit gives no condition" do
+    allow(weather_kit).to receive(:hourly).and_return((0..3).map { |offset| hour(offset, conditionCode: nil) })
+
+    result = weather(streams_for(north(61)))
+    expect(result.emoji).to eq(described_class::FALLBACK_EMOJI)
+    expect(result.summary).not_to have_key(:condition)
   end
 
   it "keeps the number of WeatherKit calls at MAX_AREAS on a long route" do
@@ -293,6 +338,36 @@ RSpec.describe ActivityDescription::Weather do
     it "gives the night emoji after sunset" do
       # 1 AM in Richland, Washington.
       expect(fallback(at: Time.utc(2026, 9, 20, 8)).emoji).to eq("🌙")
+    end
+
+    describe "with the weather summary of Intervals.icu" do
+      let(:intervals) { double("Intervals", activity_weather_summary: weather_summary) }
+      let(:weather_summary) { { min_wind_speed: 1.0, max_wind_speed: 4.0, max_wind_gust: 7.0, max_showers: 0.0 } }
+
+      def fallback_with_summary(**fields)
+        described_class.new(
+          { id: "i1", start_date: day.iso8601 }.merge(intervals_weather).merge(fields), streams_for(north(30)),
+          unit: :fahrenheit, weather_kit: weather_kit, air_quality: air_quality, intervals: intervals
+        )
+      end
+
+      it "gives the wind range and the highest gust" do
+        expect(fallback_with_summary.summary[:wind]).to eq(direction: "NNE", speed: { min: 2, max: 9 }, gust: 16)
+        expect(intervals).to have_received(:activity_weather_summary).with("i1")
+      end
+
+      # ⚠️ Intervals.icu keeps the showers apart from the rain.
+      it "names rain for showers alone" do
+        weather_summary[:max_showers] = 0.3
+
+        expect(fallback_with_summary.summary[:condition]).to eq("Rain")
+      end
+
+      it "uses the fields of the activity when the summary fails" do
+        allow(intervals).to receive(:activity_weather_summary).and_return(nil)
+
+        expect(fallback_with_summary.summary[:wind]).to eq(direction: "NNE", speed: { min: 7, max: 7 }, gust: 11)
+      end
     end
 
     it "gives the headwind of a bike ride from HEADWIND_MIN_PERCENT" do

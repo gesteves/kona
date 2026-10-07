@@ -488,9 +488,21 @@ RSpec.describe ActivityDescription::Generator do
         generator.generate!("i1")
       end
 
-      expect(ActivityDescription::Weather).to have_received(:new).with(ride, streams, unit: :celsius, headwind: true)
-      expect(ActivityDescription::Weather).to have_received(:new).with(run, streams, unit: :celsius, headwind: false)
-      expect(ActivityDescription::Weather).to have_received(:new).with(swim, streams, unit: :celsius, headwind: false)
+      expect(ActivityDescription::Weather).to have_received(:new).with(ride, streams, unit: :celsius, headwind: true, intervals: intervals)
+      expect(ActivityDescription::Weather).to have_received(:new).with(run, streams, unit: :celsius, headwind: false, intervals: intervals)
+      expect(ActivityDescription::Weather).to have_received(:new).with(swim, streams, unit: :celsius, headwind: false, intervals: intervals)
+    end
+
+    # ⚠️ A line with no stat emoji would stay as text of the owner, and each run would add one more.
+    it "replaces a weather line of a condition that config/conditions.yml does not have" do
+      allow(intervals).to receive(:activity!).and_return(activity.merge(trainer: false))
+      allow(WeatherKit).to receive(:hourly).and_return(hours.map { |hour| hour.merge(conditionCode: "Unknown") })
+      line = "#{ActivityDescription::Weather::FALLBACK_EMOJI} Unknown · 18°C · 5 km/h S wind"
+      allow(strava).to receive(:activity).and_return(name: "Morning Ride", description: "#{line}\n⚡️ Avg 200 W")
+
+      generator.generate!("i1")
+
+      expect(strava).not_to have_received(:update_activity!)
     end
 
     it "loses only the weather line when the sentence fails" do

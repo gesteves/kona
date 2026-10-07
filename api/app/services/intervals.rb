@@ -91,6 +91,15 @@ class Intervals < ApplicationService
     end
   end
 
+  # Gets the weather summary of the full activity. It has fields that the activity does not have:
+  # the wind range, the highest gust, and the showers. The wind is in m/s.
+  # @return [Hash, nil] The summary, or nil on an error.
+  def activity_weather_summary(activity_id)
+    safely("Intervals.icu", context: "activity_weather_summary") do
+      get_json!("#{INTERVALS_ICU_API_URL}/activity/#{activity_id}/weather-summary", basic_auth: auth)
+    end
+  end
+
   # The wellness record of a date. The keys have no underscores, because a custom field is
   # CamelCase.
   # @param date [Date, String] The date, as YYYY-MM-DD.

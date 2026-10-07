@@ -14,13 +14,18 @@ namespace :activity_weather do
 
     ids.each do |id|
       activity = intervals.activity!(id)
-      cycling = ActivityMatcher.normalize_type(activity[:type]) == "Cycling"
-      streams = intervals.activity_streams(id, types: %w[latlng time])
-      weather = ActivityDescription::Weather.new(activity, streams, unit: unit, headwind: cycling)
-      summary = weather.summary
-
       puts
       puts "== #{id} · #{activity[:name]} · #{activity[:start_date_local]}"
+      if ActivityDescription::Generator.indoor?(activity)
+        puts "(indoor: no weather line)"
+        next
+      end
+
+      cycling = ActivityMatcher.normalize_type(activity[:type]) == "Cycling"
+      streams = intervals.activity_streams(id, types: %w[latlng time])
+      weather = ActivityDescription::Weather.new(activity, streams, unit: unit, headwind: cycling, intervals: intervals)
+      summary = weather.summary
+
       puts summary ? JSON.pretty_generate(summary) : "(no weather)"
       puts [ weather.emoji, ActivityDescription::WeatherSentence.call(summary) ].compact.join(" ") if summary
     end

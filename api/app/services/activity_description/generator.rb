@@ -51,6 +51,16 @@ module ActivityDescription
       end
     end
 
+    # An activity is indoor when it has the trainer flag, a "virtual" activity type, or a Zwift
+    # source. An indoor activity gets no weather line. `rake activity_weather:inspect` also reads it.
+    # @param activity [Hash] The Intervals.icu activity.
+    # @return [Boolean]
+    def self.indoor?(activity)
+      activity[:trainer] == true ||
+        activity[:type].to_s.downcase.include?("virtual") ||
+        activity[:source].to_s.casecmp("zwift").zero?
+    end
+
     private
 
     def run(activity_id)
@@ -110,7 +120,7 @@ module ActivityDescription
       Composer.compose(
         headline: Composer.headline(current[:description]),
         planned: planned_summary_line(activity, sport),
-        weather: weather_line(activity, swim),
+        weather: weather_line(activity),
         water_temp: water_temp_line(activity, swim),
         power: Composer.power_block(activity),
         heat: heat_line(activity, swim),
@@ -246,15 +256,15 @@ module ActivityDescription
     # comes from the condition, and WeatherSentence writes the words. An indoor activity never gets
     # one.
     # @return [String, nil]
-    def weather_line(activity, swim)
-      return if indoor?(activity)
+    def weather_line(activity)
+      return if self.class.indoor?(activity)
 
       weather = nil
       summary = swallow("weather summary") do
         streams = @intervals.activity_streams(activity[:id], types: %w[latlng time])
         # The headwind is for a bike ride only.
         cycling = ActivityMatcher.normalize_type(activity[:type]) == "Cycling"
-        weather = Weather.new(activity, streams, unit: @intervals.temperature_unit, headwind: cycling)
+        weather = Weather.new(activity, streams, unit: @intervals.temperature_unit, headwind: cycling, intervals: @intervals)
         weather.summary
       end
       return if summary.nil?
@@ -318,14 +328,6 @@ module ActivityDescription
       Date.parse(local[0, 10])
     rescue ArgumentError, TypeError
       nil
-    end
-
-    # An activity is indoor when it has the trainer flag, a "virtual" activity type, or a Zwift
-    # source.
-    def indoor?(activity)
-      activity[:trainer] == true ||
-        activity[:type].to_s.downcase.include?("virtual") ||
-        activity[:source].to_s.casecmp("zwift").zero?
     end
 
     # Runs a step that can fail, and it catches each failure. Thus one source with a problem

@@ -164,6 +164,25 @@ HeavySnow:
   icon: snowflakes
   emoji: "❄️"
 
+Hot:
+  adverse_weather: true
+  phrases:
+    currently: it's hot outside
+    forecast: is extremely hot
+    simplified: Hot
+  icon: temperature-high
+  emoji: "🥵"
+
+Hurricane:
+  adverse_weather: true
+  precipitation: rain
+  phrases:
+    currently: there's a hurricane
+    forecast: calls for hurricane conditions
+    simplified: Hurricane
+  icon: hurricane
+  emoji: "🌀"
+
 IsolatedThunderstorms:
   adverse_weather: true
   precipitation: rain
@@ -285,6 +304,16 @@ ScatteredSnowShowers:
   icon: cloud-snow
   emoji: "🌨️"
 
+ScatteredThunderstorms:
+  adverse_weather: true
+  precipitation: rain
+  phrases:
+    currently: there are scattered thunderstorms
+    forecast: calls for scattered thunderstorms
+    simplified: Scattered thunderstorms
+  icon: cloud-bolt
+  emoji: "⛈️"
+
 SevereThunderstorm:
   adverse_weather: true
   precipitation: rain
@@ -333,6 +362,16 @@ SnowShowers:
     simplified: Snow showers
   icon: cloud-hail-mixed
   emoji: "🌨️"
+
+StrongStorms:
+  adverse_weather: true
+  precipitation: rain
+  phrases:
+    currently: there are strong storms
+    forecast: calls for strong storms
+    simplified: Strong storms
+  icon: bolt-lightning
+  emoji: "⛈️"
 
 SunFlurries:
   adverse_weather: true
@@ -391,3 +430,13 @@ Windy:
     simplified: Windy
   icon: wind
   emoji: "🌬️"
+
+WintryMix:
+  adverse_weather: true
+  precipitation: mixed
+  phrases:
+    currently: there's a wintry mix
+    forecast: calls for a wintry mix
+    simplified: Wintry mix
+  icon: cloud-sleet
+  emoji: "🌨️"

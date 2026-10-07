@@ -6,9 +6,9 @@ module ActivityDescription
   # condition, the rounded numbers, the units, and what the line omits.
   #
   # When WeatherKit has no data for the track, for example for an activity older than its history,
-  # the summary comes from the raw weather fields of the Intervals.icu activity. Those fields have no
-  # humidity and no time of precipitation, thus that summary has neither. ⚠️ An activity with no GPS
-  # track gets no weather from either source.
+  # the summary comes from the weather of the Intervals.icu activity. That weather has no humidity
+  # and no time of precipitation, thus that summary has neither. ⚠️ An activity with no GPS track
+  # gets no weather from either source.
   class Weather
     # The time between two samples of the track.
     SAMPLE_SECONDS = 600
@@ -16,9 +16,17 @@ module ActivityDescription
     AREA_RADIUS_METERS = 10_000
     # The most WeatherKit calls for one activity. A longer route makes each area larger.
     MAX_AREAS = 8
-    # The distance over which a sample measures its direction of travel. A shorter distance reads
-    # GPS noise as a direction.
-    BEARING_METERS = 200
+    # The length of one leg of the headwind measurement. A shorter leg reads GPS noise as a
+    # direction, and a longer one cuts the corners of a road with many turns.
+    LEG_METERS = 50
+    # A step between two GPS points is moving time only when it is this short and this fast. A
+    # longer step is a pause, and a slower one is a stop with GPS drift.
+    MAX_STEP_SECONDS = 60
+    MIN_MOVING_MPS = 1.0
+    # ⚠️ The emoji of a condition that config/conditions.yml does not have. It must be in
+    # Composer::STAT_EMOJIS: a weather line with no stat emoji stays at the next run as text of the
+    # owner, and the run adds a second weather line.
+    FALLBACK_EMOJI = "🌡️".freeze
     # A condition that is shorter than this is noise, and the sequence omits it.
     MIN_CONDITION_SECONDS = 900
     # ⚠️ The headwind is the wind within this angle of the direction of travel, on each side.
@@ -55,13 +63,16 @@ module ActivityDescription
     # @param headwind [Boolean] True to measure the headwind, which is for a bike ride only.
     # @param weather_kit [#hourly] The source of the hours. The specs replace it.
     # @param air_quality [#history] The source of the past AQI. The specs replace it.
-    def initialize(activity, streams, unit:, headwind: false, weather_kit: WeatherKit, air_quality: GoogleAirQuality)
+    # @param intervals [#activity_weather_summary, nil] The source of the full weather summary for
+    #   the fallback. With nil, the fallback reads the fields of the activity only.
+    def initialize(activity, streams, unit:, headwind: false, weather_kit: WeatherKit, air_quality: GoogleAirQuality, intervals: nil)
       @activity = activity
       @streams = Array(streams)
       @imperial = unit == :fahrenheit
       @headwind = headwind
       @weather_kit = weather_kit
       @air_quality = air_quality
+      @intervals = intervals
     end
 
     # @return [Hash, nil] The weather of the full activity, in the units of the athlete, for
@@ -70,7 +81,7 @@ module ActivityDescription
     def summary = report&.dig(:summary)
 
     # @return [String, nil] The emoji of the main condition, for its day or its night, from
-    #   config/conditions.yml. Nil when #summary is nil or when the condition is not in that file.
+    #   config/conditions.yml, or FALLBACK_EMOJI. Nil only when #summary is nil.
     def emoji = report&.dig(:emoji)
 
     private
@@ -115,22 +126,21 @@ module ActivityDescription
       main = main_condition(runs)
       summary = aggregate(weathered, runs, main)
       summary[:aqi] = highest_aqi(start, weighted)
-      { summary: summary.compact, emoji: main && condition_emoji(main) }
+      { summary: summary.compact, emoji: condition_emoji(main) }
     end
 
-    # The report from the raw weather fields of the Intervals.icu activity: its temperatures, its
-    # average wind and gust, its prevailing wind, its headwind, its cloud cover, and its highest
-    # rain and snow. The condition comes from the cloud cover, or from the rain or the snow.
-    # ⚠️ The gust is an AVERAGE here, and not the highest one, and the wind has no range: Intervals.icu
-    # gives an average only.
+    # The report from the weather of the Intervals.icu activity: its temperatures, its wind range
+    # and highest gust, its prevailing wind, its headwind, its cloud cover, and its highest rain,
+    # showers, and snow. The condition comes from the cloud cover, or from the precipitation.
     # @return [Hash, nil] Nil when the activity has no weather in Intervals.icu either.
     def intervals_report(start, weighted)
       return unless @activity[:has_weather] && @activity[:min_weather_temp] && @activity[:max_weather_temp]
 
-      code = intervals_condition
-      temperatures = rounded_range(@activity[:min_weather_temp], @activity[:max_weather_temp]) { |value| temperature(value) }
-      feels_like = rounded_range(@activity[:min_feels_like], @activity[:max_feels_like]) { |value| temperature(value) }
-      wind = intervals_wind
+      data = intervals_weather
+      code = intervals_condition(data)
+      temperatures = rounded_range(data[:min_weather_temp], data[:max_weather_temp]) { |value| temperature(value) }
+      feels_like = rounded_range(data[:min_feels_like], data[:max_feels_like]) { |value| temperature(value) }
+      wind = intervals_wind(data)
 
       summary = {
         units: units,
@@ -140,43 +150,55 @@ module ActivityDescription
         wind: wind,
         aqi: highest_aqi(start, weighted)
       }
-      headwind = @activity[:headwind_percent].to_f.round
-      summary[:headwind_percent] = headwind if @headwind && wind && intervals_wind_kph >= HEADWIND_MIN_KPH && headwind >= HEADWIND_MIN_PERCENT
+      headwind = data[:headwind_percent].to_f.round
+      summary[:headwind_percent] = headwind if @headwind && wind && kph(data[:average_wind_speed]) >= HEADWIND_MIN_KPH && headwind >= HEADWIND_MIN_PERCENT
 
       middle = weighted[weighted.size / 2]
       daylight = daylight?(start + middle[:offset], middle[:latitude], middle[:longitude])
       { summary: summary.compact, emoji: condition_emoji(code: code, daylight: daylight) }
     end
 
-    # Snow and rain first, then the cloud cover. The rain and the snow are the highest rates of the
-    # activity, thus any amount names the condition.
+    # The fields of the activity, with the fields of the full weather summary over them. The
+    # activity has an average wind and an average gust only, and no showers.
+    # @return [Hash]
+    def intervals_weather
+      extra = @activity[:id] && @intervals&.activity_weather_summary(@activity[:id])
+      @activity.merge(extra.to_h.compact)
+    end
+
+    # Snow and rain first, then the cloud cover. The precipitation values are the highest rates of
+    # the activity, thus any amount names the condition. ⚠️ Intervals.icu keeps the showers apart
+    # from the rain, thus an activity with showers alone has a `max_rain` of zero.
     # @return [String] A condition code of config/conditions.yml.
-    def intervals_condition
-      rain = @activity[:max_rain].to_f.positive?
-      snow = @activity[:max_snow].to_f.positive?
+    def intervals_condition(data)
+      rain = (data[:max_rain].to_f + data[:max_showers].to_f).positive?
+      snow = data[:max_snow].to_f.positive?
       return "MixedRainAndSnow" if rain && snow
       return "Snow" if snow
       return "Rain" if rain
 
-      clouds = @activity[:average_clouds].to_f
+      clouds = data[:average_clouds].to_f
       CLOUD_CONDITIONS.find { |limit, _code| clouds < limit }&.last || "Cloudy"
     end
 
-    # The average wind in km/h. Intervals.icu gives m/s.
-    def intervals_wind_kph = @activity[:average_wind_speed].to_f * 3.6
+    # @param mps [Numeric, nil] A speed in m/s, which is the unit of Intervals.icu.
+    # @return [Float] The speed in km/h.
+    def kph(mps) = mps.to_f * 3.6
 
-    # The wind of the fallback, in the shape of #wind.
+    # The wind of the fallback, in the shape of #wind. With no range in the data, the range is the
+    # average alone, and with no highest gust, the gust is the average gust.
     # @return [Hash, nil]
-    def intervals_wind
-      average = speed(intervals_wind_kph).round
-      return if average.zero?
+    def intervals_wind(data)
+      average = data[:average_wind_speed]
+      speeds = rounded_range(data[:min_wind_speed] || average, data[:max_wind_speed] || average) { |value| speed(kph(value)) }
+      return if speeds.nil? || speeds[:max].zero?
 
-      gust = speed(@activity[:average_wind_gust].to_f * 3.6).round
-      degrees = @activity[:prevailing_wind_deg]
+      gust = speed(kph(data[:max_wind_gust] || data[:average_wind_gust])).round
+      degrees = data[:prevailing_wind_deg]
       {
         direction: (compass(degrees) if degrees),
-        speed: { min: average, max: average },
-        gust: (gust if gust > average)
+        speed: speeds,
+        gust: (gust if gust > speeds[:max])
       }.compact
     end
 
@@ -234,13 +256,15 @@ module ActivityDescription
 
     # @return [Array<Hash>] Each GPS point with a numeric position, as { offset:, latitude:, longitude: }.
     def track_points
+      return @track_points if defined?(@track_points)
+
       times = stream("time")&.dig(:data)
       latlng = stream("latlng")
       latitudes = latlng&.dig(:data)
       longitudes = latlng&.dig(:data2)
-      return [] if times.blank? || latitudes.blank? || longitudes.blank?
+      return @track_points = [] if times.blank? || latitudes.blank? || longitudes.blank?
 
-      times.each_with_index.filter_map do |offset, index|
+      @track_points = times.each_with_index.filter_map do |offset, index|
         latitude = latitudes[index]
         longitude = longitudes[index]
         next unless offset.is_a?(Numeric) && latitude.is_a?(Numeric) && longitude.is_a?(Numeric)
@@ -249,34 +273,44 @@ module ActivityDescription
       end
     end
 
-    # One point each SAMPLE_SECONDS, and also the last point. Each sample has its direction of
-    # travel, or nil where the athlete did not move BEARING_METERS.
+    # One point each SAMPLE_SECONDS, and also the last point.
     def track_samples
       points = track_points
       return [] if points.empty?
 
       samples = []
       next_offset = points.first[:offset]
-      points.each_with_index do |point, position|
+      points.each do |point|
         next if point[:offset] < next_offset
 
-        samples << point.merge(bearing: travel_bearing(points, position))
+        samples << point
         next_offset = point[:offset] + SAMPLE_SECONDS
       end
-      last = points.size - 1
-      samples << points.last.merge(bearing: travel_bearing(points, last)) unless samples.last[:index] == points.last[:index]
+      samples << points.last unless samples.last[:index] == points.last[:index]
       samples
     end
 
-    # The direction from this point to the first point BEARING_METERS ahead. At the end of the
-    # track it uses the first point BEARING_METERS behind.
-    def travel_bearing(points, position)
-      origin = points[position]
-      ahead = points[(position + 1)..].find { |point| distance(origin, point) >= BEARING_METERS }
-      return bearing(origin, ahead) if ahead
+    # The track in legs of LEG_METERS, for the headwind, as { offset:, bearing:, seconds: }. A leg
+    # starts at a point and ends at the first point LEG_METERS from it. Its seconds are the moving
+    # time only (refer to MAX_STEP_SECONDS), thus a pause or a stop does not count as wind.
+    # @return [Array<Hash>]
+    def track_legs
+      points = track_points
+      return [] if points.size < 2
 
-      behind = points[0...position].reverse.find { |point| distance(point, origin) >= BEARING_METERS }
-      behind && bearing(behind, origin)
+      legs = []
+      origin = points.first
+      seconds = 0.0
+      points.each_cons(2) do |a, b|
+        step = b[:offset] - a[:offset]
+        seconds += step if step.positive? && step <= MAX_STEP_SECONDS && distance(a, b) >= MIN_MOVING_MPS * step
+        next if distance(origin, b) < LEG_METERS
+
+        legs << { offset: origin[:offset], bearing: bearing(origin, b), seconds: seconds }
+        origin = b
+        seconds = 0.0
+      end
+      legs
     end
 
     # Each sample counts for the time from the midpoint before it to the midpoint after it. A track
@@ -343,10 +377,12 @@ module ActivityDescription
         a + ((b - a) * fraction)
       end
 
-      nearest = fraction < 0.5 ? first : second
+      # ⚠️ The condition and the daylight come from the hour that holds the moment, and not from the
+      # nearest hour. WeatherKit gives them for the period that starts at `forecastStart`, thus the
+      # nearest hour moves each rain window 30 minutes too early.
       values[:windDirection] = interpolate_direction(first, second, fraction)
-      values[:conditionCode] = nearest[:conditionCode]
-      values[:daylight] = nearest[:daylight]
+      values[:conditionCode] = first[:conditionCode]
+      values[:daylight] = first[:daylight]
       values
     end
 
@@ -381,9 +417,12 @@ module ActivityDescription
       { code: code, daylight: night * 2 <= seconds }
     end
 
+    # @param main [Hash, nil] { code:, daylight: }, or nil with no condition.
+    # @return [String] The emoji of the condition, or FALLBACK_EMOJI.
     def condition_emoji(main)
-      emoji = CONDITIONS.dig(main[:code].to_sym, :emoji)
-      emoji.is_a?(Hash) ? emoji[main[:daylight] ? :day : :night] : emoji
+      emoji = main && CONDITIONS.dig(main[:code].to_sym, :emoji)
+      emoji = emoji[main[:daylight] ? :day : :night] if emoji.is_a?(Hash)
+      emoji || FALLBACK_EMOJI
     end
 
     # The words of a condition code, from the `simplified` phrase of config/conditions.yml.
@@ -406,7 +445,7 @@ module ActivityDescription
         precipitation: precipitation_spell(runs, main)
       }
       if headwind?(samples, share)
-        percent = headwind_percent(samples, share)
+        percent = headwind_percent(samples)
         result[:headwind_percent] = percent if percent && percent >= HEADWIND_MIN_PERCENT
       end
       result.compact
@@ -538,25 +577,30 @@ module ActivityDescription
 
     def precipitation_type(code) = CONDITIONS.dig(code.to_sym, :precipitation)
 
-    # @return [Boolean] True for an activity that is not a swim, with a mean wind of at least
-    #   HEADWIND_MIN_KPH.
+    # @return [Boolean] True for a bike ride with a mean wind of at least HEADWIND_MIN_KPH.
     def headwind?(samples, share)
       @headwind && mean(samples, :windSpeed, share).to_f >= HEADWIND_MIN_KPH
     end
 
-    # The share of the time with a direction of travel where the wind comes from ahead.
+    # The share of the moving time where the wind comes from ahead. Each leg of #track_legs gets
+    # the wind direction of the sample nearest to it in time, because the wind changes slowly.
     # ⚠️ WeatherKit gives the direction that the wind comes FROM. Thus a headwind is a wind
     # direction near the direction of travel, and not near its opposite.
-    def headwind_percent(samples, share)
-      measured = samples.select { |sample| sample[:bearing] && sample[:weather][:windDirection] }
-      weight = measured.sum(&share)
-      return if measured.empty? || weight.zero?
+    # @return [Integer, nil] Nil when no leg has moving time and a wind direction.
+    def headwind_percent(samples)
+      winds = samples.select { |sample| sample[:weather][:windDirection] }
+      return if winds.empty?
 
-      ahead = measured.select do |sample|
-        difference = (sample[:weather][:windDirection] - sample[:bearing]).abs % 360
+      measured = track_legs.select { |leg| leg[:seconds].positive? }
+      weight = measured.sum { |leg| leg[:seconds] }
+      return if weight.zero?
+
+      ahead = measured.select do |leg|
+        wind = winds.min_by { |sample| (sample[:offset] - leg[:offset]).abs }[:weather][:windDirection]
+        difference = (wind - leg[:bearing]).abs % 360
         [ difference, 360 - difference ].min <= HEADWIND_DEGREES
       end
-      (ahead.sum(&share) * 100.0 / weight).round
+      (ahead.sum { |leg| leg[:seconds] } * 100.0 / weight).round
     end
 
     def distance(a, b)

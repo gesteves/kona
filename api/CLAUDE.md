@@ -524,21 +524,28 @@ Thus that shared window is safe.
   alone, and the gust is the highest one alone. Put a change to what the line holds in `Weather`, and not in the sentence.
   - The main condition is the `simplified` phrase of `config/conditions.yml`, and its `emoji` is
     there too, with a day and a night variant from the `daylight` of WeatherKit.
+    ⚠️ A code that the file does not have gets `Weather::FALLBACK_EMOJI`. The line must start
+    with a `Composer::STAT_EMOJIS` member, or the next run keeps it as text of the owner and adds
+    a second weather line. Add each new WeatherKit code to the file.
+  - ⚠️ **The condition of a sample comes from the hour that holds it**, and not from the nearest
+    hour. WeatherKit gives it for the period that starts at `forecastStart`.
   - ⚠️ **Precipitation for part of the activity gives only its time**, and only for a TYPE other
     than the main condition, from `precipitation` in `config/conditions.yml` (rain, snow, ice,
     mixed). Thus "Rain with 25 minutes of snow", and never "Rain with 20 minutes of heavy rain".
     That flag is not `adverse_weather`, which also marks wind, haze, smoke, fog, and cold.
   - The headwind shows on a bike ride only, at `HEADWIND_MIN_PERCENT` (50) or more, and with a
-    mean wind of `HEADWIND_MIN_KPH`.
+    mean wind of `HEADWIND_MIN_KPH`. It reads each GPS point, in legs of `LEG_METERS`, and it
+    counts the moving time only. Thus a stop does not count as wind.
   - **The AQI is the highest of three points**: the start, the middle, and the end, from
     `GoogleAirQuality.history`, whatever its value. ⚠️ Google keeps 30 days, thus an older activity
     gets no AQI, and the line then has no AQI part.
-  - **With no WeatherKit data, the raw weather fields of the Intervals.icu activity give the line**
-    (`min_weather_temp`, `average_wind_speed`, `prevailing_wind_deg`, `average_clouds`, `max_rain`,
-    and more). ⚠️ They have no condition, thus the code derives one from the rain, the snow, and the
-    cloud cover (`CLOUD_CONDITIONS`), and the day or night emoji from the position of the sun. The
-    wind is an average with no range, and the gust is an average too. There is no humidity and no
-    time of precipitation. ⚠️ An activity with no GPS track gets no weather from either source.
+  - **With no WeatherKit data, the weather of the Intervals.icu activity gives the line**: the
+    fields of the activity, and `Intervals#activity_weather_summary` over them for the wind range,
+    the highest gust, and `max_showers`. The wind is in m/s. ⚠️ They have no condition, thus the
+    code derives one from the rain, the showers, the snow, and the cloud cover (`CLOUD_CONDITIONS`),
+    and the day or night emoji from the position of the sun. ⚠️ Intervals.icu keeps the showers
+    apart from the rain. There is no humidity and no time of precipitation. ⚠️ An activity with no
+    GPS track gets no weather from either source.
   - `rake "activity_weather:inspect[<ids>]"` prints the data and the line, and it writes nothing.
     WeatherKit keeps approximately four years of hours.
 - ⚠️ **Turnstile protects the JSON path only** (`request.format.json?`). Thus a POST from a script

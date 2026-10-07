@@ -29,10 +29,12 @@ module ActivityDescription
     end
 
     # "Cloudy", or "Cloudy with 25 minutes of rain" for precipitation during part of the activity.
-    # @return [String]
+    # @return [String, nil] Nil with no condition, thus the line does not start with a separator.
     def conditions(summary)
+      condition = summary[:condition].presence
+      return if condition.nil?
+
       spell = summary[:precipitation]
-      condition = summary[:condition].to_s
       spell ? "#{condition} with #{duration(spell[:minutes])} of #{spell[:condition]}" : condition
     end
 

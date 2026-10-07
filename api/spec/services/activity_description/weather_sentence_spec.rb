@@ -13,6 +13,10 @@ RSpec.describe ActivityDescription::WeatherSentence do
     )).to eq("Clear · 64°F–71°F (feels like 62°F–72°F) · 3 mph WNW wind with 6 mph gusts")
   end
 
+  it "starts with the temperature when the summary has no condition" do
+    expect(described_class.call(units: { temperature: "°C", wind: "km/h" }, temperature: { min: 11, max: 13 })).to eq("11°C–13°C")
+  end
+
   it "writes no wind for a calm activity, and one temperature when the range has one value" do
     expect(sentence(condition: "Mostly clear", temperature: { min: 70, max: 70 })).to eq("Mostly clear · 70°F")
   end
