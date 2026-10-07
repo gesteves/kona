@@ -403,7 +403,10 @@ event can then only start the description of one of our own activities again.
   connection. A true one shows on the Connected apps card at the next token refresh.
 - ⚠️ **Strava sends the event before Intervals.icu has the activity**, or before it knows the Strava
   id. Thus `StravaActivityJob` raises on a miss and tries again with the usual waits of Sidekiq,
-  which start at approximately 15 seconds, for the 24-hour window of `ApplicationJob`.
+  which start at approximately 15 seconds, for the 24-hour window of `ApplicationJob`. ⚠️ Bugsnag
+  discards `ActivityNotSynced`, because a miss is the normal wait. When the 24 hours end, the job
+  logs a warning and adds `StravaNameJob`: the activity then gets the Rouvy rename and no
+  description.
 - **`rake strava:subscribe` makes the subscription**, or finds the one that exists, and stores its id
   at `strava:subscription_id`. ⚠️ Strava permits ONE subscription for each app, and it GETs the
   callback with a challenge before it answers. Thus deploy `STRAVA_WEBHOOK_VERIFY_TOKEN` first. With
@@ -424,7 +427,8 @@ Thus that shared window is safe.
 | `AssetBlurhashJob(asset_id)` | Makes the blurhash placeholder of one image asset. It fails soft. |
 | `SiteBuildJob(event_type)` | fires a GitHub `repository_dispatch` to rebuild the web site. ⚠️ The one job that a caller schedules, with `perform_at` |
 | `WhoopWebhookJob(event_type, resource_id, trace_id)` | syncs Whoop metrics to Intervals.icu |
-| `StravaActivityJob(strava_id, event_time)` | finds the Intervals.icu activity of a new Strava activity, then adds its description job. A miss raises and retries |
+| `StravaActivityJob(strava_id, event_time)` | finds the Intervals.icu activity of a new Strava activity, then adds its description job. A miss raises and retries. When the retries end, it adds `StravaNameJob` |
+| `StravaNameJob(strava_id)` | corrects the Rouvy name of a Strava activity with no Intervals.icu data, for an activity that never gets a description |
 | `ActivityDescriptionJob(activity_id)` | (re)generates an activity's description and tidies its name, and PUTs both to Strava |
 | `LocationSyncJob(latitude, longitude)` | propagates the current location to Intervals.icu |
 | `IntervalsWeightJob(kg, date)` | writes the weight to the Intervals.icu wellness record of that day. ⚠️ The controller gives the day, thus a retry after midnight does not move it |

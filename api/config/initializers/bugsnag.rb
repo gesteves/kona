@@ -20,4 +20,9 @@ Bugsnag.configure do |config|
   # correct UTF-8. Nobody can act on that report. Refer to the filter for the reason that it applies
   # to that one endpoint.
   config.add_on_error(->(report) { ContactBadRequestFilter.call(report) })
+
+  # Removes each "not synced yet" miss of StravaActivityJob. A miss is the normal wait for
+  # Intervals.icu, and the job logs the last one. ⚠️ This is a string, because the job class does not
+  # load before this file.
+  config.discard_classes << "StravaActivityJob::ActivityNotSynced"
 end

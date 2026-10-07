@@ -2,13 +2,17 @@
 #
 # Strava sends the webhook before Intervals.icu has the activity, or before Intervals.icu knows its
 # Strava id. Thus a miss raises, and the job tries again with the usual waits of Sidekiq, which
-# start at approximately 15 seconds, for the 24 hours of ApplicationJob.
+# start at approximately 15 seconds, for the 24 hours of ApplicationJob. When those 24 hours end, the
+# activity gets the Rouvy rename of StravaNameJob and no description.
 class StravaActivityJob < ApplicationJob
-  # The Intervals.icu activity is not there yet.
+  # The Intervals.icu activity is not there yet. ⚠️ Bugsnag discards it, because a miss is the normal
+  # wait. Refer to config/initializers/bugsnag.rb.
   class ActivityNotSynced < StandardError; end
 
   sidekiq_retries_exhausted do |msg, exception|
-    Rails.logger.warn("Strava activity #{msg['args'].first}: no description (#{exception.message})")
+    strava_id = msg["args"].first
+    Rails.logger.warn("Strava activity #{strava_id}: no description, Rouvy rename only (#{exception.message})")
+    StravaNameJob.perform_async(strava_id)
   end
 
   # @param strava_id [String] The Strava activity id.

@@ -32,4 +32,16 @@ RSpec.describe StravaActivityJob do
     expect(described_class.get_sidekiq_options["retry_for"]).to eq(24.hours)
     expect(described_class.sidekiq_retry_in_block.call(0, described_class::ActivityNotSynced.new)).to be_nil
   end
+
+  it "adds the Rouvy rename when the retries end" do
+    exception = described_class::ActivityNotSynced.new("not there")
+    described_class.sidekiq_retries_exhausted_block.call({ "args" => [ "123", event_time ] }, exception)
+
+    expect(StravaNameJob).to have_enqueued_sidekiq_job("123")
+  end
+
+  # A miss is the normal wait for Intervals.icu, thus each attempt must not give a report.
+  it "is discarded by Bugsnag" do
+    expect(Bugsnag.configuration.discard_classes).to include(described_class::ActivityNotSynced.name)
+  end
 end
