@@ -138,4 +138,32 @@ RSpec.describe WeatherKit do
       expect(ttl).to be_between(1, WeatherKit::HOURLY_TTL.to_i)
     end
   end
+  describe ".moon_phase" do
+    let(:days) { [ { forecastStart: "2026-09-20T00:00:00Z", moonPhase: "waxingGibbous" } ] }
+
+    before do
+      allow(HTTParty).to receive(:get).and_return(response({ forecastDaily: { days: days } }.to_json))
+    end
+
+    it "asks for the daily data set of the UTC day that holds the moment" do
+      expect(described_class.moon_phase(46.21, -119.16, Time.utc(2026, 9, 20, 4, 30))).to eq("waxingGibbous")
+
+      expect(HTTParty).to have_received(:get).once.with(
+        "#{WeatherKit::WEATHERKIT_API_URL}weather/en/46.21/-119.16",
+        hash_including(query: { dataSets: "forecastDaily", dailyStart: "2026-09-20T00:00:00Z", dailyEnd: "2026-09-21T00:00:00Z", timezone: "UTC" })
+      )
+    end
+
+    it "keeps the day in the cache" do
+      2.times { described_class.moon_phase(46.21, -119.16, Time.utc(2026, 9, 20, 4, 30)) }
+
+      expect(HTTParty).to have_received(:get).once
+    end
+
+    it "gives nil with no day" do
+      allow(HTTParty).to receive(:get).and_return(response({ forecastDaily: { days: [] } }.to_json))
+
+      expect(described_class.moon_phase(46.21, -119.16, Time.utc(2026, 9, 20, 4, 30))).to be_nil
+    end
+  end
 end

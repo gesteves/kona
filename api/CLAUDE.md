@@ -532,6 +532,14 @@ Thus that shared window is safe.
     ⚠️ A code that the file does not have gets `Weather::FALLBACK_EMOJI`. The line must start
     with a `Composer::STAT_EMOJIS` member, or the next run keeps it as text of the owner and adds
     a second weather line. Add each new WeatherKit code to the file.
+  - **Two rules replace the emoji of the condition.** When the condition is not
+    `adverse_weather` and no precipitation fell, a feels-like above `HOT_FEELS_LIKE_CELSIUS`
+    (95°F) gives 🥵, and one below `COLD_FEELS_LIKE_CELSIUS` (32°F) gives 🥶. The temperature does
+    not count. ⚠️ These limits are not the ones of
+    `WeatherSummaryPresenter#hot?` and `#bad_weather?`, on purpose. A clear
+    night gives the moon phase of the day (`WeatherKit.moon_phase`, one call to the daily data set)
+    in place of 🌙, and 🌙 stays when that call fails. Each of these emoji is in
+    `Composer::STAT_EMOJIS`.
   - ⚠️ **The condition of a sample comes from the nearest hour, and each rate is linear in
     time.** Thus the error is the same on each side of an hour. Apple says that an hour starts at
     `forecastStart`, but the history of WeatherKit gives the rain of Open-Meteo at the same stamp,

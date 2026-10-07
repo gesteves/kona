@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe ActivityDescription::Weather do
   let(:start) { Time.utc(2026, 9, 20, 12) }
   let(:activity) { { start_date: start.iso8601 } }
-  let(:weather_kit) { double("WeatherKit") }
+  let(:weather_kit) { double("WeatherKit", moon_phase: nil) }
   let(:air_quality) { double("GoogleAirQuality", history: nil) }
 
   # A track with one point each minute. Each step moves the given degrees of latitude and longitude.
@@ -313,6 +313,69 @@ RSpec.describe ActivityDescription::Weather do
 
     allow(weather_kit).to receive(:hourly).and_return((0..3).map { |offset| hour(offset, daylight: false) })
     expect(weather(streams_for(north(61))).emoji).to eq("🌙")
+  end
+
+  describe "the moon" do
+    before { allow(weather_kit).to receive(:hourly).and_return((0..3).map { |offset| hour(offset, daylight: false) }) }
+
+    it "gives the moon phase of the night in place of the crescent moon" do
+      allow(weather_kit).to receive(:moon_phase).and_return("waxingGibbous")
+
+      expect(weather(streams_for(north(61))).emoji).to eq("🌔")
+      expect(weather_kit).to have_received(:moon_phase).with(a_value_within(0.01).of(46.03), -119.0, start + 30.minutes)
+    end
+
+    it "keeps the crescent moon with no phase, or when the call fails" do
+      expect(weather(streams_for(north(61))).emoji).to eq("🌙")
+
+      allow(ErrorReporter).to receive(:report_upstream)
+      allow(weather_kit).to receive(:moon_phase).and_raise("timeout")
+      expect(weather(streams_for(north(61))).emoji).to eq("🌙")
+    end
+
+    it "asks for no phase in daylight or under clouds" do
+      allow(weather_kit).to receive(:hourly).and_return((0..3).map { |offset| hour(offset, daylight: false, conditionCode: "Cloudy") })
+
+      expect(weather(streams_for(north(61))).emoji).to eq("☁️")
+      expect(weather_kit).not_to have_received(:moon_phase)
+    end
+  end
+
+  describe "a hot or a cold activity" do
+    def emoji_with(**fields)
+      allow(weather_kit).to receive(:hourly).and_return((0..3).map { |offset| hour(offset, **fields) })
+      weather(streams_for(north(61))).emoji
+    end
+
+    it "gives the hot face above 95°F of feels-like, and not from the temperature" do
+      expect(emoji_with(temperature: 33.0, temperatureApparent: 35.1)).to eq("🥵")
+      expect(emoji_with(temperature: 36.0, temperatureApparent: 35.0)).to eq("☀️")
+    end
+
+    it "gives the cold face below 32°F of feels-like, and not from the temperature" do
+      expect(emoji_with(temperature: 3.0, temperatureApparent: -0.1)).to eq("🥶")
+      expect(emoji_with(temperature: -1.0, temperatureApparent: 0.0)).to eq("☀️")
+    end
+
+    it "keeps the emoji of adverse weather" do
+      expect(emoji_with(temperatureApparent: 36.0, conditionCode: "Windy")).to eq("🌬️")
+      expect(emoji_with(temperatureApparent: -15.0, conditionCode: "Snow")).to eq("🌨️")
+    end
+
+    it "keeps the emoji of an activity with precipitation for part of it" do
+      allow(weather_kit).to receive(:hourly).and_return(
+        [ hour(0, temperatureApparent: 36.0), hour(1, temperatureApparent: 36.0),
+          hour(2, temperatureApparent: 36.0, conditionCode: "Rain"), hour(3, temperatureApparent: 36.0, conditionCode: "Rain") ]
+      )
+
+      expect(weather(streams_for(north(150))).emoji).to eq("☀️")
+    end
+
+    it "is a stat emoji, as each moon phase is" do
+      [ described_class::HOT_EMOJI, described_class::COLD_EMOJI, *described_class::MOON_EMOJI.values ].each do |emoji|
+        expect(ActivityDescription::Composer.stat_line?("#{emoji} Clear")).to be(true)
+      end
+    end
   end
 
   it "gives the one emoji of a condition with no day and night variants" do

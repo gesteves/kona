@@ -9,12 +9,13 @@ module ActivityDescription
   module Composer
     # The emoji that start each stat line, with no U+FE0F. ⚠️ Only these mark a line that the code
     # wrote, thus a line that the owner starts with another emoji, for example "🏅 New PR", stays.
-    # The set holds the emoji of each condition, and each weather emoji that the LLM selected in
-    # older descriptions.
+    # The set holds the emoji of each condition, the hot, cold, and moon-phase emoji of Weather, and
+    # each weather emoji that the LLM selected in older descriptions.
     VARIATION_SELECTOR = "\uFE0F".freeze
     STAT_EMOJIS = (
       %w[🗓️ 💧 ⚡️ 🌡️ 🔥 ☀️ 🌤️ ⛅ 🌥️ ☁️ 🌦️ 🌧️ ⛈️ 🌩️ 🌨️ ❄️ 🌬️ 🌫️ 🌪️ 🌙] +
-      CONDITIONS.values.flat_map { |condition| Array(condition[:emoji].is_a?(Hash) ? condition[:emoji].values : condition[:emoji]) }
+      CONDITIONS.values.flat_map { |condition| Array(condition[:emoji].is_a?(Hash) ? condition[:emoji].values : condition[:emoji]) } +
+      Weather::MOON_EMOJI.values + [ Weather::HOT_EMOJI, Weather::COLD_EMOJI ]
     ).compact.map { |emoji| emoji.delete(VARIATION_SELECTOR) }.uniq.freeze
 
     # The emoji of the map line that Zwift writes in the description, for example

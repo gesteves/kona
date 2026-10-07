@@ -6,7 +6,7 @@ Blizzard:
     forecast: calls for blizzard conditions
     simplified: Blizzard
   icon: snow-blowing
-  emoji: "🌨️"
+  emoji: "❄️"
 
 BlowingDust:
   adverse_weather: true
@@ -351,7 +351,7 @@ Snow:
     forecast: calls for snow
     simplified: Snow
   icon: snowflake
-  emoji: "❄️"
+  emoji: "🌨️"
 
 SnowShowers:
   adverse_weather: true
@@ -391,7 +391,9 @@ SunShowers:
     forecast: calls for sun and rain
     simplified: Sun showers
   icon: cloud-sun-rain
-  emoji: "🌦️"
+  emoji:
+    day: "🌦️"
+    night: "🌧️"
 
 Thunderstorms:
   adverse_weather: true

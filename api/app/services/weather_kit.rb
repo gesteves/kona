@@ -53,6 +53,20 @@ class WeatherKit < ApplicationService
     new(latitude, longitude, nil, nil).hourly(from: from, to: to)
   end
 
+  # The time that the cache holds a past day. The moon phase of a day never changes.
+  DAILY_TTL = 1.day
+
+  # Gets the moon phase of the UTC day that holds a moment, which can be in the past. The hourly
+  # data set has no moon phase, thus this is a separate call to the daily data set.
+  # @param latitude [Float]
+  # @param longitude [Float]
+  # @param time [Time]
+  # @return [String, nil] The `moonPhase` of WeatherKit, for example "waxingGibbous", or nil on a
+  #   failure.
+  def self.moon_phase(latitude, longitude, time)
+    new(latitude, longitude, nil, nil).moon_phase(time)
+  end
+
   # @return [OpenStruct, nil] The weather data, with snake_case keys and dot access, or nil.
   def data
     fetch_wrapped { underscore_keys(get_weather) }
@@ -80,6 +94,30 @@ class WeatherKit < ApplicationService
         response&.dig(:forecastHourly, :hours)
       end
     end
+  end
+
+  # Refer to WeatherKit.moon_phase. ⚠️ The daily data set needs a timezone, and the day only has
+  # to hold the moment, thus UTC is correct for each location.
+  def moon_phase(time)
+    return unless coordinates?
+
+    start = time.utc.beginning_of_day
+    cache_key = "weatherkit:daily:#{@latitude}:#{@longitude}:#{start.iso8601}"
+    days = cached_json(cache_key, expires_in: DAILY_TTL, empty_expires_in: EMPTY_TTL) do
+      with_retries do
+        jwt = token
+        next if jwt.blank?
+
+        response = get_json!(
+          "#{WEATHERKIT_API_URL}weather/en/#{@latitude}/#{@longitude}",
+          query: { dataSets: "forecastDaily", dailyStart: start.iso8601, dailyEnd: (start + 1.day).iso8601, timezone: "UTC" },
+          headers: { "Authorization" => "Bearer #{jwt}" },
+          timeout: HOURLY_HTTP_TIMEOUT
+        )
+        response&.dig(:forecastDaily, :days)
+      end
+    end
+    days&.first&.dig(:moonPhase).presence
   end
 
   private

@@ -27,6 +27,22 @@ module ActivityDescription
     # Composer::STAT_EMOJIS: a weather line with no stat emoji stays at the next run as text of the
     # owner, and the run adds a second weather line.
     FALLBACK_EMOJI = "🌡️".freeze
+    # The emoji of a hot or a cold activity whose condition is not adverse weather. A hot activity
+    # has a feels-like above HOT_FEELS_LIKE_CELSIUS (95°F) at some point, and a cold one has a
+    # feels-like below COLD_FEELS_LIKE_CELSIUS (32°F) at some point. The temperature does not count.
+    # ⚠️ These are not the limits of WeatherSummaryPresenter#hot? and #bad_weather?, on purpose:
+    # the owner chose them for this emoji.
+    HOT_FEELS_LIKE_CELSIUS = 35
+    COLD_FEELS_LIKE_CELSIUS = 0
+    HOT_EMOJI = "🥵".freeze
+    COLD_EMOJI = "🥶".freeze
+    # The night emoji of a clear sky. The moon phase of WeatherKit replaces it when it is available.
+    NIGHT_EMOJI = "🌙".freeze
+    # The emoji of each `moonPhase` of WeatherKit. Composer::STAT_EMOJIS holds each one.
+    MOON_EMOJI = {
+      "new" => "🌑", "waxingCrescent" => "🌒", "firstQuarter" => "🌓", "waxingGibbous" => "🌔",
+      "full" => "🌕", "waningGibbous" => "🌖", "thirdQuarter" => "🌗", "waningCrescent" => "🌘"
+    }.freeze
     # A condition that is shorter than this is noise, and the sequence omits it.
     MIN_CONDITION_SECONDS = 900
     # ⚠️ The headwind is the wind within this angle of the direction of travel, on each side.
@@ -142,7 +158,12 @@ module ActivityDescription
       main = main_condition(runs)
       summary = aggregate(weathered, runs, main)
       summary[:aqi] = highest_aqi(start, weighted)
-      { summary: summary.compact, emoji: condition_emoji(main) }
+      adverse = adverse?(main&.dig(:code)) || summary[:precipitation].present?
+      emoji = report_emoji(
+        condition_emoji(main), adverse: adverse, start: start, samples: weighted,
+        feels_like: weathered.map { |sample| sample[:weather][:temperatureApparent] }
+      )
+      { summary: summary.compact, emoji: emoji }
     end
 
     # The report from the weather of the Intervals.icu activity: its temperatures, its wind range
@@ -171,7 +192,42 @@ module ActivityDescription
 
       middle = weighted[weighted.size / 2]
       daylight = daylight?(start + middle[:offset], middle[:latitude], middle[:longitude])
-      { summary: summary.compact, emoji: condition_emoji(code: code, daylight: daylight) }
+      emoji = report_emoji(
+        condition_emoji(code: code, daylight: daylight), adverse: adverse?(code), start: start, samples: weighted,
+        feels_like: data.values_at(:min_feels_like, :max_feels_like)
+      )
+      { summary: summary.compact, emoji: emoji }
+    end
+
+    # The emoji of the line: HOT_EMOJI or COLD_EMOJI for a hot or a cold activity with no adverse
+    # weather, else the emoji of the condition, with the moon phase in place of NIGHT_EMOJI.
+    # @param emoji [String] The emoji of the main condition.
+    # @param adverse [Boolean] True when the condition is adverse weather, or when it rained or
+    #   snowed during part of the activity.
+    # @param feels_like [Array<Numeric, nil>] Each feels-like, in °C.
+    # @return [String]
+    def report_emoji(emoji, adverse:, feels_like:, start:, samples:)
+      feels_like = feels_like.compact
+      unless adverse || feels_like.empty?
+        return HOT_EMOJI if feels_like.max > HOT_FEELS_LIKE_CELSIUS
+        return COLD_EMOJI if feels_like.min < COLD_FEELS_LIKE_CELSIUS
+      end
+      return emoji unless emoji == NIGHT_EMOJI
+
+      moon_emoji(start, samples) || emoji
+    end
+
+    # @return [Boolean] True for a code that config/conditions.yml marks as adverse weather.
+    def adverse?(code) = code.present? && CONDITIONS.dig(code.to_sym, :adverse_weather) == true
+
+    # The moon phase at the middle of the activity. A failure loses the phase only.
+    # @return [String, nil] An emoji of MOON_EMOJI, or nil.
+    def moon_emoji(start, samples)
+      middle = samples[samples.size / 2]
+      MOON_EMOJI[@weather_kit.moon_phase(middle[:latitude], middle[:longitude], start + middle[:offset])]
+    rescue StandardError => e
+      ErrorReporter.report_upstream(e, service: "WeatherKit", context: "activity moon phase")
+      nil
     end
 
     # The fields of the activity, with the fields of the full weather summary over them. The
