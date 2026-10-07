@@ -162,4 +162,23 @@ RSpec.describe ActivityDescription::Composer do
       expect(described_class.compose).to eq("")
     end
   end
+  describe "the map line of Zwift" do
+    let(:description) { "Felt good today\n\n🗺️ Waisted 8 in Watopia\n⚡️ Avg 200 W" }
+
+    it "finds the line, with or without the variation selector" do
+      expect(described_class.map_line(description)).to eq("🗺️ Waisted 8 in Watopia")
+      expect(described_class.map_line("🗺 Volcano Circuit")).to eq("🗺 Volcano Circuit")
+      expect(described_class.map_line("Felt good")).to be_nil
+    end
+
+    it "removes the line from the headline only when asked" do
+      expect(described_class.headline(description, map: true)).to eq("Felt good today")
+      expect(described_class.headline(description)).to eq("Felt good today\n\n🗺️ Waisted 8 in Watopia")
+    end
+
+    it "puts the line at the top of the stat lines, with no blank line" do
+      expect(described_class.compose(headline: "Felt good today", map: "🗺️ Waisted 8 in Watopia", power: "⚡️ Avg 200 W"))
+        .to eq("Felt good today\n\n🗺️ Waisted 8 in Watopia\n⚡️ Avg 200 W")
+    end
+  end
 end

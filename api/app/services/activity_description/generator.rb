@@ -58,8 +58,12 @@ module ActivityDescription
     def self.indoor?(activity)
       activity[:trainer] == true ||
         activity[:type].to_s.downcase.include?("virtual") ||
-        activity[:source].to_s.casecmp("zwift").zero?
+        zwift?(activity)
     end
+
+    # @param activity [Hash] The Intervals.icu activity.
+    # @return [Boolean] True for an activity that Zwift uploaded.
+    def self.zwift?(activity) = activity[:source].to_s.casecmp("zwift").zero?
 
     private
 
@@ -117,8 +121,11 @@ module ActivityDescription
     # @return [String, nil]
     def compose_description(activity, sport, current)
       swim = sport == "Swimming"
+      # The map line of a Zwift activity goes at the top of the stat lines, and not in the headline.
+      zwift = self.class.zwift?(activity)
       Composer.compose(
-        headline: Composer.headline(current[:description]),
+        headline: Composer.headline(current[:description], map: zwift),
+        map: (Composer.map_line(current[:description]) if zwift),
         planned: planned_summary_line(activity, sport),
         weather: weather_line(activity),
         water_temp: water_temp_line(activity, swim),

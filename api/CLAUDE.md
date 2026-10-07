@@ -473,8 +473,11 @@ Thus that shared window is safe.
   counts a race leg: race day must not read as a rest day. The prompt is in `app/prompts/`, and the
   job omits that line with no `ANTHROPIC_API_KEY`. It keeps the text that the user wrote above the
   stat block: ⚠️ `Composer.headline` removes only a line that starts with an emoji of
-  `Composer::STAT_EMOJIS`, thus a line of the owner that starts with another emoji stays. It writes
-  no description that Strava already has. A
+  `Composer::STAT_EMOJIS`, thus a line of the owner that starts with another emoji stays.
+  ⚠️ **The one exception is the 🗺️ map line that Zwift writes.** For an activity whose
+  Intervals.icu `source` is `ZWIFT`, the code moves that line to the top of the stat lines, with
+  no blank line. 🗺️ is not a stat emoji, thus a 🗺️ line on any other activity stays in the
+  headline. It writes no description that Strava already has. A
   Redis lock stops a second job for the same activity, and that job runs again a minute later. The
   same PUT also corrects a name from Rouvy (`ROUVY - <route> - <date>` becomes `Rouvy - <route>`),
   thus it can write even when the description is empty.

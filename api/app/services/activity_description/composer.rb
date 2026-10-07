@@ -2,9 +2,10 @@ module ActivityDescription
   # Functions that make the blocks of the description and put them together, and the code that
   # corrects the activity name. The layout: a headline that the user writes, which is optional and
   # which the code keeps with no change and never makes, goes above a group of stat lines. Each
-  # stat line starts with an emoji, in this order: the planned summary (🗓️), the weather, the water
-  # temperature (💧), the power (⚡️), the heat (🌡️), and the Whoop strain (🔥). There is no I/O
-  # here: the generator collects the data and gives it to these functions.
+  # stat line starts with an emoji, in this order: the map line of Zwift (🗺️), the planned summary
+  # (🗓️), the weather, the water temperature (💧), the power (⚡️), the heat (🌡️), and the Whoop
+  # strain (🔥). There is no I/O here: the generator collects the data and gives it to these
+  # functions.
   module Composer
     # The emoji that start each stat line, with no U+FE0F. ⚠️ Only these mark a line that the code
     # wrote, thus a line that the owner starts with another emoji, for example "🏅 New PR", stays.
@@ -16,6 +17,11 @@ module ActivityDescription
       CONDITIONS.values.flat_map { |condition| Array(condition[:emoji].is_a?(Hash) ? condition[:emoji].values : condition[:emoji]) }
     ).compact.map { |emoji| emoji.delete(VARIATION_SELECTOR) }.uniq.freeze
 
+    # The emoji of the map line that Zwift writes in the description, for example
+    # "🗺️ Waisted 8 in Watopia", with no U+FE0F. ⚠️ It is not a STAT_EMOJIS member: the code keeps
+    # that line and moves it, and does not write it.
+    MAP_EMOJI = "🗺".freeze
+
     # Rouvy gives each upload the name "ROUVY - <route> - <YYYY-MM-DD>".
     ROUVY_PREFIX = /\AROUVY\b/
     ROUVY_TRAILING_DATE = /\s*[-–—]\s*\d{4}-\d{2}-\d{2}\z/
@@ -26,8 +32,9 @@ module ActivityDescription
     # then the emoji stat lines with one newline between them. That gives a block of stat lines,
     # and not paragraphs.
     # @return [String] It is empty when there is no content.
-    def compose(headline: nil, planned: nil, weather: nil, water_temp: nil, power: nil, heat: nil, whoop: nil)
+    def compose(headline: nil, map: nil, planned: nil, weather: nil, water_temp: nil, power: nil, heat: nil, whoop: nil)
       blocks = []
+      blocks << map if map.present?
       blocks << "🗓️ #{planned}" if planned.present?
       blocks << weather if weather.present?
       blocks << water_temp if water_temp.present?
@@ -47,14 +54,15 @@ module ActivityDescription
     # stat lines with an emoji. It joins them again, thus text with more than one paragraph stays
     # the same, and a group of blank lines becomes one blank line. It gives nil when only the stat
     # lines stay.
+    # @param map [Boolean] True to remove the map line of Zwift too. Refer to #map_line.
     # @return [String, nil]
-    def headline(description)
+    def headline(description, map: false)
       return if description.blank?
 
       kept = description.split("\n", -1).map(&:strip).filter_map do |line|
         next "" if line.empty? # preserve paragraph boundaries; trailing blanks fall to strip
 
-        stat_line?(line) ? nil : line
+        stat_line?(line) || (map && map_line?(line)) ? nil : line
       end
 
       kept.join("\n").gsub(/\n{3,}/, "\n\n").strip.presence
@@ -136,6 +144,15 @@ module ActivityDescription
     end
 
     # @return [Boolean] True when a line starts with one of STAT_EMOJIS.
+    # The map line that Zwift writes in the description of its activity. The composer puts it at the
+    # top of the stat lines, with no blank line above them.
+    # @return [String, nil] The first line that starts with MAP_EMOJI, or nil.
+    def map_line(description)
+      description.to_s.split("\n").map(&:strip).find { |line| map_line?(line) }
+    end
+
+    def map_line?(line) = line.delete(VARIATION_SELECTOR).start_with?(MAP_EMOJI)
+
     def stat_line?(line)
       plain = line.delete(VARIATION_SELECTOR)
       STAT_EMOJIS.any? { |emoji| plain.start_with?(emoji) }

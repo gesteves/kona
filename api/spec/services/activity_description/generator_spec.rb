@@ -432,6 +432,45 @@ RSpec.describe ActivityDescription::Generator do
     end
   end
 
+  describe "the map line of Zwift" do
+    let(:zwift_ride) { activity.merge(type: "VirtualRide", source: "ZWIFT") }
+
+    before { allow(intervals).to receive(:activity!).and_return(zwift_ride) }
+
+    it "moves the map line to the top of the stat lines" do
+      allow(strava).to receive(:activity).and_return(name: "Zwift - Pacer Group Ride", description: "🗺️ Waisted 8 in Watopia")
+
+      generator.generate!("i1")
+
+      expect(strava).to have_received(:update_activity!).with("s1", description: "🗺️ Waisted 8 in Watopia\n⚡️ Avg 200 W")
+    end
+
+    it "keeps the text of the owner above it" do
+      allow(strava).to receive(:activity).and_return(name: "Zwift - Pacer Group Ride", description: "Legs felt good\n🗺️ Waisted 8 in Watopia")
+
+      generator.generate!("i1")
+
+      expect(strava).to have_received(:update_activity!).with("s1", description: "Legs felt good\n\n🗺️ Waisted 8 in Watopia\n⚡️ Avg 200 W")
+    end
+
+    it "makes no PUT on a second run" do
+      allow(strava).to receive(:activity).and_return(name: "Zwift - Pacer Group Ride", description: "🗺️ Waisted 8 in Watopia\n⚡️ Avg 200 W")
+
+      generator.generate!("i1")
+
+      expect(strava).not_to have_received(:update_activity!)
+    end
+
+    it "keeps a map line in the headline of an activity that is not from Zwift" do
+      allow(intervals).to receive(:activity!).and_return(activity)
+      allow(strava).to receive(:activity).and_return(name: "Morning Ride", description: "🗺️ Around the lake")
+
+      generator.generate!("i1")
+
+      expect(strava).to have_received(:update_activity!).with("s1", description: "🗺️ Around the lake\n\n⚡️ Avg 200 W")
+    end
+  end
+
   describe "the weather line" do
     let(:streams) do
       [
