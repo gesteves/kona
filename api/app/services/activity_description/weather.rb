@@ -14,8 +14,12 @@ module ActivityDescription
     SAMPLE_SECONDS = 600
     # The first radius of an area. Each area gets one WeatherKit call.
     AREA_RADIUS_METERS = 10_000
+    # The first altitude band of an area, in meters above or below the altitude of its first sample.
+    # ⚠️ WeatherKit changes with the elevation, thus a climb out of the band starts a new area, and
+    # the top of a pass does not get the weather of the valley.
+    AREA_ALTITUDE_METERS = 150
     # The most WeatherKit calls for one activity. A longer route makes each area larger.
-    MAX_AREAS = 8
+    MAX_AREAS = 12
     # The length of one leg of the headwind measurement. A shorter leg reads GPS noise as a
     # direction, and a longer one cuts the corners of a road with many turns.
     LEG_METERS = 50
@@ -84,8 +88,8 @@ module ActivityDescription
     EARTH_RADIUS_METERS = 6_371_000.0
 
     # @param activity [Hash] The Intervals.icu activity. It needs `start_date`, in UTC.
-    # @param streams [Array<Hash>] The `latlng` and `time` streams of Intervals.icu. A `latlng`
-    #   stream holds the latitudes in `data` and the longitudes in `data2`.
+    # @param streams [Array<Hash>] The `latlng`, `time`, and optional `altitude` streams of
+    #   Intervals.icu. A `latlng` stream holds the latitudes in `data` and the longitudes in `data2`.
     # @param unit [Symbol] :celsius or :fahrenheit, from Intervals#temperature_unit. Fahrenheit
     #   also gives mph and inches.
     # @param headwind [Boolean] True to measure the headwind, which is for a bike ride only.
@@ -322,7 +326,8 @@ module ActivityDescription
       @streams.find { |candidate| candidate[:type] == type }
     end
 
-    # @return [Array<Hash>] Each GPS point with a numeric position, as { offset:, latitude:, longitude: }.
+    # @return [Array<Hash>] Each GPS point with a numeric position, as { offset:, latitude:,
+    #   longitude:, altitude: }. The altitude is nil when the activity has no altitude stream.
     def track_points
       return @track_points if defined?(@track_points)
 
@@ -330,6 +335,7 @@ module ActivityDescription
       latlng = stream("latlng")
       latitudes = latlng&.dig(:data)
       longitudes = latlng&.dig(:data2)
+      altitudes = stream("altitude")&.dig(:data) || []
       return @track_points = [] if times.blank? || latitudes.blank? || longitudes.blank?
 
       @track_points = times.each_with_index.filter_map do |offset, index|
@@ -337,7 +343,9 @@ module ActivityDescription
         longitude = longitudes[index]
         next unless offset.is_a?(Numeric) && latitude.is_a?(Numeric) && longitude.is_a?(Numeric)
 
-        { offset: offset, latitude: latitude.to_f, longitude: longitude.to_f, index: index }
+        altitude = altitudes[index]
+        altitude = nil unless altitude.is_a?(Numeric)
+        { offset: offset, latitude: latitude.to_f, longitude: longitude.to_f, altitude: altitude&.to_f, index: index }
       end
     end
 
@@ -393,25 +401,32 @@ module ActivityDescription
       weighted
     end
 
-    # Puts each sample in the first area whose center is within the radius, or in a new area. With
-    # more than MAX_AREAS, it starts again with a larger radius.
+    # Puts each sample in the first area whose center is within the radius and the altitude band,
+    # or in a new area. A sample or a center with no altitude matches each band. With more than
+    # MAX_AREAS, it starts again with a larger radius and a larger band.
     # @return [Array<Hash>] The areas, as { latitude:, longitude: }. Each sample gets an :area index.
     def group_into_areas(samples)
       radius = AREA_RADIUS_METERS
+      band = AREA_ALTITUDE_METERS
       loop do
         centers = []
         samples.each do |sample|
-          area = centers.index { |center| distance(center, sample) <= radius }
+          area = centers.index { |center| distance(center, sample) <= radius && in_band?(center, sample, band) }
           if area.nil?
-            centers << { latitude: sample[:latitude], longitude: sample[:longitude] }
+            centers << sample.slice(:latitude, :longitude, :altitude)
             area = centers.size - 1
           end
           sample[:area] = area
         end
-        return centers.map { |center| center.transform_values { |value| value.round(2) } } if centers.size <= MAX_AREAS
+        return centers.map { |center| { latitude: center[:latitude].round(2), longitude: center[:longitude].round(2) } } if centers.size <= MAX_AREAS
 
         radius *= 1.5
+        band *= 1.5
       end
+    end
+
+    def in_band?(center, sample, band)
+      center[:altitude].nil? || sample[:altitude].nil? || (center[:altitude] - sample[:altitude]).abs <= band
     end
 
     # @return [Hash{Time => Hash}, nil] The hours by their start time.

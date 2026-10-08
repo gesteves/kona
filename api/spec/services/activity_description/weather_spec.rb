@@ -408,6 +408,31 @@ RSpec.describe ActivityDescription::Weather do
     expect(result.summary).not_to have_key(:condition)
   end
 
+  describe "the altitude band of an area" do
+    # 30 minutes to the north, about 3.3 km, thus one area by distance.
+    def with_altitudes(altitudes) = streams_for(north(30)) + [ { type: "altitude", data: altitudes } ]
+
+    it "starts a new area when the track climbs out of AREA_ALTITUDE_METERS" do
+      summary(with_altitudes(Array.new(30) { |minute| minute * 10.0 }))
+
+      expect(weather_kit).to have_received(:hourly).twice
+      expect(weather_kit).to have_received(:hourly).with(46.0, -119.0, any_args)
+      expect(weather_kit).to have_received(:hourly).with(46.02, -119.0, any_args)
+    end
+
+    it "keeps one area for a flat track" do
+      summary(with_altitudes(Array.new(30, 1000.0)))
+
+      expect(weather_kit).to have_received(:hourly).once
+    end
+
+    it "groups by distance alone with no altitude stream" do
+      summary(streams_for(north(30)))
+
+      expect(weather_kit).to have_received(:hourly).once
+    end
+  end
+
   it "keeps the number of WeatherKit calls at MAX_AREAS on a long route" do
     # Approximately 500 km to the north.
     summary(streams_for(Array.new(300) { [ 0.015, 0.0 ] }))

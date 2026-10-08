@@ -520,7 +520,9 @@ Thus that shared window is safe.
 - **The weather line comes from WeatherKit, and code writes it, with no LLM.**
   `ActivityDescription::Weather` takes a sample of the GPS track each 10 minutes, gets the past
   hours of each area, and makes each decision: the condition, the rounded numbers, the units, and
-  what to omit. `WeatherSentence` only writes the words: the conditions, the temperature, the
+  what to omit. An area is within `AREA_RADIUS_METERS` of its first sample and within
+  `AREA_ALTITUDE_METERS` of its altitude, from the `altitude` stream. ⚠️ WeatherKit changes with
+  the elevation, thus the band stops the top of a climb from getting the weather of the valley. `WeatherSentence` only writes the words: the conditions, the temperature, the
   humidity, the wind, and the AQI, with a middot between them, as in the other stat lines. For
   example `Cloudy with some rain · 11°C–13°C (feels like 8°C–10°C) · 12–18 km/h SSE wind
   with 24 km/h gusts (62% headwind) · AQI 54`. A wind range that starts at zero gives its top
