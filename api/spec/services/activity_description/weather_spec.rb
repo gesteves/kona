@@ -257,7 +257,7 @@ RSpec.describe ActivityDescription::Weather do
     end
 
     it "keeps the dry code below MIN_PRECIPITATION_MM_PER_HOUR, or with a clear type" do
-      expect(code_with(precipitationType: "rain", precipitationIntensity: 0.05)).to eq("Cloudy")
+      expect(code_with(precipitationType: "rain", precipitationIntensity: 0.04)).to eq("Cloudy")
       expect(code_with(precipitationType: "clear", precipitationIntensity: 1.0)).to eq("Cloudy")
     end
 
@@ -272,7 +272,7 @@ RSpec.describe ActivityDescription::Weather do
           hour(2, conditionCode: "Cloudy", precipitationType: "rain", precipitationIntensity: 0.3) ]
       )
 
-      # Dry until about 12:40, then drizzle for the rest of the 100 minutes.
+      # Dry at the start, then drizzle for the rest of the 100 minutes.
       result = summary(streams_for(north(100)))
       expect(result[:condition]).to eq("Drizzle")
       expect(result[:precipitation]).to be_nil

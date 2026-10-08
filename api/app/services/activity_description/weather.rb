@@ -13,7 +13,7 @@ module ActivityDescription
     # The time between two samples of the track.
     SAMPLE_SECONDS = 600
     # The first radius of an area. Each area gets one WeatherKit call.
-    AREA_RADIUS_METERS = 10_000
+    AREA_RADIUS_METERS = 5_000
     # The first altitude band of an area, in meters above or below the altitude of its first sample.
     # ⚠️ WeatherKit changes with the elevation, thus a climb out of the band starts a new area, and
     # the top of a pass does not get the weather of the valley.
@@ -69,8 +69,8 @@ module ActivityDescription
     # The values that WeatherKit gives for each hour, and that the code interpolates in time.
     LINEAR_FIELDS = %i[temperature temperatureApparent windSpeed windGust humidity precipitationIntensity].freeze
     # The rate of precipitation, in mm/h, from which a sample is wet. Below it, the precipitation
-    # is not measurable.
-    MIN_PRECIPITATION_MM_PER_HOUR = 0.1
+    # is a trace.
+    MIN_PRECIPITATION_MM_PER_HOUR = 0.05
     # The condition code for a wet sample whose hour has a dry code, from the `precipitationType`
     # of WeatherKit. Each type has steps of [the rate below which the code applies, the code].
     # ⚠️ The condition codes of WeatherKit miss light rain: an hour with 0.4 mm/h can be "Cloudy".
