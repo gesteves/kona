@@ -202,6 +202,12 @@ RSpec.describe ActivityDescription::Weather do
       expect(summary(streams_for(north(61)))[:aqi]).to eq(40)
     end
 
+    it "uses the points that give a reading" do
+      allow(air_quality).to receive(:history) { |_lat, _lon, time| time == start ? 35 : nil }
+
+      expect(summary(streams_for(north(61)))[:aqi]).to eq(35)
+    end
+
     it "gives no AQI with no reading" do
       expect(summary(streams_for(north(61)))).not_to have_key(:aqi)
     end

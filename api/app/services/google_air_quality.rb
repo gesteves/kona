@@ -13,7 +13,8 @@ class GoogleAirQuality < ApplicationService
   # The history endpoint of Google keeps the hours of the last 30 days.
   HISTORY_MAX_AGE = 30.days
 
-  # The AQI of a past hour at a location, for the weather line of an activity description.
+  # The AQI of a past hour at a location, for the weather line of an activity description. A time
+  # in the current hour gets the current conditions. Refer to #history_aqi.
   # @param latitude [Float]
   # @param longitude [Float]
   # @param time [Time]
@@ -38,6 +39,9 @@ class GoogleAirQuality < ApplicationService
   end
 
   # Refer to GoogleAirQuality.history. A past hour does not change, thus the cache holds it for a day.
+  # ⚠️ The history endpoint gives a 400 for the CURRENT hour, thus a time in it gets the current
+  # conditions. The description job runs some seconds after an activity ends, thus the end of each
+  # activity, and often all of a short one, is in the current hour.
   # @see https://developers.google.com/maps/documentation/air-quality/reference/rest/v1/history/lookup
   # @param time [Time]
   # @return [Integer, nil]
@@ -47,6 +51,7 @@ class GoogleAirQuality < ApplicationService
 
     hour = time.utc.beginning_of_hour
     return if hour < HISTORY_MAX_AGE.ago
+    return current_conditions_aqi if hour >= Time.current.utc.beginning_of_hour
 
     cache_key = "google:aqi:history:#{@latitude}:#{@longitude}:#{@country_code}:#{@aqi_code}:#{hour.iso8601}"
     data = cached_json(cache_key, expires_in: 1.day) do
@@ -64,6 +69,11 @@ class GoogleAirQuality < ApplicationService
   end
 
   private
+
+  # @return [Integer, nil] The current AQI of the local index, or nil with no data.
+  def current_conditions_aqi
+    get_current_conditions&.dig(:indexes)&.find { |index| index[:code] == @aqi_code }&.dig(:aqi)
+  end
 
   def get_aqi
     data = (@datetime.nil? || @datetime <= Time.current) ? get_current_conditions : get_forecast

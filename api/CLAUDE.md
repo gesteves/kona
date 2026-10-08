@@ -558,7 +558,10 @@ Thus that shared window is safe.
     counts the moving time only. Thus a stop does not count as wind.
   - **The AQI is the highest of three points**: the start, the middle, and the end, from
     `GoogleAirQuality.history`, whatever its value. ⚠️ Google keeps 30 days, thus an older activity
-    gets no AQI, and the line then has no AQI part.
+    gets no AQI, and the line then has no AQI part. A point with no reading goes away, and the
+    other points still give the AQI. ⚠️ **The history endpoint gives a 400 for the current
+    hour**, thus a point in it gets the current conditions. The job runs some seconds after an
+    activity ends, thus the end of each activity, and often all of a short one, is in that hour.
   - **With no WeatherKit data, the weather of the Intervals.icu activity gives the line**: the
     fields of the activity, and `Intervals#activity_weather_summary` over them for the wind range,
     the highest gust, and `max_showers`. The wind is in m/s. ⚠️ They have no condition, thus the

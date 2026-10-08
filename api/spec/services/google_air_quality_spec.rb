@@ -45,6 +45,20 @@ RSpec.describe GoogleAirQuality do
       )
     end
 
+    # ⚠️ The history endpoint gives a 400 for the current hour.
+    it "gives the current conditions for a time in the current hour, and does not ask the history" do
+      allow(HTTParty).to receive(:post).and_return(instance_double(HTTParty::Response, success?: true, body: current_body, request: nil))
+
+      expect(described_class.history(latitude, longitude, Time.current)).to eq(42)
+      expect(HTTParty).to have_received(:post).once.with(a_string_ending_with("currentConditions:lookup"), any_args)
+    end
+
+    it "asks the history for the hour before the current one" do
+      described_class.history(latitude, longitude, 1.hour.ago)
+
+      expect(HTTParty).to have_received(:post).once.with(a_string_ending_with("history:lookup"), any_args)
+    end
+
     it "asks nothing for an hour older than the 30 days that Google keeps" do
       expect(described_class.history(latitude, longitude, 31.days.ago)).to be_nil
       expect(HTTParty).not_to have_received(:post)
