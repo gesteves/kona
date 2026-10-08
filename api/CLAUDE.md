@@ -471,7 +471,8 @@ Thus that shared window is safe.
   TrainerRoad calendar. ⚠️ `TrainerRoad#planned_workouts` omits a race leg, thus that line is for a
   structured workout alone. `TrainerRoad#workouts`, which the widgets read for the rest-day check,
   counts a race leg: race day must not read as a rest day. The prompt is in `app/prompts/`, and the
-  job omits that line with no `ANTHROPIC_API_KEY`. It keeps the text that the user wrote above the
+  job omits that line with no `ANTHROPIC_API_KEY`. Anthropic also writes the words of a weather
+  condition that changes: refer to the weather item below. It keeps the text that the user wrote above the
   stat block: ⚠️ `Composer.headline` removes only a line that starts with an emoji of
   `Composer::STAT_EMOJIS`, thus a line of the owner that starts with another emoji stays.
   ⚠️ **The one exception is the 🗺️ map line that Zwift writes.** For an activity whose
@@ -517,7 +518,8 @@ Thus that shared window is safe.
   25%. With no distance, it is the longest run. ⚠️ Give the race its distance: without one, a
   warm-up that uploads before the race ends is the longest run at that moment, and it keeps the
   name.
-- **The weather line comes from WeatherKit, and code writes it, with no LLM.**
+- **The weather line comes from WeatherKit, and code writes each number of it.** An LLM writes
+  only the words of a condition that changes. Refer to the last items of this list.
   `ActivityDescription::Weather` takes a sample of the GPS track each 10 minutes, gets the past
   hours of each area, and makes each decision: the condition, the rounded numbers, the units, and
   what to omit. An area is within `AREA_RADIUS_METERS` of its first sample and within
@@ -571,7 +573,19 @@ Thus that shared window is safe.
     and the day or night emoji from the position of the sun. ⚠️ Intervals.icu keeps the showers
     apart from the rain. There is no humidity and no time of precipitation. ⚠️ An activity with no
     GPS track gets no weather from either source.
-  - `rake "activity_weather:inspect[<ids>]"` prints the data and the line, and it writes nothing.
+  - **An LLM summarizes a condition that changes** (`Llm.weather_conditions`). When the runs hold
+    two or more codes, the summary has `conditions`: the words of each condition in time order,
+    and no time and no share. The LLM gets that list, separated by commas, and gives one phrase in
+    place of the condition and the precipitation. The emoji stays the one that code selects.
+    - ⚠️ **A phrase with a digit goes away**, and so does a phrase on more than one line, with the
+      `·` separator, or longer than `MAX_WEATHER_CONDITIONS_LENGTH`. Code writes each number.
+    - ⚠️ **Redis keeps each phrase for 30 days**, below a digest of the prompt, the model, and the
+      list. Thus the Strava run and the Whoop run write the same words, and the second run makes
+      no PUT.
+    - With no `ANTHROPIC_API_KEY`, a failure, or a phrase that goes away, the code writes the words.
+  - `rake "activity_weather:inspect[<ids>]"` prints the data and the line, and it writes nothing
+    to Strava. For a condition that changes, it also prints the line of the LLM, and that call fills
+    the Redis cache.
     WeatherKit keeps approximately four years of hours.
 - ⚠️ **Turnstile protects the JSON path only** (`request.format.json?`). Thus a POST from a script
   with no `Accept: application/json` does not do that check. We read this and **accepted** it: the

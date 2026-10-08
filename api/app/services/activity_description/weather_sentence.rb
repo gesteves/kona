@@ -16,11 +16,13 @@ module ActivityDescription
 
     # The parts, in this order: the conditions, the temperature, the humidity, the wind, and the AQI.
     # @param summary [Hash] The summary of Weather.
+    # @param changing [String, nil] The phrase of the LLM for a condition that changes. With nil,
+    #   the line uses #conditions.
     # @return [String] The line, with no emoji and no period at the end.
-    def call(summary)
+    def call(summary, changing = nil)
       units = summary[:units] || {}
       [
-        conditions(summary),
+        changing.presence || conditions(summary),
         temperature(summary, units[:temperature]),
         ("#{summary[:humidity_percent]}% humidity" if summary[:humidity_percent]),
         (wind(summary[:wind], summary[:headwind_percent], units[:wind]) if summary[:wind]),

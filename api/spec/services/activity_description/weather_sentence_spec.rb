@@ -13,6 +13,14 @@ RSpec.describe ActivityDescription::WeatherSentence do
     )).to eq("Clear · 64°F–71°F (feels like 62°F–72°F) · 3 mph WNW wind with 6 mph gusts")
   end
 
+  it "writes the phrase of the LLM in place of the condition and the precipitation" do
+    summary = { units: { temperature: "°C", wind: "km/h" }, condition: "Cloudy", precipitation: { condition: "rain" },
+                temperature: { min: 11, max: 13 } }
+
+    expect(described_class.call(summary, "Cloudy, then rain")).to eq("Cloudy, then rain · 11°C–13°C")
+    expect(described_class.call(summary, nil)).to eq("Cloudy with some rain · 11°C–13°C")
+  end
+
   it "starts with the temperature when the summary has no condition" do
     expect(described_class.call(units: { temperature: "°C", wind: "km/h" }, temperature: { min: 11, max: 13 })).to eq("11°C–13°C")
   end

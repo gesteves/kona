@@ -546,7 +546,8 @@ module ActivityDescription
         feels_like: (feels_like unless feels_like == temperatures),
         wind: wind(samples, share),
         humidity_percent: humidity_percent(samples, share),
-        precipitation: precipitation_spell(runs, main)
+        precipitation: precipitation_spell(runs, main),
+        conditions: condition_list(runs)
       }
       if headwind?(samples, share)
         percent = headwind_percent(samples)
@@ -649,6 +650,15 @@ module ActivityDescription
         merged.first[:night] += first[:night]
       end
       merged
+    end
+
+    # The words of each condition, in time order, for the LLM that summarizes a condition that
+    # changes. It holds no time and no share, on purpose: the LLM writes words only.
+    # @return [Array<String>, nil] Nil when the activity has one condition only.
+    def condition_list(runs)
+      return if runs.map { |run| run[:code] }.uniq.size < 2
+
+      runs.map { |run| condition_phrase(run[:code]) }
     end
 
     def extend_run(run, seconds:, night:, last:)

@@ -27,7 +27,11 @@ namespace :activity_weather do
       summary = weather.summary
 
       puts summary ? JSON.pretty_generate(summary) : "(no weather)"
-      puts [ weather.emoji, ActivityDescription::WeatherSentence.call(summary) ].compact.join(" ") if summary
+      next unless summary
+
+      puts [ weather.emoji, ActivityDescription::WeatherSentence.call(summary) ].compact.join(" ")
+      changing = summary[:conditions] && ActivityDescription::Llm.weather_conditions(summary[:conditions])
+      puts "LLM: #{[ weather.emoji, ActivityDescription::WeatherSentence.call(summary, changing) ].compact.join(' ')}" if changing
     end
   end
 end

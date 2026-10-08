@@ -491,6 +491,52 @@ RSpec.describe ActivityDescription::Generator do
       allow(GoogleAirQuality).to receive(:history).and_return(nil)
     end
 
+    describe "a condition that changes" do
+      # 13:30 to 15:00: clear in the 14:00 hour, then rain in the 15:00 hour.
+      let(:streams) do
+        [
+          { type: "time", data: (0..90).map { |minute| minute * 60 } },
+          { type: "latlng", data: (0..90).map { |minute| 40.0 + (minute * 0.0001) }, data2: Array.new(91, -105.0) }
+        ]
+      end
+      let(:hours) do
+        (13..16).map do |hour|
+          { forecastStart: "2026-07-09T#{hour}:00:00Z", temperature: 18.0, temperatureApparent: 18.0, windSpeed: 5.0,
+            windDirection: 180, conditionCode: hour >= 15 ? "Rain" : "Clear", daylight: true }
+        end
+      end
+
+      before { allow(intervals).to receive(:activity!).and_return(activity.merge(trainer: false)) }
+
+      it "writes the phrase of the LLM, and code writes each number and the emoji" do
+        allow(ActivityDescription::Llm).to receive(:weather_conditions).and_return("Clear, then rain")
+
+        generator.generate!("i1")
+
+        expect(ActivityDescription::Llm).to have_received(:weather_conditions).with([ "Clear", "Rain" ])
+        expect(strava).to have_received(:update_activity!).with("s1", description: "☀️ Clear, then rain · 18°C · 5 km/h S wind\n⚡️ Avg 200 W")
+      end
+
+      it "writes the words of the code when the LLM gives nothing or fails" do
+        allow(ActivityDescription::Llm).to receive(:weather_conditions).and_return(nil)
+        generator.generate!("i1")
+
+        allow(ActivityDescription::Llm).to receive(:weather_conditions).and_raise("timeout")
+        generator.generate!("i1")
+
+        expect(strava).to have_received(:update_activity!).with("s1", description: a_string_starting_with("☀️ Clear with some rain · 18°C")).twice
+      end
+    end
+
+    it "never asks the LLM about one condition" do
+      allow(intervals).to receive(:activity!).and_return(activity.merge(trainer: false))
+      allow(ActivityDescription::Llm).to receive(:weather_conditions)
+
+      generator.generate!("i1")
+
+      expect(ActivityDescription::Llm).not_to have_received(:weather_conditions)
+    end
+
     it "never fetches weather for indoor activities" do
       generator.generate!("i1") # trainer: true
 

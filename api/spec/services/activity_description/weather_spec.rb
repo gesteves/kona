@@ -296,6 +296,20 @@ RSpec.describe ActivityDescription::Weather do
     end
   end
 
+  describe "the list of conditions" do
+    it "gives no list for one condition" do
+      expect(summary(streams_for(north(61)))).not_to have_key(:conditions)
+    end
+
+    it "gives the words of each condition in time order, with no time" do
+      allow(weather_kit).to receive(:hourly).and_return(
+        [ hour(0, conditionCode: "Cloudy"), hour(1, conditionCode: "Rain"), hour(2, conditionCode: "Cloudy"), hour(3, conditionCode: "Cloudy") ]
+      )
+
+      expect(summary(streams_for(north(150)))[:conditions]).to eq([ "Cloudy", "Rain", "Cloudy" ])
+    end
+  end
+
   it "names the condition with the most time, with the phrase of config/conditions.yml" do
     allow(weather_kit).to receive(:hourly).and_return(
       [ hour(0, conditionCode: "MostlyCloudy"), hour(1, conditionCode: "MostlyCloudy"), hour(2, conditionCode: "Rain"), hour(3) ]
