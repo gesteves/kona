@@ -219,11 +219,11 @@ RSpec.describe ActivityDescription::Weather do
     expect(summary(streams_for(north(61)))).not_to have_key(:feels_like)
   end
 
-  it "gives the humidity only when it is high in warm weather" do
-    expect(summary(streams_for(north(61)))).not_to have_key(:humidity_percent)
+  it "always gives the mean humidity" do
+    expect(summary(streams_for(north(61)))[:humidity_percent]).to eq(50)
 
-    allow(weather_kit).to receive(:hourly).and_return((0..3).map { |offset| hour(offset, temperature: 30.0, humidity: 0.8) })
-    expect(summary(streams_for(north(61)))[:humidity_percent]).to eq(80)
+    allow(weather_kit).to receive(:hourly).and_return((0..3).map { |offset| hour(offset, humidity: nil) })
+    expect(summary(streams_for(north(61)))).not_to have_key(:humidity_percent)
   end
 
   # ⚠️ The stamp convention of WeatherKit history is not certain, thus the error is the same on each side.

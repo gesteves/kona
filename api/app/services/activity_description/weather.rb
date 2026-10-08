@@ -61,10 +61,6 @@ module ActivityDescription
     # The sun is above the horizon above this elevation, in degrees: the refraction and the size of
     # the sun move the true sunrise below zero.
     SUNRISE_ELEVATION = -0.833
-    # The summary gives the humidity only at or above both of these: the mean humidity, in percent,
-    # and the highest temperature, in °C.
-    HUMID_PERCENT = 70
-    HUMID_CELSIUS = 24
 
     # The values that WeatherKit gives for each hour, and that the code interpolates in time.
     LINEAR_FIELDS = %i[temperature temperatureApparent windSpeed windGust humidity precipitationIntensity].freeze
@@ -559,14 +555,10 @@ module ActivityDescription
       { min: yield(values.min).round, max: yield(values.max).round }
     end
 
-    # @return [Integer, nil] The mean humidity, only when it is high in warm weather.
+    # @return [Integer, nil] The mean humidity, in percent, or nil when WeatherKit gives none.
     def humidity_percent(samples, share)
       humidity = mean(samples, :humidity, share)
-      hottest = samples.filter_map { |sample| sample[:weather][:temperature] }.max
-      return if humidity.nil? || hottest.nil?
-      return unless humidity * 100 >= HUMID_PERCENT && hottest >= HUMID_CELSIUS
-
-      (humidity * 100).round
+      humidity && (humidity * 100).round
     end
 
     def mean(samples, field, share)
