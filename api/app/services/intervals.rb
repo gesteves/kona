@@ -10,6 +10,10 @@ class Intervals < ApplicationService
     run_distance:  %w[Run VirtualRun TrailRun]
   }.freeze
 
+  # The largest GPX file that #activity_gpx keeps. It is the same limit as one upload on the Course
+  # maps page.
+  GPX_MAX_BYTES = 25.megabytes
+
   def initialize
     @athlete_id = ENV["ICU_ATHLETE_ID"]
     @api_key = ENV["ICU_API_KEY"]
@@ -98,6 +102,15 @@ class Intervals < ApplicationService
     safely("Intervals.icu", context: "activity_weather_summary") do
       get_json!("#{INTERVALS_ICU_API_URL}/activity/#{activity_id}/weather-summary", basic_auth: auth)
     end
+  end
+
+  # Gets the GPX file that Intervals.icu makes for an activity. Intervals.icu refuses an activity
+  # that came from Strava, and an activity with no GPS data.
+  # ⚠️ It follows no redirect, because each hop would get the API key.
+  # @param activity_id [String] The Intervals.icu activity id.
+  # @return [String, nil] The GPX document, or nil on a failure or for a file past GPX_MAX_BYTES.
+  def activity_gpx(activity_id)
+    download("#{INTERVALS_ICU_API_URL}/activity/#{activity_id}/gpx-file", max_bytes: GPX_MAX_BYTES, limit: 0, basic_auth: auth)&.dig(:body)
   end
 
   # The wellness record of a date. The keys have no underscores, because a custom field is

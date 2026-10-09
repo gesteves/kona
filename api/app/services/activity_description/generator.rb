@@ -31,6 +31,9 @@ module ActivityDescription
     # Whoop workout.
     WHOOP_WINDOW = 1.hour
 
+    # The time in which a race leg adds its track to the Course maps page one time only.
+    RACE_TRACK_TTL = 30.days
+
     def initialize(intervals: Intervals.new, strava: Strava.new, whoop: Whoop.new, location: Location.new, trainer_road: nil)
       @intervals = intervals
       @strava = strava
@@ -73,6 +76,7 @@ module ActivityDescription
       race_leg = find_race_leg(activity)
       race_name = race_leg&.name
       requeue_partner(activity, race_leg)
+      queue_race_track(activity, race_leg, sport)
 
       # A leg of a race always gets its name, and a transition gets its name and no description.
       describe = ELIGIBLE_SPORTS.include?(sport) && activity[:pool_length].blank?
@@ -168,6 +172,18 @@ module ActivityDescription
 
       key = "activity:race_pair:#{[ activity[:id], race_leg.partner_id ].map(&:to_s).sort.join(':')}"
       ActivityDescriptionJob.perform_async(race_leg.partner_id) if $redis.set(key, "1", nx: true, ex: 1.day.to_i)
+    end
+
+    # Adds the GPS track of a race leg to the Course maps page, one time for each activity. Refer to
+    # RaceTrackJob. A transition and an indoor leg get no track.
+    # ⚠️ The key stays for RACE_TRACK_TTL. Thus a later run does not add a track again after the
+    # owner deleted it.
+    def queue_race_track(activity, race_leg, sport)
+      return if race_leg.nil? || RaceLeg.transition?(activity) || self.class.indoor?(activity)
+      return unless activity[:stream_types]&.include?("latlng") && MapboxTileset.configured?
+
+      key = "activity:race_track:#{activity[:id]}"
+      RaceTrackJob.perform_async(activity[:id].to_s, race_leg.name, sport) if $redis.set(key, "1", nx: true, ex: RACE_TRACK_TTL.to_i)
     end
 
     # @return [Boolean] True when two texts are the same, with no regard to the line ends and to the

@@ -442,6 +442,7 @@ Thus that shared window is safe.
 | `ContactMailJob(name, email, message, context, restored_from_spam = false)` | contact intake: Akismet + compose |
 | `ContactDeliveryJob(payload)` | the one retryable *delivery* unit — sends via Resend |
 | `MapTilesetJob(id)` | publishes an uploaded GPX track to Mapbox as a vector tileset |
+| `RaceTrackJob(activity_id, name, sport)` | adds the GPX of one race leg from Intervals.icu to Course maps, then adds its `MapTilesetJob`. Refer to "The course-map renderer" |
 | `WhoopTokenRefreshJob()` | forces a Whoop token refresh on a schedule (see below) |
 | `ThreadsTokenRefreshJob()` | renews the 60-day Threads token each day (see below) |
 
@@ -511,6 +512,8 @@ Thus that shared window is safe.
       second leg queues the first one again, one time, below the key `activity:race_pair:<ids>`.
   - A transition gets its name and no description. ⚠️ The race name wins over a name that the owner
     typed in Strava.
+  - Each outdoor leg that is not a transition also adds its GPS track to Course maps. Refer to "The
+    course-map renderer".
 - **A running race comes from the Intervals.icu calendar, and NOT from TrainerRoad**, because the
   owner puts only triathlons in TrainerRoad. On a date with no TrainerRoad race and ONE A, B, or C
   race of type `Run` (`Intervals#race_events`), one run gets the race name alone
@@ -2308,6 +2311,19 @@ and `StaticMap` makes the render URL and gets the image.
   controls of Web Awesome are part of their form, thus they submit and appear in `FormData` as a
   native control does. The switch for the marker order has a hidden `0` field with it, because a
   switch that is off submits nothing.
+
+**A race leg adds its own track.** When `ActivityDescription::Generator` finds a leg (refer to
+`RaceLeg`), it adds `RaceTrackJob`. That job gets the GPX of the leg from Intervals.icu, gives it the
+race name and the sport, and sends it through the same `GpxTrack` and `TrackLibrary#stage` as an
+upload. A transition, an indoor leg, and a leg with no `latlng` stream get no track.
+
+- ⚠️ **The GPX comes from Intervals.icu, and never from Strava.** Intervals.icu refuses the GPX of
+  an activity that came from Strava. Thus no Strava data goes into a map.
+- ⚠️ **The key `activity:race_track:<icu id>` permits one job for each activity, for 30 days.** The
+  Strava webhook and the Whoop webhook both run the generator, and it can run again later. Without
+  the key, a track that the owner deleted comes back.
+- The job keeps a track whose id exists. The id comes from the title, thus a manual upload of the
+  same race keeps its render settings.
 
 `Admin::BaseController` needs the session of the owner. That controller, `SessionsController`, and
 `WhoopOauthController` each include the **`OwnerFacing`** concern, which sets `Cache-Control:

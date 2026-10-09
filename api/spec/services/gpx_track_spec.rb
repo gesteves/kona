@@ -94,6 +94,31 @@ RSpec.describe GpxTrack do
 
       expect(parsed.title).to eq("activity_123 - Other")
     end
+
+    # RaceTrackJob gives the race name, because the GPX of Intervals.icu names the activity.
+    it "uses the name and the type of the caller in place of the file" do
+      parsed = described_class.new(
+        StringIO.new(<<~XML),
+          <gpx><trk><name>Morning Ride</name><type>running</type><trkseg>
+            <trkpt lat="1.0" lon="2.0"><time>2026-07-25T13:32:14Z</time></trkpt>
+          </trkseg></trk></gpx>
+        XML
+        name: "Golden Gate Tri", type: "Cycling"
+      )
+
+      expect(parsed.title).to eq("2026 Golden Gate Tri - Cycling")
+      expect(parsed.start_icon).to eq("bicycle-share")
+    end
+
+    it "keeps the file values when the caller gives none" do
+      parsed = described_class.new(StringIO.new(<<~XML), name: "", type: nil)
+        <gpx><trk><name>Wednesday Nighter</name><type>cycling</type><trkseg>
+          <trkpt lat="1.0" lon="2.0"/>
+        </trkseg></trk></gpx>
+      XML
+
+      expect(parsed.title).to eq("Wednesday Nighter - Cycling")
+    end
   end
 
   describe "#id" do

@@ -86,6 +86,31 @@ RSpec.describe Intervals do
     end
   end
 
+  describe "#activity_gpx" do
+    let(:url) { "https://intervals.icu/api/v1/activity/a1/gpx-file" }
+
+    it "gives the GPX document, with basic auth" do
+      stub_streamed_get(url, body: "<gpx/>")
+
+      expect(service.activity_gpx("a1")).to eq("<gpx/>")
+      expect(HTTParty).to have_received(:get).with(url, hash_including(basic_auth: hash_including(username: "API_KEY")))
+    end
+
+    it "gives nil when Intervals.icu refuses the activity" do
+      stub_streamed_get(url, body: "", code: 422)
+
+      expect(service.activity_gpx("a1")).to be_nil
+    end
+
+    # ⚠️ Each hop would get the API key.
+    it "follows no redirect" do
+      stub_streamed_get(url, body: "", code: 302, headers: { "location" => "https://elsewhere.test/a.gpx" })
+
+      expect(service.activity_gpx("a1")).to be_nil
+      expect(HTTParty).to have_received(:get).once
+    end
+  end
+
   describe "wellness and activity writes" do
     it "PUTs partial wellness updates with basic auth and raises HttpError on failure" do
       response = instance_double(HTTParty::Response, success?: false, code: 422, body: "no such field", request: nil)

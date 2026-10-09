@@ -2,8 +2,9 @@ require "nokogiri"
 require "digest"
 require "time"
 
-# Parses a GPX file that a user uploads, and gives the few values that a static map render needs:
-# the title of the track, its sport, its bounding box, and its two end points.
+# Parses a GPX file that a user uploads, or the GPX of a race leg from RaceTrackJob. It gives the
+# few values that a static map render needs: the title of the track, its sport, its bounding box,
+# and its two end points.
 #
 # It is not an ApplicationService, because that base class is for HTTP integrations and this class
 # makes no network call.
@@ -48,17 +49,19 @@ class GpxTrack
 
   # @param io [IO, String] The GPX document, as an IO or as a path.
   # @param fallback_name [String, nil] The title to use when the file names no track.
+  # @param name [String, nil] The title to use in place of the name in the file.
+  # @param type [String, nil] The sport to use in place of the type in the file.
   # @raise [ParseError] If the code cannot parse the document as XML, or if it has no track
   #   points.
-  def initialize(io, fallback_name: nil)
+  def initialize(io, fallback_name: nil, name: nil, type: nil)
     @fallback_name = fallback_name
     @coordinates = []
     read(io)
 
     raise ParseError, "No track points found in GPX file" if @coordinates.empty?
 
-    @activity_name = @activity_name.presence || @fallback_name.presence || "Untitled"
-    @activity_type = @activity_type.presence&.titleize || "Other"
+    @activity_name = name.presence || @activity_name.presence || @fallback_name.presence || "Untitled"
+    @activity_type = (type.presence || @activity_type.presence)&.titleize || "Other"
   end
 
   # The title of the activity, with its year at the start and its sport at the end. It does not add

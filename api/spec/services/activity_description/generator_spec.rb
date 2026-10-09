@@ -292,6 +292,76 @@ RSpec.describe ActivityDescription::Generator do
 
       expect(strava).not_to have_received(:update_activity!)
     end
+
+    describe "the Course maps track" do
+      let(:track_key) { "activity:race_track:i1" }
+      let(:bike) { legs[2].merge(stream_types: %w[latlng time]) }
+
+      before { allow(MapboxTileset).to receive(:configured?).and_return(true) }
+
+      it "queues the track of a leg one time" do
+        allow(intervals).to receive(:activity!).and_return(bike)
+
+        generator.generate!("i1")
+
+        expect($redis).to have_received(:set).with(track_key, "1", nx: true, ex: 30.days.to_i)
+        expect(RaceTrackJob).to have_enqueued_sidekiq_job("i1", "#{race} – Bike", "Cycling")
+      end
+
+      # ⚠️ The owner can delete the track, and a later run must not add it again.
+      it "does not queue the track a second time" do
+        allow(intervals).to receive(:activity!).and_return(bike)
+        allow($redis).to receive(:set).with(track_key, "1", nx: true, ex: 30.days.to_i).and_return(false)
+
+        generator.generate!("i1")
+
+        expect(RaceTrackJob.jobs).to be_empty
+      end
+
+      it "queues the track of a running race" do
+        run = activity.merge(type: "Run", distance: 21_300.0, trainer: false, stream_types: %w[latlng time])
+        allow(trainer_road).to receive(:race_name).and_return(nil)
+        allow(intervals).to receive(:activity!).and_return(run)
+        allow(intervals).to receive(:race_events).and_return([ { name: "Grand Teton Half Marathon", type: "Run", distance: 21_097.0 } ])
+        allow(intervals).to receive(:activities!).and_return([ run ])
+
+        generator.generate!("i1")
+
+        expect(RaceTrackJob).to have_enqueued_sidekiq_job("i1", "Grand Teton Half Marathon", "Running")
+      end
+
+      {
+        "a transition" => ->(leg) { leg.merge(type: "Transition", id: "i2") },
+        "an indoor leg" => ->(leg) { leg.merge(trainer: true) },
+        "a leg with no GPS stream" => ->(leg) { leg.merge(stream_types: %w[time]) }
+      }.each do |label, change|
+        it "queues no track for #{label}" do
+          allow(intervals).to receive(:activity!).and_return(change.call(bike))
+
+          generator.generate!("i1")
+
+          expect(RaceTrackJob.jobs).to be_empty
+        end
+      end
+
+      it "queues no track on a day with no race" do
+        allow(trainer_road).to receive(:race_name).and_return(nil)
+        allow(intervals).to receive(:activity!).and_return(bike)
+
+        generator.generate!("i1")
+
+        expect(RaceTrackJob.jobs).to be_empty
+      end
+
+      it "queues no track when Mapbox has no configuration" do
+        allow(MapboxTileset).to receive(:configured?).and_return(false)
+        allow(intervals).to receive(:activity!).and_return(bike)
+
+        generator.generate!("i1")
+
+        expect(RaceTrackJob.jobs).to be_empty
+      end
+    end
   end
 
   describe "the Whoop strain" do
