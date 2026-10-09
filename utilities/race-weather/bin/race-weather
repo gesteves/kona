@@ -1,0 +1,103 @@
+#!/usr/bin/env ruby
+# Prints a Markdown table of the weather and the AQI on the past dates that are closest to a race
+# date. Each past date has the weekday of the race. The table goes to stdout, and the notes go to
+# stderr.
+#
+#   bundle exec bin/race-weather "Great Falls, Montana" "August 15, 2027" [--units metric] [--years 5]
+
+require 'dotenv'
+require 'optparse'
+require 'time'
+require 'tzinfo'
+
+Dotenv.load(File.expand_path('../.env', __dir__))
+
+require_relative '../lib/race_weather/dates'
+require_relative '../lib/race_weather/format'
+require_relative '../lib/race_weather/google'
+require_relative '../lib/race_weather/purple_air'
+require_relative '../lib/race_weather/summary'
+require_relative '../lib/race_weather/weather_kit'
+
+include RaceWeather
+
+options = { units: :imperial, years: 5 }
+parser = OptionParser.new do |opts|
+  opts.banner = 'Usage: bin/race-weather LOCATION RACE_DATE [options]'
+  opts.on('--units UNITS', Format::UNITS, 'imperial (default) or metric') { |units| options[:units] = units }
+  opts.on('--years N', Integer, 'The number of past dates (default 5)') { |years| options[:years] = years }
+  opts.on('-h', '--help', 'Show this help') do
+    puts opts
+    exit
+  end
+end
+
+begin
+  parser.parse!
+rescue OptionParser::ParseError => e
+  abort "#{e.message}\n#{parser}"
+end
+
+location, date_text = ARGV
+abort parser.to_s if location.to_s.strip.empty? || date_text.nil?
+abort '--years must be 1 or more' unless options[:years].positive?
+abort 'Set GOOGLE_API_KEY in .env' if ENV['GOOGLE_API_KEY'].to_s.empty?
+abort 'Set the WEATHERKIT_* keys in .env' unless WeatherKit.configured?
+
+begin
+  race_date = Dates.parse(date_text)
+rescue ArgumentError => e
+  abort e.message
+end
+
+place = Google.geocode(location) or abort "Google found no place for #{location.inspect}"
+zone_id = Google.time_zone(place[:lat], place[:lng]) or abort 'Google gave no time zone for that place'
+zone = TZInfo::Timezone.get(zone_id)
+warn "#{place[:name]} (#{place[:lat]}, #{place[:lng]}), #{zone_id}"
+warn "Race date: #{race_date.strftime('%A, %B %-d, %Y')}"
+
+warn 'No PURPLEAIR_API_KEY, the AQI column says "No data"' unless PurpleAir.configured?
+warn 'No ANTHROPIC_API_KEY, the Weather column gives the most common condition' unless Summary.configured?
+
+sensors =
+  begin
+    PurpleAir.configured? ? PurpleAir.sensors(place[:lat], place[:lng]) : []
+  rescue StandardError => e
+    warn "PurpleAir sensor search failed: #{e.message}"
+    []
+  end
+
+today = zone.now.to_date
+rows = Dates.past_dates(race_date, today: today, count: options[:years]).filter_map do |date|
+  from = zone.local_time(date.year, date.month, date.day)
+  nxt = date + 1
+  to = zone.local_time(nxt.year, nxt.month, nxt.day)
+  warn "#{date.strftime('%b %-d, %Y')}:"
+
+  hours =
+    begin
+      WeatherKit.hourly(place[:lat], place[:lng], from: from, to: to)
+    rescue StandardError => e
+      warn "  WeatherKit failed: #{e.message}"
+      []
+    end
+  if hours.empty?
+    warn '  left out: WeatherKit has no hours for this date'
+    next
+  end
+  hours.each { |hour| hour['localHour'] = zone.to_local(Time.iso8601(hour['forecastStart'])).hour }
+
+  aqi =
+    begin
+      PurpleAir.daily_aqi(sensors, from: from, to: to)
+    rescue StandardError => e
+      warn "  PurpleAir failed: #{e.message}"
+      nil
+    end
+  warn(aqi ? "  AQI from #{aqi[:sensor]}, #{aqi[:km]} km away" : '  AQI: no sensor covers this date')
+
+  phrase, = Summary.phrase(hours)
+  Format.row(date: date, hours: hours, phrase: phrase, aqi: aqi, units: options[:units])
+end
+
+puts Format.table(rows)

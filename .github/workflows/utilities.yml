@@ -7,18 +7,21 @@ name: "Utilities"
 #
 # utilities/aqi-map/ has no test framework and needs none, but its copy of the EPA AQI math is a
 # copy of the code in the api that a person keeps correct. Thus a plain Ruby check compares it with
-# the published equation. utilities/contentful/ is a set of Node scripts that a person runs one time
-# each against Contentful, and there is nothing to check there.
+# the published equation. utilities/race-weather/ has a plain Ruby check of its dates and its cells.
+# utilities/contentful/ is a set of Node scripts that a person runs one time each against
+# Contentful, and there is nothing to check there.
 on:
   push:
     branches: [main]
     paths:
       - 'utilities/aqi-map/**'
+      - 'utilities/race-weather/**'
       - '.github/workflows/utilities.yml'
   pull_request:
     branches: [main]
     paths:
       - 'utilities/aqi-map/**'
+      - 'utilities/race-weather/**'
       - '.github/workflows/utilities.yml'
 
 permissions:
@@ -54,3 +57,27 @@ jobs:
       # gem. Thus this step is fast, and the Gemfile of the Sinatra app cannot break it.
       - name: EPA AQI golden vectors
         run: ruby spec/epa_aqi_check.rb
+
+  race-weather:
+    name: Race weather check
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: utilities/race-weather
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # ⚠️ working-directory must be an input of the action. Refer to the aqi-map job.
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@14594264cd68ce8a2345dd349bc3d138a4ef85c8 # v1.327.0
+        with:
+          working-directory: utilities/race-weather
+          bundler-cache: false
+
+      # There is no bundle install. The check loads lib/race_weather/dates.rb and format.rb only,
+      # which use the standard library only.
+      - name: Dates and cells
+        run: ruby spec/race_weather_check.rb

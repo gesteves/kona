@@ -54,6 +54,11 @@ values of `utilities/aqi-map/`, and it deploys nothing.
   alone, thus you can compare the two files directly. `spec/epa_aqi_check.rb` tests it against
   known-correct values, which come from the **published equation** and not from either copy of the
   code. Thus one error in both copies cannot pass. `utilities.yml` runs that check.
+- **`utilities/race-weather/`** — a CLI. It prints a Markdown table of the weather and the AQI on
+  the past dates closest to a race date, with the weekday of the race. It uses WeatherKit,
+  PurpleAir, Google Maps, and Claude with its own `.env`, and not the api classes.
+  ⚠️ It loads the EPA math from `utilities/aqi-map/lib/epa_aqi.rb`, thus that file stays the one
+  copy in `utilities/`. A change to that file also changes this tool.
 
 ## Local development
 
