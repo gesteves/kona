@@ -37,7 +37,7 @@ Rules:
 - 40 characters or fewer. Sentence case, no trailing period.
 - Never add "mostly" or "partly" to a condition, and never join conditions with "or".
 - Never mention two sky conditions, except as one of the ranges above.
-- Never describe weather that isn't in the list.
+- Synonyms are acceptable as long as the summary of conditions remains accurate. Never describe or invent weather that isn't in the list.
 - No numbers, no emoji, no exclamation marks. Plain, factual American English.
 
 Examples:
