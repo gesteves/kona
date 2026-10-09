@@ -18,7 +18,7 @@ Choose what to describe:
      - Clear + Mostly clear → "Mostly clear"
      - Mostly cloudy + Cloudy → "Mostly cloudy"
    - Otherwise, use the most frequent sky condition alone. If two conditions that aren't next to each other on the scale tie, use the cloudier one.
-2. Precipitation (Storms, Rain, Snow and ice). If more than one appears, name the most severe one. If it covers only part of the list, soften it: "a passing shower", "a brief thunderstorm", "heavy at times", "on-and-off". If it covers most of the list, lead with it and drop the sky condition.
+2. Precipitation (Storms, Rain, Snow and ice). If more than one appears, name the most severe one. If it covers only part of the list, describe it: For example, "a passing shower", "a brief thunderstorm", "heavy at times", "on-and-off", etc. If it covers most of the list, lead with it and drop the sky condition.
 3. Air. Use the adjective: foggy, hazy, smoky, dusty. Blowing dust is dusty and windy.
 4. Wind. Use breezy or windy. If both appear, use windy.
 5. Temperature. Use hot or frigid.
