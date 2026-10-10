@@ -52,9 +52,29 @@ module ActivityDescription
     # Below this share of the time, a headwind is not worth a word.
     HEADWIND_MIN_PERCENT = 50
 
-    # The cloud cover, in percent, below which each condition applies, for the Intervals.icu
-    # fallback, which has a cloud cover and no condition. Above the last step, it is Cloudy.
+    # The cloud cover, in percent, below which each condition applies, for a sky with no sky code:
+    # the Intervals.icu fallback, and a track where each hour is, for example, Windy. Above the last
+    # step, it is Cloudy.
     CLOUD_CONDITIONS = [ [ 13, "Clear" ], [ 38, "MostlyClear" ], [ 63, "PartlyCloudy" ], [ 88, "MostlyCloudy" ] ].freeze
+    SKY_CODES = [ *CLOUD_CONDITIONS.map(&:last), "Cloudy" ].freeze
+
+    # The most facts that the LLM gets. The facts after this number go away, thus the order of
+    # #condition_facts is the order of importance.
+    MAX_FACTS = 3
+    # The most precipitation facts, one for each type.
+    MAX_PRECIPITATION_FACTS = 2
+    # The words of a share of the time, as [the lowest share, the words].
+    SHARE_WORDS = [ [ 0.9, "the whole time" ], [ 0.6, "most of the time" ], [ 0.2, "part of the time" ], [ 0.0, "briefly" ] ].freeze
+    # From this share, the precipitation already says the sky, thus the facts have no sky.
+    SKY_HIDDEN_SHARE = 0.6
+    # The word of the mean wind speed, as [the lowest km/h, the word]: the start of Beaufort 5, 4,
+    # and 3. Below the last step, the facts have no wind. These are one step below the names of
+    # the scale, on purpose: a person on a bike feels a "moderate breeze" as windy.
+    WIND_WORDS = [ [ 29, "very windy" ], [ 20, "windy" ], [ 12, "breezy" ] ].freeze
+    # The codes that give an air fact.
+    AIR_CODES = %w[Fog Haze Smoke Dust BlowingDust].freeze
+    # The codes whose words already say the wind. With one of them, the facts have no wind.
+    WINDY_CODES = %w[Blizzard BlowingSnow BlowingDust].freeze
     # The sun is above the horizon above this elevation, in degrees: the refraction and the size of
     # the sun move the true sunrise below zero.
     SUNRISE_ELEVATION = -0.833
@@ -226,9 +246,12 @@ module ActivityDescription
       return "Snow" if snow
       return "Rain" if rain
 
-      clouds = data[:average_clouds].to_f
-      CLOUD_CONDITIONS.find { |limit, _code| clouds < limit }&.last || "Cloudy"
+      cloud_condition(data[:average_clouds].to_f)
     end
+
+    # @param percent [Numeric] A cloud cover, in percent.
+    # @return [String] A sky code of CLOUD_CONDITIONS.
+    def cloud_condition(percent) = CLOUD_CONDITIONS.find { |limit, _code| percent < limit }&.last || "Cloudy"
 
     # @param mps [Numeric, nil] A speed in m/s, which is the unit of Intervals.icu.
     # @return [Float] The speed in km/h.
@@ -421,14 +444,25 @@ module ActivityDescription
         feels_like: (feels_like unless feels_like == temperatures),
         wind: wind(samples, share),
         humidity_percent: humidity_percent(samples, share),
-        precipitation: precipitation_spell(runs, main),
-        conditions: condition_list(runs)
+        precipitation: precipitation_spell(runs, main)
       }
+      add_facts(result, condition_facts(samples, runs, share))
       if headwind?(samples, share)
         percent = headwind_percent(samples)
         result[:headwind_percent] = percent if percent && percent >= HEADWIND_MIN_PERCENT
       end
       result.compact
+    end
+
+    # Puts the facts in the summary. A sky word alone is the condition, and it needs no LLM. Each
+    # other set of facts goes to the LLM as `conditions`.
+    # @param facts [Array<Array(String, String)>] The facts of #condition_facts.
+    def add_facts(result, facts)
+      if facts.map(&:first) == [ "Sky" ]
+        result[:condition] = facts.first.last.upcase_first
+      elsif facts.any?
+        result[:conditions] = facts.map { |label, words| "#{label}: #{words}" }
+      end
     end
 
     def units
@@ -527,14 +561,71 @@ module ActivityDescription
       merged
     end
 
-    # The words of each condition, in time order, for the LLM that summarizes a condition that
-    # changes. It holds no time and no share, on purpose: the LLM writes words only.
-    # @return [Array<String>, nil] Nil when the activity has one condition only.
-    def condition_list(runs)
-      return if runs.map { |run| run[:code] }.uniq.size < 2
+    # The facts of the conditions, for the LLM, in the order of importance: the precipitation, the
+    # wind, the air, and the sky. Code decides each fact and each word, and the LLM only joins them.
+    # ⚠️ The Breezy, Windy, Hot, and Frigid codes give no fact: the wind speed gives the wind word,
+    # and the line gives the temperature as numbers.
+    # @return [Array<Array(String, String)>] Each fact as [label, words], MAX_FACTS at the most.
+    #   Empty with no runs, or with a code that config/conditions.yml does not have: that code can
+    #   be precipitation, and the facts would omit it.
+    def condition_facts(samples, runs, share)
+      return [] if runs.empty? || runs.any? { |run| !CONDITIONS.key?(run[:code].to_sym) }
 
-      runs.map { |run| condition_phrase(run[:code]) }
+      total = runs.sum { |run| run[:seconds] }
+      precipitation = run_facts(runs, total) { |code| precipitation_type(code) }.first(MAX_PRECIPITATION_FACTS)
+      facts = precipitation.map { |fact| [ "Precipitation", fact[:words] ] }
+
+      wind = wind_word(samples, share) unless runs.any? { |run| WINDY_CODES.include?(run[:code]) }
+      facts << [ "Wind", wind ] if wind
+      facts.concat(run_facts(runs, total) { |code| code if AIR_CODES.include?(code) }.map { |fact| [ "Air", fact[:words] ] })
+
+      sky = sky_word(samples, runs, share)
+      facts << [ "Sky", sky ] if sky && precipitation.none? { |fact| fact[:share] >= SKY_HIDDEN_SHARE }
+      facts.first(MAX_FACTS)
     end
+
+    # One fact for each key of the runs, as { words:, share: }, most time first. The words are the
+    # phrase of the code with the most time, the SHARE_WORDS of the key, and "on and off" when the
+    # key has more than one stretch.
+    # ⚠️ Only a run with no key ends a stretch. Rain, then a thunderstorm, then rain is one stretch
+    # of rain: it did not stop.
+    # @param total [Numeric] The seconds of all the runs.
+    # @yieldparam code [String] The condition code of a run.
+    # @yieldreturn [Object, nil] The key of the run, or nil for a run that gives no fact.
+    # @return [Array<Hash>]
+    def run_facts(runs, total)
+      keyed = runs.map { |run| [ yield(run[:code]), run ] }
+      stretches = keyed.slice_when { |(a, _), (b, _)| a.nil? || b.nil? }.flat_map { |chunk| chunk.filter_map(&:first).uniq }.tally
+
+      keyed.select(&:first).group_by(&:first).map do |key, pairs|
+        group = pairs.map(&:last)
+        code, = group.group_by { |run| run[:code] }.max_by { |_code, same| same.sum { |run| run[:seconds] } }
+        share = group.sum { |run| run[:seconds] } / total.to_f
+        words = [ fact_phrase(code), SHARE_WORDS.find { |limit, _words| share >= limit }.last ]
+        words << "on and off" if stretches[key] > 1
+        { words: words.join(", "), share: share }
+      end.sort_by { |fact| -fact[:share] }
+    end
+
+    # @return [String, nil] The WIND_WORDS word of the mean wind speed, or nil below the last step.
+    def wind_word(samples, share)
+      speed = mean(samples, :windSpeed, share)
+      speed && WIND_WORDS.find { |limit, _word| speed >= limit }&.last
+    end
+
+    # The sky word: the main condition of the runs with a sky code, by the rule of #main_condition.
+    # Thus the word agrees with the emoji. With no such run, the mean cloud cover gives the word.
+    # @return [String, nil] Nil with no sky run and no cloud cover.
+    def sky_word(samples, runs, share)
+      sky = runs.select { |run| SKY_CODES.include?(run[:code]) }
+      return fact_phrase(main_condition(sky)[:code]) if sky.any?
+
+      clouds = mean(samples, :cloudCover, share)
+      clouds && fact_phrase(cloud_condition(clouds * 100))
+    end
+
+    # The phrase of a code for a fact: "mixed rain and snow", and not "Mixed rain & snow".
+    def fact_phrase(code) = condition_phrase(code).downcase.gsub("&", "and")
 
     def extend_run(run, seconds:, night:, last:)
       run[:seconds] += seconds

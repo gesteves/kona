@@ -110,6 +110,7 @@ RSpec.describe ActivityDescription::TrackWeather do
 
     it "mixes the values by the share of the distance" do
       expect(at(8, south: { temperature: 10.0 }, north: { temperature: 20.0 })[:temperature]).to be_within(0.01).of(10.0 + (10.0 * share(8)))
+      expect(at(8, south: { cloudCover: 0.0 }, north: { cloudCover: 1.0 })[:cloudCover]).to be_within(0.01).of(share(8))
     end
 
     it "mixes the wind direction across north, and not through south" do

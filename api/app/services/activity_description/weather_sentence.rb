@@ -16,7 +16,7 @@ module ActivityDescription
 
     # The parts, in this order: the conditions, the temperature, the humidity, the wind, and the AQI.
     # @param summary [Hash] The summary of Weather.
-    # @param changing [String, nil] The phrase of the LLM for a condition that changes. With nil,
+    # @param changing [String, nil] The phrase of the LLM from the condition facts. With nil,
     #   the line uses #conditions.
     # @return [String] The line, with no emoji and no period at the end.
     def call(summary, changing = nil)

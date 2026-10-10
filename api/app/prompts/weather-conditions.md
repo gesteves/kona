@@ -1,65 +1,48 @@
-You will receive a comma-separated list of weather conditions, in the order they happened. Write one short phrase describing the weather overall, the way a person would say it out loud.
+You get the weather of an outdoor activity as short facts, one on each line. Someone asks "How was the weather?", and the answer is "It was ___". Write **only** the words in the blank.
 
-Every condition belongs to one of these groups:
-- Sky: Clear, Mostly clear, Partly cloudy, Mostly cloudy, Cloudy
-- Storms: Isolated thunderstorms, Scattered thunderstorms, Thunderstorms, Severe thunderstorm, Strong storms, Tropical storm, Hurricane, Tornado
-- Rain: Drizzle, Rain, Heavy rain, Scattered showers, Sun showers, Mixed rainfall, Freezing drizzle, Freezing rain
-- Snow and ice: Flurries, Sun flurries, Snow, Heavy snow, Snow showers, Scattered snow showers, Blowing snow, Blizzard, Sleet, Hail, Mixed rain & sleet, Mixed rain & snow, Mixed snow & sleet, Wintry mix
-- Air: Fog, Haze, Smoke, Dust, Blowing dust
-- Wind: Breezy, Windy
-- Temperature: Hot, Frigid
-
-Choose what to describe:
-1. Sky. Sky conditions run from Clear → Mostly clear → Partly cloudy → Mostly cloudy → Cloudy.
-   - Find the sky condition that appears most often, then the second most often.
-   - If they are next to each other on the scale and the second appears more than half as often as the first, use a range:
-     - Mostly clear + Partly cloudy → "Mostly clear to partly cloudy"
-     - Partly cloudy + Mostly cloudy → "Partly to mostly cloudy"
-     - Clear + Mostly clear → "Mostly clear"
-     - Mostly cloudy + Cloudy → "Mostly cloudy"
-   - Otherwise, use the most frequent sky condition alone. If two conditions that aren't next to each other on the scale tie, use the cloudier one.
-2. Precipitation (Storms, Rain, Snow and ice). If more than one appears, name the most severe one. If it covers only part of the list, describe it such as, for example, "a passing shower", "a brief thunderstorm", "heavy at times", "on-and-off", or similar phrases. If it covers most of the list, lead with it and drop the sky condition.
-3. Air. Use the adjective: foggy, hazy, smoky, dusty. Blowing dust is dusty and windy.
-4. Wind. Use breezy or windy. If both appear, use windy.
-5. Temperature. Use hot or frigid.
-
-Don't double count. Blizzard, Blowing snow, and Blowing dust already include wind. Sun showers and Sun flurries already include sun. Don't add a separate wind or sky word that repeats them.
-
-Write the phrase so it reads naturally:
-- Temperature and air words lead as adjectives ("Hot and hazy").
-- The sky condition comes next, and wind joins with "and" ("Mostly clear and windy").
-- Precipitation usually comes last after "with" ("Partly cloudy with a passing shower"), unless it leads.
-- Write "and" instead of "&".
-
-Mention at most three things. If the phrase would run past 40 characters or name more than three things, drop elements in this order until it fits: sky, air, wind, temperature. Never drop storms or precipitation.
-
-Rules:
-- 40 characters or fewer. Sentence case, no trailing period.
-- Never add "mostly" or "partly" to a condition, and never join conditions with "or".
-- Never mention two sky conditions, except as one of the ranges above.
-- Synonyms are acceptable as long as the summary of conditions remains accurate. Never describe or invent weather that isn't in the list.
-- No numbers, no emoji, no exclamation marks. Plain, factual American English.
+- Use each fact, and keep its meaning. A time word such as "briefly", "part of the time", "most of the time", or "on and off" must stay true.
+- Do not invent conditions that aren't present—do not add weather that the facts do not give.
+- Use common American English language that a person would use conversationally. Natural-language synonyms are encouraged as long as the meaning is preserved, such as "overcast" for cloudy, "drizzling" for drizzle, "very rainy" for heavy rain the whole time, etc.
+- Keep it short, about six words. Sentence case. No period, no numbers, no emoji, no preamble.
 
 Examples:
-- "Partly cloudy, Mostly clear, Partly cloudy" → "Partly cloudy"
-- "Mostly clear, Partly cloudy" → "Mostly clear to partly cloudy"
-- "Partly cloudy, Mostly cloudy, Partly cloudy, Mostly cloudy" → "Partly to mostly cloudy"
-- "Clear, Mostly clear" → "Mostly clear"
-- "Windy, Mostly clear, Windy" → "Mostly clear and windy"
-- "Cloudy, Drizzle" → "Cloudy and drizzling"
-- "Clear, Rain, Clear" → "Clear with a passing shower"
-- "Drizzle, Partly cloudy, Drizzle" → "On-and-off drizzle"
-- "Rain, Heavy rain, Rain" → "Rain, heavy at times"
-- "Partly cloudy, Isolated thunderstorms, Partly cloudy" → "Partly cloudy with a brief thunderstorm"
-- "Haze, Hot, Haze" → "Hot and hazy"
-- "Frigid, Clear, Windy" → "Frigid, clear, and windy"
-- "Mixed rain & snow, Wintry mix, Breezy" → "Breezy with a wintry mix"
-- "Blizzard, Heavy snow, Blizzard" → "Blizzard"
-- "Clear, Partly cloudy, Rain, Windy" → "Partly cloudy and windy with some rain"
 
-Never write phrases like these:
-- "Mostly partly cloudy"
-- "Mostly clear or partly cloudy"
-- "Clear to mostly clear"
-- "Windy with blizzard"
-- "Partly cloudy and Isolated thunderstorms"
+Precipitation: rain, part of the time
+Sky: cloudy
+→ Cloudy with some rain
+→ Overcast and raining for part of it
+
+Precipitation: drizzle, most of the time
+→ Drizzling for most of it
+→ Drizzling most of the time
+
+Wind: very windy
+Sky: cloudy
+→ Overcast and very windy
+→ Cloudy and very windy
+
+Precipitation: heavy rain, the whole time
+→ Heavy rain
+→ Very rainy
+
+Precipitation: scattered showers, briefly
+Sky: partly cloudy
+→ Partly cloudy with a passing shower
+→ Partly cloudy with brief showers
+→ Partly cloudy with scattered showers
+
+Precipitation: rain, part of the time, on and off
+Wind: breezy
+Sky: mostly cloudy
+→ Mostly cloudy and breezy with on-and-off rain
+→ Mostly cloudy and breezy with some rain
+→ Mostly cloudy and breezy with rain for part of it
+
+Precipitation: rain, most of the time
+Precipitation: thunderstorms, briefly
+→ Rainy with a brief thunderstorm
+→ Mostly rainy with brief thunderstorms
+
+Air: smoke, the whole time
+Sky: mostly clear
+→ Mostly clear but smoky

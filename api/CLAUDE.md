@@ -472,8 +472,8 @@ Thus that shared window is safe.
   TrainerRoad calendar. ⚠️ `TrainerRoad#planned_workouts` omits a race leg, thus that line is for a
   structured workout alone. `TrainerRoad#workouts`, which the widgets read for the rest-day check,
   counts a race leg: race day must not read as a rest day. The prompt is in `app/prompts/`, and the
-  job omits that line with no `ANTHROPIC_API_KEY`. Anthropic also writes the words of a weather
-  condition that changes: refer to the weather item below. It keeps the text that the user wrote above the
+  job omits that line with no `ANTHROPIC_API_KEY`. Anthropic also joins the facts of the weather
+  conditions into one phrase: refer to the weather item below. It keeps the text that the user wrote above the
   stat block: ⚠️ `Composer.headline` removes only a line that starts with an emoji of
   `Composer::STAT_EMOJIS`, thus a line of the owner that starts with another emoji stays.
   ⚠️ **The one exception is the 🗺️ map line that Zwift writes.** For an activity whose
@@ -522,7 +522,8 @@ Thus that shared window is safe.
   warm-up that uploads before the race ends is the longest run at that moment, and it keeps the
   name.
 - **The weather line comes from WeatherKit, and code writes each number of it.** An LLM writes
-  only the words of a condition that changes. Refer to the last items of this list.
+  only the words of the condition, from facts that code decides. Refer to the last items of this
+  list.
   `ActivityDescription::Weather` takes a sample of the GPS track each minute, and makes each
   decision: the condition, the rounded numbers, the units, and what to omit.
   `ActivityDescription::TrackWeather` gives the weather of each sample. It makes one WeatherKit
@@ -566,8 +567,8 @@ Thus that shared window is safe.
     decides it after the mix of the two query points. A code that is already precipitation does
     not change.
   - ⚠️ **Precipitation for part of the activity gives no time**, and only a TYPE other than the
-    main condition gets it, from `precipitation` in `config/conditions.yml` (rain, snow, ice,
-    mixed). Thus "Rain with some snow", and never "Rain with some heavy rain". An hourly code
+    main condition gets it, from `precipitation` in `config/conditions.yml` (rain, storm, snow,
+    ice, mixed). Thus "Rain with some snow", and never "Rain with some heavy rain". An hourly code
     cannot give minutes.
     That flag is not `adverse_weather`, which also marks wind, haze, smoke, fog, and cold.
   - The headwind shows on a bike ride only, at `HEADWIND_MIN_PERCENT` (50) or more, and with a
@@ -586,19 +587,33 @@ Thus that shared window is safe.
     and the day or night emoji from the position of the sun. ⚠️ Intervals.icu keeps the showers
     apart from the rain. There is no humidity and no time of precipitation. ⚠️ An activity with no
     GPS track gets no weather from either source.
-  - **An LLM summarizes a condition that changes** (`Llm.weather_conditions`). When the runs hold
-    two or more codes, the summary has `conditions`: the words of each condition in time order,
-    and no time and no share. The LLM gets that list, separated by commas, and gives one phrase in
-    place of the condition and the precipitation. The emoji stays the one that code selects.
+  - **An LLM joins the condition facts into one phrase** (`Llm.weather_conditions`), which is the
+    answer to "How was the weather?". `Weather#condition_facts` decides each fact and each word,
+    and the prompt holds the phrasing only. Each fact is one line, for example
+    `Precipitation: rain, part of the time`, and the order is the importance: the precipitation,
+    the wind, the air, and the sky. `MAX_FACTS` cuts the list from the end.
+    - The precipitation and the air get a `SHARE_WORDS` time word, and "on and off" when a run with
+      no fact separates two stretches. ⚠️ A storm is a type of its own (`precipitation: storm` in
+      `config/conditions.yml`), thus one hour of rain does not hide a short thunderstorm.
+    - ⚠️ **The wind word comes from the mean wind speed** (`WIND_WORDS`), and not from the Breezy
+      and Windy codes of Apple. The line prints that same speed.
+    - ⚠️ **The sky word is the main condition of the sky codes**, thus it agrees with the emoji.
+      Only with no sky code, for example when each hour is Windy, does the mean `cloudCover` give
+      it.
+    - ⚠️ **The phrase has no temperature, on purpose.** The line gives the numbers and the 🥵/🥶
+      emoji, thus the Hot and Frigid codes give no fact.
+    - **A sky word alone needs no LLM**: it becomes the condition, and the summary has no
+      `conditions`. A code that `config/conditions.yml` does not have gives no facts at all,
+      because that code can be precipitation.
     - ⚠️ **A phrase with a digit goes away**, and so does a phrase on more than one line, with the
       `·` separator, or longer than `MAX_WEATHER_CONDITIONS_LENGTH`. Code writes each number.
-    - ⚠️ **Redis keeps each phrase for 30 days**, below a digest of the prompt, the model, and the
-      list. Thus the Strava run and the Whoop run write the same words, and the second run makes
-      no PUT.
+    - ⚠️ **No cache keeps the phrase, on purpose.** The owner runs the description again to get a
+      new phrase. Thus the Strava run and the Whoop run can write different words, and the last
+      run wins.
     - With no `ANTHROPIC_API_KEY`, a failure, or a phrase that goes away, the code writes the words.
   - `rake "activity_weather:inspect[<ids>]"` prints the data and the line, and it writes nothing
-    to Strava. For a condition that changes, it also prints the line of the LLM, and that call fills
-    the Redis cache.
+    to Strava. For a summary with facts, it also prints the line of the LLM, from a new call
+    each time.
     WeatherKit keeps approximately four years of hours.
 - ⚠️ **Turnstile protects the JSON path only** (`request.format.json?`). Thus a POST from a script
   with no `Accept: application/json` does not do that check. We read this and **accepted** it: the

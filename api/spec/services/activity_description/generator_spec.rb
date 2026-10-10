@@ -550,7 +550,7 @@ RSpec.describe ActivityDescription::Generator do
     end
     let(:hours) do
       (13..15).map do |hour|
-        { forecastStart: "2026-07-09T#{hour}:00:00Z", temperature: 18.0, temperatureApparent: 18.0, windSpeed: 5.0,
+        { forecastStart: "2026-07-09T#{hour}:00:00Z", temperature: 18.0, temperatureApparent: 18.0, windSpeed: 5.0, cloudCover: 0.0,
           windDirection: 180, conditionCode: "Clear", daylight: true }
       end
     end
@@ -561,7 +561,7 @@ RSpec.describe ActivityDescription::Generator do
       allow(GoogleAirQuality).to receive(:history).and_return(nil)
     end
 
-    describe "a condition that changes" do
+    describe "more than one fact" do
       # 13:30 to 15:00: clear in the 14:00 hour, then rain in the 15:00 hour.
       let(:streams) do
         [
@@ -571,7 +571,7 @@ RSpec.describe ActivityDescription::Generator do
       end
       let(:hours) do
         (13..16).map do |hour|
-          { forecastStart: "2026-07-09T#{hour}:00:00Z", temperature: 18.0, temperatureApparent: 18.0, windSpeed: 5.0,
+          { forecastStart: "2026-07-09T#{hour}:00:00Z", temperature: 18.0, temperatureApparent: 18.0, windSpeed: 5.0, cloudCover: 0.0,
             windDirection: 180, conditionCode: hour >= 15 ? "Rain" : "Clear", daylight: true }
         end
       end
@@ -579,12 +579,12 @@ RSpec.describe ActivityDescription::Generator do
       before { allow(intervals).to receive(:activity!).and_return(activity.merge(trainer: false)) }
 
       it "writes the phrase of the LLM, and code writes each number and the emoji" do
-        allow(ActivityDescription::Llm).to receive(:weather_conditions).and_return("Clear, then rain")
+        allow(ActivityDescription::Llm).to receive(:weather_conditions).and_return("Clear with a passing shower")
 
         generator.generate!("i1")
 
-        expect(ActivityDescription::Llm).to have_received(:weather_conditions).with([ "Clear", "Rain" ])
-        expect(strava).to have_received(:update_activity!).with("s1", description: "☀️ Clear, then rain · 18°C · 5 km/h S wind\n⚡️ Avg 200 W")
+        expect(ActivityDescription::Llm).to have_received(:weather_conditions).with([ "Precipitation: rain, part of the time", "Sky: clear" ])
+        expect(strava).to have_received(:update_activity!).with("s1", description: "☀️ Clear with a passing shower · 18°C · 5 km/h S wind\n⚡️ Avg 200 W")
       end
 
       it "writes the words of the code when the LLM gives nothing or fails" do
@@ -598,7 +598,7 @@ RSpec.describe ActivityDescription::Generator do
       end
     end
 
-    it "never asks the LLM about one condition" do
+    it "never asks the LLM about a sky word alone" do
       allow(intervals).to receive(:activity!).and_return(activity.merge(trainer: false))
       allow(ActivityDescription::Llm).to receive(:weather_conditions)
 

@@ -292,7 +292,7 @@ module ActivityDescription
       end
       return if summary.nil?
 
-      # The LLM summarizes a condition that changes. With no answer, the code writes the words.
+      # The LLM joins the condition facts. With no answer, the code writes the words.
       changing = summary[:conditions] && swallow("weather conditions") { Llm.weather_conditions(summary[:conditions]) }
       sentence = swallow("weather sentence") { WeatherSentence.call(summary, changing) }
       return if sentence.blank?

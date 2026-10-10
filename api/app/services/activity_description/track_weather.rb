@@ -18,7 +18,7 @@ module ActivityDescription
 
     # The values that WeatherKit gives for each hour, and that the code interpolates in time and
     # mixes in space.
-    LINEAR_FIELDS = %i[temperature temperatureApparent windSpeed windGust humidity precipitationIntensity].freeze
+    LINEAR_FIELDS = %i[temperature temperatureApparent windSpeed windGust humidity cloudCover precipitationIntensity].freeze
     # The rate of precipitation, in mm/h, from which a point is wet. Below it, the precipitation is
     # a trace.
     MIN_PRECIPITATION_MM_PER_HOUR = 0.05

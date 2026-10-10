@@ -175,7 +175,7 @@ Hot:
 
 Hurricane:
   adverse_weather: true
-  precipitation: rain
+  precipitation: storm
   phrases:
     currently: there's a hurricane
     forecast: calls for hurricane conditions
@@ -185,7 +185,7 @@ Hurricane:
 
 IsolatedThunderstorms:
   adverse_weather: true
-  precipitation: rain
+  precipitation: storm
   phrases:
     currently: there are isolated thunderstorms
     forecast: calls for isolated thunderstorms
@@ -306,7 +306,7 @@ ScatteredSnowShowers:
 
 ScatteredThunderstorms:
   adverse_weather: true
-  precipitation: rain
+  precipitation: storm
   phrases:
     currently: there are scattered thunderstorms
     forecast: calls for scattered thunderstorms
@@ -316,7 +316,7 @@ ScatteredThunderstorms:
 
 SevereThunderstorm:
   adverse_weather: true
-  precipitation: rain
+  precipitation: storm
   phrases:
     currently: there's a severe thunderstorm
     forecast: calls for severe thunderstorms
@@ -365,7 +365,7 @@ SnowShowers:
 
 StrongStorms:
   adverse_weather: true
-  precipitation: rain
+  precipitation: storm
   phrases:
     currently: there are strong storms
     forecast: calls for strong storms
@@ -397,7 +397,7 @@ SunShowers:
 
 Thunderstorms:
   adverse_weather: true
-  precipitation: rain
+  precipitation: storm
   phrases:
     currently: there are thunderstorms
     forecast: calls for thunderstorms
@@ -407,6 +407,7 @@ Thunderstorms:
 
 Tornado:
   adverse_weather: true
+  precipitation: storm
   phrases:
     currently: there's a tornado
     forecast: calls for tornado conditions
@@ -416,7 +417,7 @@ Tornado:
 
 TropicalStorm:
   adverse_weather: true
-  precipitation: rain
+  precipitation: storm
   phrases:
     currently: there's a tropical storm
     forecast: calls for a tropical storm

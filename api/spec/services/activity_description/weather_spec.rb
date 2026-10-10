@@ -70,7 +70,6 @@ RSpec.describe ActivityDescription::Weather do
     result = summary(streams_for(north(51)))
 
     expect(result[:condition]).to eq("Clear")
-    expect(result[:conditions]).to eq(%w[Clear Cloudy])
   end
 
   it "interpolates between the hour before and the hour after each sample" do
@@ -164,7 +163,7 @@ RSpec.describe ActivityDescription::Weather do
       expect(result[:precipitation]).to eq(condition: "rain")
     end
 
-    it "counts a storm code as rain" do
+    it "counts a storm code as precipitation" do
       expect(spell("Cloudy", "ScatteredThunderstorms")[:precipitation]).to include(condition: "scattered thunderstorms")
     end
 
@@ -307,17 +306,80 @@ RSpec.describe ActivityDescription::Weather do
     end
   end
 
-  describe "the list of conditions" do
-    it "gives no list for one condition" do
-      expect(summary(streams_for(north(61)))).not_to have_key(:conditions)
+  describe "the condition facts" do
+    # One code for each hour. Over 240 minutes, the first hour and the last hour each have about
+    # 30 minutes, and each other hour has 60.
+    def facts_of(codes, minutes: 240, **fields)
+      allow(weather_kit).to receive(:hourly).and_return(codes.each_with_index.map { |code, offset| hour(offset, conditionCode: code, **fields) })
+      summary(streams_for(north(minutes)))
     end
 
-    it "gives the words of each condition in time order, with no time" do
-      allow(weather_kit).to receive(:hourly).and_return(
-        [ hour(0, conditionCode: "Cloudy"), hour(1, conditionCode: "Rain"), hour(2, conditionCode: "Cloudy"), hour(3, conditionCode: "Cloudy") ]
-      )
+    it "gives a sky word alone as the condition, and no facts" do
+      result = facts_of(%w[MostlyClear MostlyClear MostlyClear Clear Clear])
 
-      expect(summary(streams_for(north(150)))[:conditions]).to eq([ "Cloudy", "Rain", "Cloudy" ])
+      expect(result[:condition]).to eq("Mostly clear")
+      expect(result).not_to have_key(:conditions)
+    end
+
+    it "gives the precipitation with its share of the time, then the sky" do
+      expect(facts_of(%w[Cloudy Cloudy Rain Cloudy Cloudy])[:conditions]).to eq([ "Precipitation: rain, part of the time", "Sky: cloudy" ])
+    end
+
+    it "gives each step of SHARE_WORDS" do
+      expect(facts_of(%w[Cloudy Cloudy Cloudy Cloudy Rain])[:conditions].first).to eq("Precipitation: rain, briefly")
+      expect(facts_of(%w[Cloudy Rain Rain Rain Rain])[:conditions].first).to eq("Precipitation: rain, most of the time")
+      expect(facts_of(%w[Rain Rain Rain Rain Rain])[:conditions].first).to eq("Precipitation: rain, the whole time")
+    end
+
+    it "says on and off when a dry run separates two runs of precipitation" do
+      expect(facts_of(%w[Cloudy Rain Cloudy Rain Cloudy])[:conditions].first).to eq("Precipitation: rain, part of the time, on and off")
+    end
+
+    # ⚠️ It rained the whole time: a thunderstorm does not stop the rain.
+    it "gives a storm as a fact of its own, and it does not stop the rain" do
+      expect(facts_of(%w[Rain Rain Rain Thunderstorms Rain])[:conditions])
+        .to eq([ "Precipitation: rain, most of the time", "Precipitation: thunderstorms, part of the time" ])
+    end
+
+    it "omits the sky when the precipitation is most of the time" do
+      expect(facts_of(%w[Cloudy Rain Rain Rain Rain])[:conditions]).to eq([ "Precipitation: rain, most of the time" ])
+    end
+
+    it "gives the wind word of the mean wind speed, and no wind below the last step" do
+      expect([ 11.9, 12.0, 20.0, 29.0 ].map { |speed| facts_of(%w[Cloudy Cloudy Cloudy Cloudy Cloudy], windSpeed: speed)[:conditions] })
+        .to eq([ nil, [ "Wind: breezy", "Sky: cloudy" ], [ "Wind: windy", "Sky: cloudy" ], [ "Wind: very windy", "Sky: cloudy" ] ])
+    end
+
+    # The Windy code comes from Apple, and the line prints the wind speed.
+    it "gives no wind for a Windy code with a low wind speed, and the sky from the cloud cover" do
+      result = facts_of(%w[Windy Windy Windy Windy Windy], cloudCover: 0.5)
+
+      expect(result[:condition]).to eq("Partly cloudy")
+      expect(result).not_to have_key(:conditions)
+    end
+
+    it "gives no wind for a code that already says the wind" do
+      expect(facts_of(%w[Blizzard Blizzard Blizzard Blizzard Blizzard], windSpeed: 50.0)[:conditions])
+        .to eq([ "Precipitation: blizzard, the whole time" ])
+    end
+
+    it "gives an air fact with its share of the time" do
+      expect(facts_of(%w[Fog Fog Clear Clear Clear])[:conditions]).to eq([ "Air: fog, part of the time", "Sky: clear" ])
+    end
+
+    it "keeps MAX_FACTS, and drops the air and the sky first" do
+      expect(facts_of(%w[Rain Rain Fog Snow Cloudy], windSpeed: 30.0)[:conditions])
+        .to eq([ "Precipitation: rain, part of the time", "Precipitation: snow, part of the time", "Wind: very windy" ])
+    end
+
+    it "writes and in place of an ampersand" do
+      expect(facts_of(%w[Cloudy Cloudy MixedRainAndSnow Cloudy Cloudy])[:conditions].first)
+        .to eq("Precipitation: mixed rain and snow, part of the time")
+    end
+
+    # A code that the file does not have can be precipitation, and the facts would omit it.
+    it "gives no facts with a code that config/conditions.yml does not have" do
+      expect(facts_of(%w[Unknown Unknown Rain Rain Rain])).not_to have_key(:conditions)
     end
   end
 
