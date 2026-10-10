@@ -71,10 +71,6 @@ updates:
     ignore:
       - dependency-name: "satori"
         versions: [">=0.33.0"]
-      # ⚠️ @cloudflare/vitest-pool-workers has a peer dependency on vitest 4, and `npm ci` refuses
-      # vitest 5. Remove this entry when a release of the pool permits vitest 5.
-      - dependency-name: "vitest"
-        versions: [">=5.0.0"]
 
   # The local-only tools in utilities/. Nothing here goes to production, but all three have a
   # lockfile in the repo, and without this entry no CVE would ever change one. utilities/maps also

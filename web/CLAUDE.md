@@ -316,10 +316,10 @@ work, and it is more than unsupported. Read this again when typescript-eslint ac
 ESLint has **no format rule** on (a check gave 0 of 64), thus Prettier alone controls the layout and
 `eslint-config-prettier` is not necessary.
 
-⚠️ **The pool configuration is `vitest.config.mts`, and not `.ts`.** The pool 0.18 is ESM only, and
-with no `"type": "module"` in `package.json`, Vite loads a `.ts` configuration as CJS and the import
-fails. `test/helpers.ts` has its own code for the outbound fetch mock (`interceptFetch`), because
-the same release removed the `fetchMock` of the pool.
+⚠️ **The Vitest configuration is `vitest.config.mts`, and not `.ts`.** `@cloudflare/vitest-plugin`
+is ESM only, and with no `"type": "module"` in `package.json`, Vite loads a `.ts` configuration as
+CJS and the import fails. `test/helpers.ts` has its own code for the outbound fetch mock
+(`interceptFetch`), because the plugin has no `fetchMock`.
 
 ## Environment variables
 
@@ -415,7 +415,7 @@ jsdom has no `caches.default` and no `request.cf`.
 
 | Project | Covers | Runtime | Files |
 |---|---|---|---|
-| `worker` | `src/*.ts` | `workerd`, via `@cloudflare/vitest-pool-workers` | `test/*.test.ts` |
+| `worker` | `src/*.ts` | `workerd`, via `@cloudflare/vitest-plugin` | `test/*.test.ts` |
 | `browser` | `source/javascripts/**` | `jsdom` | `test/browser/**/*.test.js` |
 
 ⚠️ **The FILE EXTENSION keeps the two `include` globs apart, and not the directory.** The **worker**
@@ -424,7 +424,7 @@ stops at its first `document`, with an error that does not show the cause. Each 
 `.js` file.
 
 ⚠️ **No test covers the render of an OG card, on purpose, and no file in `test/` can import
-`src/og-render.ts`.** The fallback module loader of the pool sets the type for `.wasm` only. It
+`src/og-render.ts`.** The fallback module loader of the plugin sets the type for `.wasm` only. It
 reads each other extension as UTF-8 and parses it as JS. Thus the `.ttf` and `.png` Data modules of
 that file give a syntax error that does not show the cause. That is why `handleOg` takes its
 renderer as a `RenderCard` parameter and gets the true one through a dynamic `import()`.

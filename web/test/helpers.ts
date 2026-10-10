@@ -41,7 +41,7 @@ export const assetsRecording = (
 
 // ── Outbound fetch mocking ────────────────────────────────────────────────────────────────────
 // This replaces the old `fetchMock` of the pool, which was an undici MockAgent through
-// `cloudflare:test`. @cloudflare/vitest-pool-workers removed it in 0.18. The two supported
+// `cloudflare:test`. @cloudflare/vitest-plugin has no `fetchMock`. The two supported
 // replacements are MSW and a stub of `globalThis.fetch`. This is the stub, with the same rules that
 // the tests need:
 //

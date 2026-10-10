@@ -26,7 +26,7 @@
     "wrangler": "^4.149.0"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.22.0",
+    "@cloudflare/vitest-plugin": "^1.4.0",
     "@cloudflare/workers-types": "^5.20260930.2",
     "@eslint/js": "^10.0.1",
     "axe-core": "4.14.0",
@@ -38,6 +38,6 @@
     "stylelint-config-standard-scss": "^17.0.0",
     "stylelint-scss": "^7.3.0",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.11"
+    "vitest": "^5.0.3"
   }
 }

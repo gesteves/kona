@@ -1,10 +1,10 @@
-import { cloudflareTest } from '@cloudflare/vitest-pool-workers';
+import { cloudflareTest } from '@cloudflare/vitest-plugin';
 import { defineConfig } from 'vitest/config';
 
 // `npm test` runs TWO suites, which need two mutually incompatible runtimes — hence
 // `test.projects` rather than one flat config:
 //
-//   worker  — src/*.ts, the Cloudflare Worker, inside workerd via @cloudflare/vitest-pool-workers.
+//   worker  — src/*.ts, the Cloudflare Worker, inside workerd via @cloudflare/vitest-plugin.
 //   browser — source/javascripts/**, the Stimulus/Turbo bundle, inside jsdom.
 //
 // They can't share a config: the pool replaces the whole runtime with workerd, which has no
@@ -28,12 +28,6 @@ export default defineConfig({
         // binding, which points at ./build (absent in the CI `checks` job, which runs before any
         // build). We only mirror wrangler.jsonc's compatibility_date so the runtime matches what
         // ships.
-        //
-        // ⚠️ This is the Vitest 4 shape. It used to be a `test.poolOptions.workers` block inside
-        // `defineWorkersConfig` from `@cloudflare/vitest-pool-workers/config`; pool 0.18 dropped
-        // that subpath export, and the same options object is now the argument to the
-        // `cloudflareTest` *plugin* on a plain config. The pool version and the vitest major move
-        // together — the pool peer-depends on `vitest@^4.1`, so neither can be bumped alone.
         plugins: [
           cloudflareTest({
             miniflare: {

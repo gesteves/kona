@@ -197,7 +197,7 @@ jobs:
       # dependency version. Do not add a flag.
       #
       # ⚠️ If this step becomes red because of the tools again, increase the versions of
-      # `wrangler` and `@cloudflare/vitest-pool-workers` **together**. The pool pins the exact
+      # `wrangler` and `@cloudflare/vitest-plugin` **together**. The plugin pins the exact
       # versions of wrangler and miniflare. Thus npm moves an `npm update wrangler` alone back to
       # the pinned version, and nothing changes.
       - name: npm audit (JS dependency CVEs)
