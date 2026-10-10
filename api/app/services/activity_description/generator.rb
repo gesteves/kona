@@ -284,7 +284,7 @@ module ActivityDescription
 
       weather = nil
       summary = swallow("weather summary") do
-        streams = @intervals.activity_streams(activity[:id], types: %w[latlng time altitude])
+        streams = @intervals.activity_streams(activity[:id], types: %w[latlng time])
         # The headwind is for a bike ride only.
         cycling = ActivityMatcher.normalize_type(activity[:type]) == "Cycling"
         weather = Weather.new(activity, streams, unit: @intervals.temperature_unit, headwind: cycling, intervals: @intervals)

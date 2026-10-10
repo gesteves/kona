@@ -1,7 +1,7 @@
 module ActivityDescription
   # Makes a weather summary for the full track of an outdoor activity from the WeatherKit hours.
-  # It takes a sample of the GPS track at a fixed interval, gets the hours for each area that the
-  # track crosses, interpolates each sample in time, and then aggregates the samples by time.
+  # It takes a sample of the GPS track at a fixed interval, gets the hours at the position of each
+  # sample, interpolates each sample in time, and then aggregates the samples by time.
   # WeatherSentence writes the words from the Hash that #summary gives. Each decision is here: the
   # condition, the rounded numbers, the units, and what the line omits.
   #
@@ -10,16 +10,12 @@ module ActivityDescription
   # and no time of precipitation, thus that summary has neither. ⚠️ An activity with no GPS track
   # gets no weather from either source.
   class Weather
-    # The time between two samples of the track.
-    SAMPLE_SECONDS = 600
-    # The first radius of an area. Each area gets one WeatherKit call.
-    AREA_RADIUS_METERS = 5_000
-    # The first altitude band of an area, in meters above or below the altitude of its first sample.
-    # ⚠️ WeatherKit changes with the elevation, thus a climb out of the band starts a new area, and
-    # the top of a pass does not get the weather of the valley.
-    AREA_ALTITUDE_METERS = 150
-    # The most WeatherKit calls for one activity. A longer route makes each area larger.
-    MAX_AREAS = 12
+    # The time between two samples of the track: four samples each hour, and also the first and the
+    # last point. Each sample gets the weather at its own position.
+    SAMPLE_SECONDS = 900
+    # The decimals of each position that goes to WeatherKit, approximately 1 km. Samples that round
+    # to the same position share one call, for example during a stop.
+    COORDINATE_DECIMALS = 2
     # The length of one leg of the headwind measurement. A shorter leg reads GPS noise as a
     # direction, and a longer one cuts the corners of a road with many turns.
     LEG_METERS = 50
@@ -88,8 +84,8 @@ module ActivityDescription
     EARTH_RADIUS_METERS = 6_371_000.0
 
     # @param activity [Hash] The Intervals.icu activity. It needs `start_date`, in UTC.
-    # @param streams [Array<Hash>] The `latlng`, `time`, and optional `altitude` streams of
-    #   Intervals.icu. A `latlng` stream holds the latitudes in `data` and the longitudes in `data2`.
+    # @param streams [Array<Hash>] The `latlng` and `time` streams of Intervals.icu. A `latlng`
+    #   stream holds the latitudes in `data` and the longitudes in `data2`.
     # @param unit [Symbol] :celsius or :fahrenheit, from Intervals#temperature_unit. Fahrenheit
     #   also gives mph and inches.
     # @param headwind [Boolean] True to measure the headwind, which is for a bike ride only.
@@ -138,17 +134,10 @@ module ActivityDescription
     # The report from WeatherKit, over the full GPS track.
     # @return [Hash, nil] Nil when WeatherKit gives no data for most of the samples.
     def weathered_report(start, weighted)
-      areas = group_into_areas(weighted)
-      from = start.beginning_of_hour
-      to = (start + weighted.last[:offset]).beginning_of_hour + 2.hours
-
-      hours_by_area = areas.map do |area|
-        hours = @weather_kit.hourly(area[:latitude], area[:longitude], from: from, to: to)
-        index_hours(hours)
-      end
+      by_position = hours_by_position(start, weighted)
 
       weathered = weighted.filter_map do |sample|
-        hours = hours_by_area[sample[:area]]
+        hours = by_position[position(sample)]
         weather = hours && interpolate(hours, start + sample[:offset])
         weather && sample.merge(weather: weather)
       end
@@ -327,7 +316,7 @@ module ActivityDescription
     end
 
     # @return [Array<Hash>] Each GPS point with a numeric position, as { offset:, latitude:,
-    #   longitude:, altitude: }. The altitude is nil when the activity has no altitude stream.
+    #   longitude:, index: }.
     def track_points
       return @track_points if defined?(@track_points)
 
@@ -335,7 +324,6 @@ module ActivityDescription
       latlng = stream("latlng")
       latitudes = latlng&.dig(:data)
       longitudes = latlng&.dig(:data2)
-      altitudes = stream("altitude")&.dig(:data) || []
       return @track_points = [] if times.blank? || latitudes.blank? || longitudes.blank?
 
       @track_points = times.each_with_index.filter_map do |offset, index|
@@ -343,9 +331,7 @@ module ActivityDescription
         longitude = longitudes[index]
         next unless offset.is_a?(Numeric) && latitude.is_a?(Numeric) && longitude.is_a?(Numeric)
 
-        altitude = altitudes[index]
-        altitude = nil unless altitude.is_a?(Numeric)
-        { offset: offset, latitude: latitude.to_f, longitude: longitude.to_f, altitude: altitude&.to_f, index: index }
+        { offset: offset, latitude: latitude.to_f, longitude: longitude.to_f, index: index }
       end
     end
 
@@ -401,33 +387,26 @@ module ActivityDescription
       weighted
     end
 
-    # Puts each sample in the first area whose center is within the radius and the altitude band,
-    # or in a new area. A sample or a center with no altitude matches each band. With more than
-    # MAX_AREAS, it starts again with a larger radius and a larger band.
-    # @return [Array<Hash>] The areas, as { latitude:, longitude: }. Each sample gets an :area index.
-    def group_into_areas(samples)
-      radius = AREA_RADIUS_METERS
-      band = AREA_ALTITUDE_METERS
-      loop do
-        centers = []
-        samples.each do |sample|
-          area = centers.index { |center| distance(center, sample) <= radius && in_band?(center, sample, band) }
-          if area.nil?
-            centers << sample.slice(:latitude, :longitude, :altitude)
-            area = centers.size - 1
-          end
-          sample[:area] = area
-        end
-        return centers.map { |center| { latitude: center[:latitude].round(2), longitude: center[:longitude].round(2) } } if centers.size <= MAX_AREAS
+    # Gets the hours at the position of each sample, with one WeatherKit call for each position.
+    # ⚠️ The calls stop at the first position with no hours. Each call already tries again, thus an
+    # outage, or an activity older than the history of WeatherKit, costs one call and not one call
+    # for each sample. That keeps a long activity inside the lock of the generator.
+    # @return [Hash{Array(Float, Float) => Hash}] The hours by their start time, for each position.
+    def hours_by_position(start, samples)
+      from = start.beginning_of_hour
+      to = (start + samples.last[:offset]).beginning_of_hour + 2.hours
 
-        radius *= 1.5
-        band *= 1.5
+      samples.map { |sample| position(sample) }.uniq.each_with_object({}) do |position, result|
+        hours = index_hours(@weather_kit.hourly(*position, from: from, to: to))
+        break result if hours.nil?
+
+        result[position] = hours
       end
     end
 
-    def in_band?(center, sample, band)
-      center[:altitude].nil? || sample[:altitude].nil? || (center[:altitude] - sample[:altitude]).abs <= band
-    end
+    # @return [Array(Float, Float)] The latitude and the longitude of a sample, rounded to
+    #   COORDINATE_DECIMALS.
+    def position(sample) = [ sample[:latitude].round(COORDINATE_DECIMALS), sample[:longitude].round(COORDINATE_DECIMALS) ]
 
     # @return [Hash{Time => Hash}, nil] The hours by their start time.
     def index_hours(hours)

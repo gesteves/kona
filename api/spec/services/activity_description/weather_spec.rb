@@ -59,7 +59,7 @@ RSpec.describe ActivityDescription::Weather do
   it "asks for the hours from the start hour to two hours after the last sample" do
     summary(streams_for(north(61)))
 
-    expect(weather_kit).to have_received(:hourly).once.with(46.0, -119.0, from: start, to: start + 3.hours)
+    expect(weather_kit).to have_received(:hourly).with(46.0, -119.0, from: start, to: start + 3.hours)
   end
 
   it "interpolates between the hour before and the hour after each sample" do
@@ -422,42 +422,51 @@ RSpec.describe ActivityDescription::Weather do
     expect(result.summary).not_to have_key(:condition)
   end
 
-  describe "the altitude band of an area" do
-    # 30 minutes to the north, about 3.3 km, thus one area by distance.
-    def with_altitudes(altitudes) = streams_for(north(30)) + [ { type: "altitude", data: altitudes } ]
+  describe "the position of each sample" do
+    # 70 minutes to the north, 0.002° each minute. The samples are at minutes 0, 15, 30, 45, and 60,
+    # and at the last point, minute 69.
+    let(:track) { streams_for(Array.new(70) { [ 0.002, 0.0 ] }) }
+    let(:latitudes) { [ 46.0, 46.03, 46.06, 46.09, 46.12, 46.14 ] }
 
-    it "starts a new area when the track climbs out of AREA_ALTITUDE_METERS" do
-      summary(with_altitudes(Array.new(30) { |minute| minute * 10.0 }))
+    it "asks for the hours each 15 minutes, and at the last point" do
+      summary(track)
 
-      expect(weather_kit).to have_received(:hourly).twice
-      expect(weather_kit).to have_received(:hourly).with(46.0, -119.0, any_args)
-      expect(weather_kit).to have_received(:hourly).with(46.02, -119.0, any_args)
+      expect(weather_kit).to have_received(:hourly).exactly(6).times
+      latitudes.each { |latitude| expect(weather_kit).to have_received(:hourly).with(latitude, -119.0, any_args) }
     end
 
-    it "keeps one area for a flat track" do
-      summary(with_altitudes(Array.new(30, 1000.0)))
+    it "gives each sample the weather of its own position" do
+      allow(weather_kit).to receive(:hourly) do |latitude, *|
+        (0..3).map { |offset| hour(offset, temperature: latitude < 46.075 ? 10.0 : 20.0) }
+      end
+
+      expect(summary(track)[:temperature]).to eq(min: 10.0, max: 20.0)
+    end
+
+    it "makes one call for the samples at the same position" do
+      summary(streams_for(stop(30)))
 
       expect(weather_kit).to have_received(:hourly).once
     end
 
-    it "groups by distance alone with no altitude stream" do
-      summary(streams_for(north(30)))
+    # ⚠️ Each call already tries again. An outage must not cost one failed call for each sample.
+    it "stops the calls at the first position with no hours" do
+      allow(weather_kit).to receive(:hourly) do |latitude, *|
+        (0..3).map { |offset| hour(offset) } if latitude < 46.105
+      end
 
-      expect(weather_kit).to have_received(:hourly).once
+      result = summary(track)
+
+      expect(weather_kit).to have_received(:hourly).exactly(5).times
+      expect(result[:temperature]).to eq(min: 10.0, max: 10.0)
     end
   end
 
-  it "keeps the number of WeatherKit calls at MAX_AREAS on a long route" do
-    # Approximately 500 km to the north.
-    summary(streams_for(Array.new(300) { [ 0.015, 0.0 ] }))
-
-    expect(weather_kit).to have_received(:hourly).at_most(described_class::MAX_AREAS).times
-  end
-
-  it "gives nil when WeatherKit has no data" do
+  it "gives nil when WeatherKit has no data, after one call" do
     allow(weather_kit).to receive(:hourly).and_return(nil)
 
     expect(summary(streams_for(north(30)))).to be_nil
+    expect(weather_kit).to have_received(:hourly).once
   end
   # WeatherKit has no data, for example for an activity older than its history.
   describe "the Intervals.icu fallback" do

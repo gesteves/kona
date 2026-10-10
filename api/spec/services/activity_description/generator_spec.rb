@@ -556,7 +556,7 @@ RSpec.describe ActivityDescription::Generator do
     end
 
     before do
-      allow(intervals).to receive(:activity_streams).with("i1", types: %w[latlng time altitude]).and_return(streams)
+      allow(intervals).to receive(:activity_streams).with("i1", types: %w[latlng time]).and_return(streams)
       allow(WeatherKit).to receive(:hourly).and_return(hours)
       allow(GoogleAirQuality).to receive(:history).and_return(nil)
     end
