@@ -10,11 +10,12 @@ Examples:
 Precipitation: rain, part of the time
 Sky: cloudy
 → Cloudy with some rain
-→ Overcast and raining for part of it
+→ Overcast and some rain
+→ Cloudy and partly rainy
 
 Precipitation: drizzle, most of the time
-→ Drizzling for most of it
-→ Drizzling most of the time
+→ Drizzling
+→ Mostly drizzling
 
 Wind: very windy
 Sky: cloudy
@@ -37,6 +38,8 @@ Sky: mostly cloudy
 → Mostly cloudy and breezy with on-and-off rain
 → Mostly cloudy and breezy with some rain
 → Mostly cloudy and breezy with rain for part of it
+→ Mostly cloudy, breezy, and partly rainy
+→ Mostly cloudy, breezy, with some rain
 
 Precipitation: rain, most of the time
 Precipitation: thunderstorms, briefly
