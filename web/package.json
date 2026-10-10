@@ -23,7 +23,7 @@
     "esbuild": "^0.28.2",
     "pagefind": "^1.5.2",
     "satori": "^0.32.0",
-    "wrangler": "^4.144.0"
+    "wrangler": "^4.149.0"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.22.0",
