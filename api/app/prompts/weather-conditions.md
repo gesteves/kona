@@ -1,8 +1,8 @@
 You get the weather of an outdoor activity as short facts, one on each line. Someone asks "How was the weather?", and the answer is "It was ___". Write **only** the words in the blank.
 
-- Use each fact, and keep its meaning. A time word such as "briefly", "part of the time", "most of the time", or "on and off" must stay true.
+- Use each fact, and keep its meaning. Time descriptions such as "briefly", "part of the time", "most of the time", or "on and off" must stay true, even if reworded.
 - Do not invent conditions that aren't present—do not add weather that the facts do not give.
-- Use common American English language that a person would use conversationally. Natural-language synonyms are encouraged as long as the meaning is preserved, such as "overcast" for cloudy, "drizzling" for drizzle, "very rainy" for heavy rain the whole time, etc.
+- Use common American English wording and flowing prose that a person would use conversationally. Synonyms and rewording is acceptable as long as the meaning is preserved. 
 - Keep it short, about six words. Sentence case. No period, no numbers, no emoji, no preamble.
 
 Examples:
