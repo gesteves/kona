@@ -26,6 +26,8 @@ namespace :activity_weather do
       weather = ActivityDescription::Weather.new(activity, streams, unit: unit, headwind: cycling, intervals: intervals)
       summary = weather.summary
 
+      track = weather.track_weather
+      puts "WeatherKit: #{track.calls} calls, #{track.query_points.size} query points" if track
       puts summary ? JSON.pretty_generate(summary) : "(no weather)"
       next unless summary
 

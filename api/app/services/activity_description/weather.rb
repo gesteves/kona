@@ -1,7 +1,7 @@
 module ActivityDescription
   # Makes a weather summary for the full track of an outdoor activity from the WeatherKit hours.
-  # It takes a sample of the GPS track at a fixed interval, gets the hours at the position of each
-  # sample, interpolates each sample in time, and then aggregates the samples by time.
+  # It takes a sample of the GPS track each minute, gets the weather of each sample from
+  # TrackWeather, and then aggregates the samples by time.
   # WeatherSentence writes the words from the Hash that #summary gives. Each decision is here: the
   # condition, the rounded numbers, the units, and what the line omits.
   #
@@ -10,12 +10,9 @@ module ActivityDescription
   # and no time of precipitation, thus that summary has neither. ⚠️ An activity with no GPS track
   # gets no weather from either source.
   class Weather
-    # The time between two samples of the track: four samples each hour, and also the first and the
-    # last point. Each sample gets the weather at its own position.
-    SAMPLE_SECONDS = 900
-    # The decimals of each position that goes to WeatherKit, approximately 1 km. Samples that round
-    # to the same position share one call, for example during a stop.
-    COORDINATE_DECIMALS = 2
+    # The time between two samples of the track, and also the last point. A sample costs no
+    # WeatherKit call: TrackWeather decides the calls.
+    SAMPLE_SECONDS = 60
     # The length of one leg of the headwind measurement. A shorter leg reads GPS noise as a
     # direction, and a longer one cuts the corners of a road with many turns.
     LEG_METERS = 50
@@ -62,21 +59,6 @@ module ActivityDescription
     # the sun move the true sunrise below zero.
     SUNRISE_ELEVATION = -0.833
 
-    # The values that WeatherKit gives for each hour, and that the code interpolates in time.
-    LINEAR_FIELDS = %i[temperature temperatureApparent windSpeed windGust humidity precipitationIntensity].freeze
-    # The rate of precipitation, in mm/h, from which a sample is wet. Below it, the precipitation
-    # is a trace.
-    MIN_PRECIPITATION_MM_PER_HOUR = 0.05
-    # The condition code for a wet sample whose hour has a dry code, from the `precipitationType`
-    # of WeatherKit. Each type has steps of [the rate below which the code applies, the code].
-    # ⚠️ The condition codes of WeatherKit miss light rain: an hour with 0.4 mm/h can be "Cloudy".
-    PRECIPITATION_CODES = {
-      "rain" => [ [ 0.5, "Drizzle" ], [ 4.0, "Rain" ], [ Float::INFINITY, "HeavyRain" ] ],
-      "snow" => [ [ 0.5, "Flurries" ], [ 4.0, "Snow" ], [ Float::INFINITY, "HeavySnow" ] ],
-      "sleet" => [ [ Float::INFINITY, "Sleet" ] ],
-      "hail" => [ [ Float::INFINITY, "Hail" ] ],
-      "mixed" => [ [ Float::INFINITY, "MixedRainfall" ] ]
-    }.freeze
     # The sky-cover codes that are almost the same. The main condition is the family with the most
     # time, named by its code with the most time. Each other code is a family of its own.
     SKY_FAMILIES = { "Clear" => :clear, "MostlyClear" => :clear, "PartlyCloudy" => :cloudy, "MostlyCloudy" => :cloudy }.freeze
@@ -112,6 +94,15 @@ module ActivityDescription
     #   config/conditions.yml, or FALLBACK_EMOJI. Nil only when #summary is nil.
     def emoji = report&.dig(:emoji)
 
+    # The weather along the track. The inspect task reads its calls and its query points.
+    # @return [TrackWeather, nil] Nil with no start time.
+    def track_weather
+      return @track_weather if defined?(@track_weather)
+
+      start = start_time
+      @track_weather = start && TrackWeather.new(track_points, start: start, weather_kit: @weather_kit)
+    end
+
     private
 
     def report
@@ -134,11 +125,8 @@ module ActivityDescription
     # The report from WeatherKit, over the full GPS track.
     # @return [Hash, nil] Nil when WeatherKit gives no data for most of the samples.
     def weathered_report(start, weighted)
-      by_position = hours_by_position(start, weighted)
-
       weathered = weighted.filter_map do |sample|
-        hours = by_position[position(sample)]
-        weather = hours && interpolate(hours, start + sample[:offset])
+        weather = track_weather.at(sample)
         weather && sample.merge(weather: weather)
       end
       return if weathered.size * 2 < weighted.size
@@ -316,7 +304,7 @@ module ActivityDescription
     end
 
     # @return [Array<Hash>] Each GPS point with a numeric position, as { offset:, latitude:,
-    #   longitude:, index: }.
+    #   longitude:, meters:, index: }, where `meters` is the distance along the track.
     def track_points
       return @track_points if defined?(@track_points)
 
@@ -326,12 +314,17 @@ module ActivityDescription
       longitudes = latlng&.dig(:data2)
       return @track_points = [] if times.blank? || latitudes.blank? || longitudes.blank?
 
+      previous = nil
+      meters = 0.0
       @track_points = times.each_with_index.filter_map do |offset, index|
         latitude = latitudes[index]
         longitude = longitudes[index]
         next unless offset.is_a?(Numeric) && latitude.is_a?(Numeric) && longitude.is_a?(Numeric)
 
-        { offset: offset, latitude: latitude.to_f, longitude: longitude.to_f, index: index }
+        point = { offset: offset, latitude: latitude.to_f, longitude: longitude.to_f, index: index }
+        meters += distance(previous, point) if previous
+        previous = point
+        point.merge(meters: meters)
       end
     end
 
@@ -385,103 +378,6 @@ module ActivityDescription
       end
       weighted.each { |sample| sample[:seconds] = 1.0 } if weighted.sum { |sample| sample[:seconds] }.zero?
       weighted
-    end
-
-    # Gets the hours at the position of each sample, with one WeatherKit call for each position.
-    # ⚠️ The calls stop at the first position with no hours. Each call already tries again, thus an
-    # outage, or an activity older than the history of WeatherKit, costs one call and not one call
-    # for each sample. That keeps a long activity inside the lock of the generator.
-    # @return [Hash{Array(Float, Float) => Hash}] The hours by their start time, for each position.
-    def hours_by_position(start, samples)
-      from = start.beginning_of_hour
-      to = (start + samples.last[:offset]).beginning_of_hour + 2.hours
-
-      samples.map { |sample| position(sample) }.uniq.each_with_object({}) do |position, result|
-        hours = index_hours(@weather_kit.hourly(*position, from: from, to: to))
-        break result if hours.nil?
-
-        result[position] = hours
-      end
-    end
-
-    # @return [Array(Float, Float)] The latitude and the longitude of a sample, rounded to
-    #   COORDINATE_DECIMALS.
-    def position(sample) = [ sample[:latitude].round(COORDINATE_DECIMALS), sample[:longitude].round(COORDINATE_DECIMALS) ]
-
-    # @return [Hash{Time => Hash}, nil] The hours by their start time.
-    def index_hours(hours)
-      return if hours.blank?
-
-      hours.each_with_object({}) do |hour, index|
-        start = Time.iso8601(hour[:forecastStart].to_s)
-        index[start] = hour
-      rescue ArgumentError
-        next
-      end.presence
-    end
-
-    # The weather at one moment, from the hour before it and the hour after it.
-    # @return [Hash, nil]
-    def interpolate(hours, time)
-      first = hours[time.beginning_of_hour]
-      return if first.nil?
-
-      second = hours[time.beginning_of_hour + 1.hour] || first
-      fraction = (time - time.beginning_of_hour) / 3600.0
-
-      values = LINEAR_FIELDS.index_with do |field|
-        a = first[field]
-        b = second[field]
-        next if a.nil? && b.nil?
-
-        a = (a || b).to_f
-        b = (b || a).to_f
-        a + ((b - a) * fraction)
-      end
-
-      # ⚠️ The codes come from the nearest hour, and the rates are linear. Thus the time of each
-      # hour has the same error on each side. Apple says that an hour starts at `forecastStart`,
-      # but its history gives the rain of Open-Meteo at the same stamp, and Open-Meteo stamps the
-      # end of the hour.
-      nearest = fraction < 0.5 ? first : second
-      values[:windDirection] = interpolate_direction(first, second, fraction)
-      values[:conditionCode] = wet_code(nearest[:conditionCode], nearest[:precipitationType], values[:precipitationIntensity])
-      values[:daylight] = nearest[:daylight]
-      values
-    end
-
-    # The condition code of a sample. A dry code with a measurable rate of precipitation becomes a
-    # code of PRECIPITATION_CODES. A code that is already precipitation stays the same.
-    # @param code [String, nil] The condition code of the hour.
-    # @param type [String, nil] The `precipitationType` of the hour, for example "rain".
-    # @param intensity [Float, nil] The rate of precipitation, in mm/h.
-    # @return [String, nil]
-    def wet_code(code, type, intensity)
-      return code if code.present? && precipitation_type(code)
-      return code if intensity.to_f < MIN_PRECIPITATION_MM_PER_HOUR
-
-      steps = PRECIPITATION_CODES[type.to_s.downcase]
-      return code if steps.nil?
-
-      steps.find { |limit, _code| intensity < limit }.last
-    end
-
-    # ⚠️ A direction is an angle, thus the code interpolates it as a vector. A plain average of 350°
-    # and 10° gives 180°, which is the opposite wind.
-    def interpolate_direction(first, second, fraction)
-      x = 0.0
-      y = 0.0
-      [ [ first, 1 - fraction ], [ second, fraction ] ].each do |hour, share|
-        next if hour[:windDirection].nil?
-
-        speed = [ hour[:windSpeed].to_f, 0.1 ].max
-        radians = hour[:windDirection].to_f * Math::PI / 180
-        x += Math.sin(radians) * speed * share
-        y += Math.cos(radians) * speed * share
-      end
-      return if x.zero? && y.zero?
-
-      (Math.atan2(x, y) * 180 / Math::PI) % 360
     end
 
     # The condition code of the SKY_FAMILIES family with the most time in the runs, and whether most
@@ -684,8 +580,12 @@ module ActivityDescription
       weight = measured.sum { |leg| leg[:seconds] }
       return if weight.zero?
 
+      # Both lists are in time order, thus one walk finds the nearest sample of each leg.
+      nearest = 0
       ahead = measured.select do |leg|
-        wind = winds.min_by { |sample| (sample[:offset] - leg[:offset]).abs }[:weather][:windDirection]
+        nearest += 1 while nearest + 1 < winds.size &&
+                           (winds[nearest + 1][:offset] - leg[:offset]).abs < (winds[nearest][:offset] - leg[:offset]).abs
+        wind = winds[nearest][:weather][:windDirection]
         difference = (wind - leg[:bearing]).abs % 360
         [ difference, 360 - difference ].min <= HEADWIND_DEGREES
       end

@@ -62,6 +62,17 @@ RSpec.describe ActivityDescription::Weather do
     expect(weather_kit).to have_received(:hourly).with(46.0, -119.0, from: start, to: start + 3.hours)
   end
 
+  # Each sample counts for one minute, thus each condition gets its true share of the time.
+  it "gives each condition its true share of the time" do
+    allow(weather_kit).to receive(:hourly).and_return([ hour(0, conditionCode: "Clear"), hour(1, conditionCode: "Cloudy") ])
+
+    # 12:00 to 12:50: clear to 12:30, then cloudy.
+    result = summary(streams_for(north(51)))
+
+    expect(result[:condition]).to eq("Clear")
+    expect(result[:conditions]).to eq(%w[Clear Cloudy])
+  end
+
   it "interpolates between the hour before and the hour after each sample" do
     allow(weather_kit).to receive(:hourly).and_return([ hour(0, temperature: 10.0), hour(1, temperature: 20.0) ])
 
@@ -420,46 +431,6 @@ RSpec.describe ActivityDescription::Weather do
     result = weather(streams_for(north(61)))
     expect(result.emoji).to eq(described_class::FALLBACK_EMOJI)
     expect(result.summary).not_to have_key(:condition)
-  end
-
-  describe "the position of each sample" do
-    # 70 minutes to the north, 0.002° each minute. The samples are at minutes 0, 15, 30, 45, and 60,
-    # and at the last point, minute 69.
-    let(:track) { streams_for(Array.new(70) { [ 0.002, 0.0 ] }) }
-    let(:latitudes) { [ 46.0, 46.03, 46.06, 46.09, 46.12, 46.14 ] }
-
-    it "asks for the hours each 15 minutes, and at the last point" do
-      summary(track)
-
-      expect(weather_kit).to have_received(:hourly).exactly(6).times
-      latitudes.each { |latitude| expect(weather_kit).to have_received(:hourly).with(latitude, -119.0, any_args) }
-    end
-
-    it "gives each sample the weather of its own position" do
-      allow(weather_kit).to receive(:hourly) do |latitude, *|
-        (0..3).map { |offset| hour(offset, temperature: latitude < 46.075 ? 10.0 : 20.0) }
-      end
-
-      expect(summary(track)[:temperature]).to eq(min: 10.0, max: 20.0)
-    end
-
-    it "makes one call for the samples at the same position" do
-      summary(streams_for(stop(30)))
-
-      expect(weather_kit).to have_received(:hourly).once
-    end
-
-    # ⚠️ Each call already tries again. An outage must not cost one failed call for each sample.
-    it "stops the calls at the first position with no hours" do
-      allow(weather_kit).to receive(:hourly) do |latitude, *|
-        (0..3).map { |offset| hour(offset) } if latitude < 46.105
-      end
-
-      result = summary(track)
-
-      expect(weather_kit).to have_received(:hourly).exactly(5).times
-      expect(result[:temperature]).to eq(min: 10.0, max: 10.0)
-    end
   end
 
   it "gives nil when WeatherKit has no data, after one call" do

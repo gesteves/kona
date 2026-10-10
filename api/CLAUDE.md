@@ -523,12 +523,19 @@ Thus that shared window is safe.
   name.
 - **The weather line comes from WeatherKit, and code writes each number of it.** An LLM writes
   only the words of a condition that changes. Refer to the last items of this list.
-  `ActivityDescription::Weather` takes a sample of the GPS track each 15 minutes, and at the first
-  and the last point. It gets the past hours at the position of each sample, and makes each decision: the condition, the rounded
-  numbers, the units, and what to omit. Each position gets one WeatherKit call, thus the top of a
-  climb does not get the weather of the valley. ⚠️ The calls stop at the first position with no
-  hours. Each call already tries again, and an outage must not cost one failed call for each
-  sample. `WeatherSentence` only writes the words: the conditions, the temperature, the
+  `ActivityDescription::Weather` takes a sample of the GPS track each minute, and makes each
+  decision: the condition, the rounded numbers, the units, and what to omit.
+  `ActivityDescription::TrackWeather` gives the weather of each sample. It makes one WeatherKit
+  call in each cell of about 1 km (`CELL_DECIMALS`) that the track crosses, at the first track
+  point in that cell. A sample gets the two query points around it, mixed by the distance along
+  the track. One call gives each hour of a position, thus a sample costs no call.
+  ⚠️ The calls stop at the first position with no hours. Each call already tries again, and an
+  outage must not cost one failed call for each cell.
+  ⚠️ The range of each call is the hours of the activity. Do not widen it to share calls:
+  WeatherKit gives other values for the latest hours when the range starts earlier.
+  ⚠️ There is no temperature correction for the elevation. WeatherKit applies its own terrain at
+  each position, and it does not say for which elevation each value is.
+  `WeatherSentence` only writes the words: the conditions, the temperature, the
   humidity, the wind, and the AQI, with a middot between them, as in the other stat lines. For
   example `Cloudy with some rain · 11°C–13°C (feels like 8°C–10°C) · 12–18 km/h SSE wind
   with 24 km/h gusts (62% headwind) · AQI 54`. A wind range that starts at zero gives its top
@@ -553,9 +560,11 @@ Thus that shared window is safe.
     `forecastStart`, but the history of WeatherKit gives the rain of Open-Meteo at the same stamp,
     and Open-Meteo stamps the END of the hour.
   - ⚠️ **The condition codes of WeatherKit miss light rain**: an hour with 0.4 mm/h can be
-    "Cloudy". Thus a dry code with a `precipitationIntensity` of `MIN_PRECIPITATION_MM_PER_HOUR`
-    or more gets a code of `PRECIPITATION_CODES`, from its `precipitationType` and its rate. A code
-    that is already precipitation does not change.
+    "Cloudy". Thus a dry code with a `precipitationIntensity` of
+    `TrackWeather::MIN_PRECIPITATION_MM_PER_HOUR` or more gets a code of
+    `TrackWeather::PRECIPITATION_CODES`, from its `precipitationType` and its rate. The code
+    decides it after the mix of the two query points. A code that is already precipitation does
+    not change.
   - ⚠️ **Precipitation for part of the activity gives no time**, and only a TYPE other than the
     main condition gets it, from `precipitation` in `config/conditions.yml` (rain, snow, ice,
     mixed). Thus "Rain with some snow", and never "Rain with some heavy rain". An hourly code
