@@ -419,6 +419,34 @@ RSpec.describe ActivityDescription::Generator do
       expect(strava).to have_received(:update_activity!).with("s1", description: a_string_starting_with("🗓️ 2 hours of sweet spot"))
     end
 
+    # ⚠️ Intervals.icu keeps the name of the first upload, thus a Garmin name can hide the name that
+    # the Strava copy has.
+    it "matches the Strava name when the Intervals.icu name differs" do
+      allow(intervals).to receive(:activity!).and_return(activity.merge(name: "Teton County Cycling"))
+      allow(strava).to receive(:activity).and_return({ name: "Gibbs", description: nil })
+      allow(trainer_road).to receive(:planned_workouts)
+        .and_return([ { name: "Gibbs", sport: "Cycling", description: "2x20 @ 90%" } ])
+
+      generator.generate!("i1")
+
+      expect(ActivityDescription::Llm).to have_received(:planned_summary).with("2x20 @ 90%")
+    end
+
+    it "refuses a different workout in each of the two names" do
+      allow(intervals).to receive(:activity!).and_return(activity.merge(name: "Pettit"))
+      allow(strava).to receive(:activity).and_return({ name: "Gibbs", description: nil })
+      allow(trainer_road).to receive(:planned_workouts).and_return(
+        [
+          { name: "Gibbs", sport: "Cycling", description: "a" },
+          { name: "Pettit", sport: "Cycling", description: "b" }
+        ]
+      )
+
+      generator.generate!("i1")
+
+      expect(ActivityDescription::Llm).not_to have_received(:planned_summary)
+    end
+
     it "skips the headline when the activity is shorter than the workout" do
       allow(intervals).to receive(:activity!).and_return(activity.merge(name: "Gibbs on the trainer", moving_time: 3600))
       allow(trainer_road).to receive(:planned_workouts)

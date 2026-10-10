@@ -130,7 +130,7 @@ module ActivityDescription
       Composer.compose(
         headline: Composer.headline(current[:description], map: zwift),
         map: (Composer.map_line(current[:description]) if zwift),
-        planned: planned_summary_line(activity, sport),
+        planned: planned_summary_line(activity, sport, current[:name]),
         weather: weather_line(activity),
         water_temp: water_temp_line(activity, swim),
         power: Composer.power_block(activity),
@@ -209,29 +209,34 @@ module ActivityDescription
       end
     end
 
-    # The 🗓️ planned-workout summary: the one TrainerRoad workout whose name is in the name of the
+    # The 🗓️ planned-workout summary: the one TrainerRoad workout whose name is in a name of the
     # activity, with the same characters and the same case. The LLM writes the summary. With no
     # match, with more than one match, or with an activity that is too short for the workout, there
     # is no headline. This applies to a bike ride and to a run only.
+    # ⚠️ It reads the Strava name and the Intervals.icu name. Intervals.icu keeps the name of the
+    # first upload that it gets, thus the two names can be different.
+    # @param strava_name [String, nil] The name of the Strava copy.
     # @return [String, nil]
-    def planned_summary_line(activity, sport)
+    def planned_summary_line(activity, sport, strava_name)
       return unless HEADLINE_SPORTS.include?(sport)
-      return if activity[:name].blank?
+
+      names = [ strava_name, activity[:name] ].compact_blank.uniq
+      return if names.empty?
 
       planned = planned_workouts_for(activity)
       matches = planned.select do |workout|
         workout[:sport].present? &&
           ActivityMatcher.compatible_types?(sport, workout[:sport]) &&
           workout[:name].present? &&
-          activity[:name].include?(workout[:name])
+          names.any? { |name| name.include?(workout[:name]) }
       end
 
       if matches.empty?
-        log_info("no TR planned workout name appears in activity name #{activity[:name].inspect} — no headline")
+        log_info("no TR planned workout name appears in activity names #{names.inspect} — no headline")
         return
       end
       if matches.size > 1
-        log_warn("ambiguous TR name match for activity #{activity[:name].inspect}: #{matches.map { |m| m[:name] }.join(', ')} — refusing to pick, skipping headline")
+        log_warn("ambiguous TR name match for activity names #{names.inspect}: #{matches.map { |m| m[:name] }.join(', ')} — refusing to pick, skipping headline")
         return
       end
 
