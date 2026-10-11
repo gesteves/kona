@@ -268,6 +268,8 @@ export default class extends Controller {
         return;
       }
       this.fillTile(tile, answer);
+      // ⚠️ No `await`. `social#canPost` waits for each upload, and it must not wait for Claude too.
+      this.requestAlt(tile, { auto: true });
     } catch {
       // A remove or a Turbo visit aborted it, and the tile is already gone.
       if (aborter.signal.aborted) return;
@@ -485,6 +487,15 @@ export default class extends Controller {
   }
 
   /**
+   * Asks Claude again for the alt text of a tile, at a click of its Generate control.
+   */
+  generateAlt(event) {
+    event.preventDefault();
+    const tile = event.currentTarget.closest(PHOTO);
+    if (tile) this.requestAlt(tile);
+  }
+
+  /**
    * Asks Claude for the alt text of the photo of a tile, and writes the answer into its field.
    *
    * ⚠️ **The button is `loading` AND `disabled` while the request is out.** The `loading`
@@ -492,19 +503,24 @@ export default class extends Controller {
    * that it stops a click, thus `disabled` does. The check at the top stops a second request
    * for the moment between a click and the render.
    *
-   * ⚠️ The answer REPLACES the field. A value that code writes fires no event, thus this
-   * dispatches `input` on the field: `countAlt` runs for the tile and `social#validate` runs for
-   * the form, exactly as a keystroke would. A refusal leaves the field as it was and says why in
-   * a toast.
+   * ⚠️ A click REPLACES the field, because the owner asked for new words. The automatic request
+   * writes into an EMPTY field only: the owner can type while the upload or the request is out,
+   * and those words win. A value that code writes fires no event, thus this dispatches `input` on
+   * the field: `countAlt` runs for the tile and `social#validate` runs for the form, exactly as a
+   * keystroke would. A refusal leaves the field as it was and says why in a toast.
+   *
+   * ⚠️ It runs only when the tile has the Generate control. The server renders that control only
+   * with a Claude key, thus with no key the upload asks for nothing.
+   * @param {HTMLElement} tile
+   * @param {object} [options]
+   * @param {boolean} [options.auto] True for the request that the upload starts.
    */
-  async generateAlt(event) {
-    event.preventDefault();
-    const button = event.currentTarget;
-    if (button.loading) return;
-
-    const tile = button.closest(PHOTO);
-    const url = tile?.dataset.photoAltUrl;
-    if (!url) return;
+  async requestAlt(tile, { auto = false } = {}) {
+    const button = tile.querySelector("[data-photo-generate]");
+    const field = tile.querySelector("[data-photo-alt]");
+    const url = tile.dataset.photoAltUrl;
+    if (!button || !field || !url || button.loading) return;
+    if (auto && field.value?.trim()) return;
 
     button.loading = true;
     button.disabled = true;
@@ -523,8 +539,8 @@ export default class extends Controller {
         toast(answer.error || t(this.words, "alt_failed"), "danger");
         return;
       }
+      if (auto && field.value?.trim()) return;
 
-      const field = tile.querySelector("[data-photo-alt]");
       field.value = answer.alt ?? "";
       field.dispatchEvent(new Event("input", { bubbles: true }));
     } catch {

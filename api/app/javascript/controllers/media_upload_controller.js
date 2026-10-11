@@ -7,8 +7,8 @@ import { csrfHeader } from "../lib/csrf";
 const FILE = "[data-media-upload-target='file']";
 
 /**
- * The media uploader: it picks images, uploads each one at once, and collects the words that go
- * with it.
+ * The media uploader: it picks images, uploads each one at once, asks Claude for the alt text of
+ * each one, and collects the words that go with it.
  *
  * ⚠️ **Each file uploads at the moment the owner picks it**, and the form then carries the id and
  * not the bytes. A file input cannot be refilled by the server, thus a page that renders again
@@ -121,6 +121,8 @@ export default class extends Controller {
         return;
       }
       this.fillTile(tile, answer);
+      // ⚠️ No `await`. The submit waits for each upload, and it must not wait for Claude too.
+      this.requestAlt(tile, { auto: true });
     } catch {
       if (aborter.signal.aborted) return; // a remove or a Turbo visit
       this.dropTile(tile);
@@ -234,20 +236,34 @@ export default class extends Controller {
   }
 
   /**
-   * Asks Claude for the alt text of the picture of a tile, and writes the answer into its field.
-   *
-   * ⚠️ The answer REPLACES the field. The owner asked for it, thus a merge with what is there is
-   * not what they want.
+   * Asks Claude again for the alt text of a tile, at a click of its Generate control.
    * @param {Event} event
    */
-  async generateAlt(event) {
+  generateAlt(event) {
     event.preventDefault();
-    const button = event.currentTarget;
-    if (button.loading) return;
+    const tile = event.currentTarget.closest(FILE);
+    if (tile) this.requestAlt(tile);
+  }
 
-    const tile = button.closest(FILE);
-    const url = tile?.dataset.fileAltUrl;
-    if (!url) return;
+  /**
+   * Asks Claude for the alt text of the picture of a tile, and writes the answer into its field.
+   *
+   * ⚠️ A click REPLACES the field, because the owner asked for new words. The automatic request
+   * writes into an EMPTY field only: the owner can type while the upload or the request is out,
+   * and those words win.
+   *
+   * ⚠️ It runs only when the tile has the Generate control. The server renders that control only
+   * with a Claude key, thus with no key the upload asks for nothing.
+   * @param {HTMLElement} tile
+   * @param {object} [options]
+   * @param {boolean} [options.auto] True for the request that the upload starts.
+   */
+  async requestAlt(tile, { auto = false } = {}) {
+    const button = tile.querySelector("[data-file-generate]");
+    const field = tile.querySelector("[data-file-alt]");
+    const url = tile.dataset.fileAltUrl;
+    if (!button || !field || !url || button.loading) return;
+    if (auto && field.value?.trim()) return;
 
     // ⚠️ Both: `loading` draws the busy state and keeps the width, and nothing says that it stops
     // a click.
@@ -268,8 +284,8 @@ export default class extends Controller {
         toast(answer.error || t(this.words, "alt_failed"), "danger");
         return;
       }
+      if (auto && field.value?.trim()) return;
 
-      const field = tile.querySelector("[data-file-alt]");
       field.value = answer.alt ?? "";
       field.dispatchEvent(new Event("input", { bubbles: true }));
     } catch {

@@ -13,7 +13,7 @@
 <%# ⚠️ `data-file-alt-url` is the path of the Generate control of THIS tile. The server writes it
     here, and the answer of the upload writes it for a new tile, thus the JavaScript builds no
     path. The control renders only when Claude has a key, and it is disabled while the tile has
-    no id. %>
+    no id. ⚠️ The end of an upload asks for the alt text only when the tile has this control. %>
 <div class="media-file" data-media-upload-target="file"
      data-file-alt-url="<%= contentful_upload_file_alt_path(file.id) if file.id.present? %>">
   <%# The id that the upload answered with. It is empty while the upload is out, and the action

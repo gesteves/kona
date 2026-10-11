@@ -1621,13 +1621,17 @@ alt text takes the width. The owner drags a tile or moves it with the arrow keys
   (1000). One alt text goes to each network. The tile says when the text is past it, `social#canPost` keeps the submit off, and `#photo_error` refuses the request.
 - **The Preview panel shows the thumbnails on each row**, from `#preview_photos`, thus the
   panel still shows what the network will render.
-- **A Generate control below the alt text field asks Claude for it.** `AltText` sends the STORED
+- **Claude writes the alt text when the upload ends, and a Generate control below the field asks
+  again.** `AltText` sends the STORED
   JPEG, which is the picture that Bluesky will show, with the prompt in `app/prompts/alt-text.md`
   and a plain text answer (`AnthropicStructuredOutput#text_call`). The model is `claude-sonnet-5-5`,
   and `ANTHROPIC_ALT_TEXT_MODEL` replaces it. ⚠️ **The control renders with `ANTHROPIC_API_KEY`
   alone**, as the two other Claude features stay silent without one; `SocialPresenter#alt_text?`
-  carries that flag from the controller. ⚠️ The answer REPLACES the field, and the controller
-  dispatches `input` on it, thus the count and the submit button follow. ⚠️ The button is
+  carries that flag from the controller. ⚠️ The automatic request runs only for a tile with that
+  control, thus with no key the upload asks for nothing. ⚠️ A click REPLACES the field, and the
+  automatic request writes into an EMPTY field only: the owner can type while the upload is out.
+  The controller dispatches `input` on the field, thus the count and the submit button follow.
+  ⚠️ The submit does not wait for the alt text, as it does for an upload. ⚠️ The button is
   `loading` AND `disabled` while the request is out: `loading` draws the busy state and keeps the
   width, and nothing says that it stops a click. The call runs in the request, inside the
   20-second rack-timeout, thus `TIMEOUT_SECONDS` stays below it. It fails soft: a 502 with a
@@ -2158,8 +2162,9 @@ become different. `location_map_controller.js` holds the `variant` of each state
 ### The media uploader
 
 `/contentful/uploads` puts one or more images into Contentful as **published assets**. The owner
-picks the files, each one becomes a tile with a thumbnail, a title, and an alt-text field, a
-Generate control asks Claude for that text, and the submit makes the assets. The alt text becomes
+picks the files, each one becomes a tile with a thumbnail, a title, and an alt-text field, Claude
+writes that text when the upload ends, a Generate control asks again, and the submit makes the
+assets. The alt text becomes
 `fields.description`, which is the field that `web/` renders as the `alt` of an image.
 
 The page is a copy of the photo composer of the Social media page, with **no reorder**: the order
@@ -2195,8 +2200,9 @@ and says so, and no other part of the app changes.
     byte to Contentful. A content type from the browser is not such a check.
   - ⚠️ `RequestBodyLimit` has `/contentful/uploads/files` **above** `/contentful`: the first prefix
     wins, and the page itself is a small form of ids and words.
-- **The alt text** (`POST /contentful/uploads/files/:id/alt`). It is the same `AltText` service as
-  the Social media page, with the same prompt and the same model. ⚠️ It sends the **thumbnail**: a
+- **The alt text** (`POST /contentful/uploads/files/:id/alt`). The page asks for it when the pick
+  answers, with the rules of the Social media page. It is the same `AltText` service, with the
+  same prompt and the same model. ⚠️ It sends the **thumbnail**: a
   38MB camera JPEG as base64 is far past what the call should carry, and the description of a
   picture does not change with the resolution.
 - **The submit** (`POST /contentful/uploads`). It records each tile and adds one
