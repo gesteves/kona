@@ -1,6 +1,7 @@
 // The media uploader: the picker and the tiles of the picked files. It reads as the photo composer
 // of the Social media page reads, and the one difference is that a tile here has no grip: the order
-// of the tiles means nothing to Contentful. The list of the recent uploads uses `admin-card`.
+// of the tiles means nothing to Contentful. The list of the recent uploads uses `admin-card`, and
+// `.media-record` puts the X on a card.
 
 .media-upload {
   &__tiles {
@@ -78,5 +79,38 @@
 
   &__generate {
     align-self: start;
+  }
+}
+
+// One card of the recent uploads, inside an `admin-card`, in rows: the badge and the X, the title,
+// the file name, and the time.
+.media-record {
+  // The badge and the X, as a `wa-split`. ⚠️ No wrap: the X stays in the corner.
+  &__header {
+    flex-wrap: nowrap;
+  }
+
+  // The form of the X. ⚠️ A card with no X, which is one that processes, must put its title at the
+  // height of the cards beside it. Thus the X must add no height to its row.
+  &__dismiss {
+    align-self: center;
+    // ⚠️ Not the block default: a block puts the button on a line of text, and that line is
+    // taller than the badge.
+    display: flex;
+
+    // The X is taller than the badge. These margins give it no height, and the row centers it.
+    // The end margin puts the edge of the icon, and not of its square, on the edge of the text.
+    > wa-button {
+      margin-block: calc(var(--wa-form-control-height) / -2);
+      margin-inline-end: calc((1em - var(--wa-form-control-height)) / 2);
+    }
+
+    // ⚠️ The square of an icon button, as on `.media-file__remove`: <wa-button> makes one only
+    // for a <wa-icon> child.
+    > wa-button::part(button) {
+      aspect-ratio: 1;
+      padding: 0;
+      width: var(--wa-form-control-height);
+    }
   }
 }

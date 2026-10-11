@@ -74,18 +74,16 @@
         <li data-job-status-id="<%= upload.id %>" data-job-status-state="<%= upload.status %>">
           <wa-card class="admin-card">
             <div class="wa-stack wa-gap-m">
-              <div class="wa-cluster wa-gap-s">
-                <h3 class="admin-card__title wa-heading-m"><%= upload.title %></h3>
+              <div class="wa-split wa-gap-s media-record__header">
                 <wa-badge variant="<%= upload.status_variant %>" appearance="outlined">
                   <%= upload.status_label %>
                 </wa-badge>
-                <wa-relative-time class="admin-card__age wa-caption-s" date="<%= upload.uploaded_at %>" sync></wa-relative-time>
 
                 <%# The X takes the record off the list, and the asset stays in Contentful. It asks
                     nothing, because the list is a receipt. ⚠️ It is absent while the file is
                     processing: the job reads this record, thus a removal would stop the publish. %>
                 <% unless upload.processing? %>
-                  <%= form_with url: contentful_upload_path(upload.id), method: :delete do %>
+                  <%= form_with url: contentful_upload_path(upload.id), method: :delete, class: "media-record__dismiss" do %>
                     <wa-button type="submit" appearance="plain" size="small">
                       <%= raw icon_svg("classic", "light", "circle-xmark") %>
                       <span class="wa-visually-hidden"><%= t(".dismiss", title: upload.title) %></span>
@@ -93,6 +91,8 @@
                   <% end %>
                 <% end %>
               </div>
+
+              <h3 class="admin-card__title wa-heading-m"><%= upload.title %></h3>
 
               <p class="admin-card__summary"><%= upload.file_name %></p>
 
@@ -109,6 +109,8 @@
                   <%= t(".publishing") %>
                 </span>
               <% end %>
+
+              <wa-relative-time class="wa-caption-s" date="<%= upload.uploaded_at %>" sync></wa-relative-time>
             </div>
           </wa-card>
         </li>
