@@ -2233,6 +2233,11 @@ in-progress sentinel is the word **`processing`**, in that file and in each stor
 store that uses another word polls for all time. ⚠️ **This page needs the Sidekiq worker**: a file
 stays at "Processing" until the job publishes it, and the page says so when it finds no process.
 
+**The X of a card** (`DELETE /contentful/uploads/:id`) takes the record off the list, and the
+asset stays in Contentful. ⚠️ A card that is processing has no X, and the action refuses such a
+record: the job reads it, thus a removal would stop the publish with no message. The page sets
+`turbo-refresh-scroll` to `preserve`, thus the redirect after the X keeps the scroll position.
+
 ⚠️ **A publish of an asset starts the Contentful webhook**, thus each new image also gets its R2
 mirror copy and its blurhash placeholder, with no change to this code. It also builds the site, and
 that is the next section.

@@ -50,6 +50,7 @@ RSpec.describe "Public API host route constraints", type: :request do
     [ :get,  "/contentful/uploads" ],
     [ :post, "/contentful/uploads" ],
     [ :get,  "/contentful/uploads/status" ],
+    [ :delete, "/contentful/uploads/#{'a' * 32}" ],
     [ :post, "/contentful/uploads/files" ],
     [ :get,  "/contentful/uploads/files/#{'a' * 32}" ],
     [ :post, "/contentful/uploads/files/#{'a' * 32}/alt" ]

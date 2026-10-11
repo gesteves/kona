@@ -1,5 +1,9 @@
 <%= render "layouts/page_header", title: t("admin.pages.contentful_uploads") %>
 
+<%# The X of a card and the status poll both load this page again. Turbo then keeps the scroll
+    position, thus the owner can clear a list below the form with no jump to the top. %>
+<% content_for :head, tag.meta(name: "turbo-refresh-scroll", content: "preserve") %>
+
 <% unless @configured %>
   <wa-callout variant="warning">
     <%= slotted_icon_svg("classic", "light", "triangle-exclamation", slot: "icon") %>
@@ -76,6 +80,18 @@
                   <%= upload.status_label %>
                 </wa-badge>
                 <wa-relative-time class="admin-card__age wa-caption-s" date="<%= upload.uploaded_at %>" sync></wa-relative-time>
+
+                <%# The X takes the record off the list, and the asset stays in Contentful. It asks
+                    nothing, because the list is a receipt. ⚠️ It is absent while the file is
+                    processing: the job reads this record, thus a removal would stop the publish. %>
+                <% unless upload.processing? %>
+                  <%= form_with url: contentful_upload_path(upload.id), method: :delete do %>
+                    <wa-button type="submit" appearance="plain" size="small">
+                      <%= raw icon_svg("classic", "light", "circle-xmark") %>
+                      <span class="wa-visually-hidden"><%= t(".dismiss", title: upload.title) %></span>
+                    </wa-button>
+                  <% end %>
+                <% end %>
               </div>
 
               <p class="admin-card__summary"><%= upload.file_name %></p>

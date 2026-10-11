@@ -193,11 +193,14 @@ Rails.application.routes.draw do
 
       # The Contentful tools of the admin. Today there is one: the media uploader, which puts an
       # image into the space as a published asset.
-      # ⚠️ `contentful/uploads/status` and `contentful/uploads/files` are static segments. Keep
-      # both above any `:id` route that a later tool draws here.
-      get  "contentful/uploads"        => "contentful_uploads#index",  as: :contentful_uploads
-      post "contentful/uploads"        => "contentful_uploads#create"
-      get  "contentful/uploads/status" => "contentful_uploads#status", as: :contentful_uploads_status
+      # ⚠️ `contentful/uploads/status` and `contentful/uploads/files` are static segments. The `:id`
+      # of a record is 32 hex digits, thus that route cannot take either one. Keep that constraint,
+      # and keep both static segments above any `:id` route with no constraint.
+      get    "contentful/uploads"        => "contentful_uploads#index",   as: :contentful_uploads
+      post   "contentful/uploads"        => "contentful_uploads#create"
+      get    "contentful/uploads/status" => "contentful_uploads#status",  as: :contentful_uploads_status
+      delete "contentful/uploads/:id"    => "contentful_uploads#destroy", as: :contentful_upload,
+             constraints: { id: /\h{32}/ }
 
       # One picked file, before the owner submits the form. The page uploads each one at the moment
       # the owner picks it, and the form then carries the id.

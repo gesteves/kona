@@ -14,6 +14,8 @@
 <%# Turbo puts this nonce on each script that it adds, and it refreshes the tag at each visit. That
     is why each request can have its own nonce and a Drive navigation still works. %>
 <%= csp_meta_tag %>
+<%# The tags that one page adds with `content_for :head`. %>
+<%= content_for(:head) %>
 
 <script nonce="<%= content_security_policy_nonce %>">
   // The dark theme of Web Awesome uses a `.wa-dark` class, and not prefers-color-scheme. Thus this

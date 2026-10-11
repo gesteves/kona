@@ -55,6 +55,25 @@ module Admin
       render json: library.statuses
     end
 
+    # DELETE /contentful/uploads/:id
+    #
+    # Takes one record off the list. The asset in Contentful does not change.
+    #
+    # ⚠️ It refuses a record that is still processing. The job reads that record, thus a removal
+    # would stop the publish with no message.
+    def destroy
+      record = library.find(params[:id].to_s)
+      return redirect_to(contentful_uploads_path, status: :see_other) if record.nil?
+
+      if ContentfulUploadPresenter.new(record).processing?
+        return redirect_to(contentful_uploads_path, status: :see_other,
+                           alert: t("admin.contentful_uploads.flash.still_processing", title: record["title"]))
+      end
+
+      library.delete(record["id"])
+      redirect_to contentful_uploads_path, status: :see_other
+    end
+
     private
 
     def library

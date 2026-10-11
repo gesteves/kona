@@ -276,6 +276,7 @@ en:
 
     contentful_uploads:
       index:
+        dismiss: "Remove %{title} from the list"   # Visually hidden, on the X of a card.
         empty: "Nothing uploaded yet. Pick an image and it shows here once Contentful has
           published it."
         files: "Images"
@@ -317,6 +318,7 @@ en:
         publishing:
           one: "Uploading %{files} to Contentful. This takes a moment."
           other: "Uploading %{count} images to Contentful. This takes a moment."
+        still_processing: "%{title} is still publishing. Remove it from the list when it's done."
         too_many: "Upload at most %{count} images at a time."
         unconfigured: "Uploading needs a Contentful management token."
 

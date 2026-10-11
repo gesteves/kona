@@ -89,6 +89,28 @@ RSpec.describe "Admin Contentful uploads", type: :request do
         expect(response.body).to include('data-controller="job-status"')
         expect(response.body).to include("data-job-status-state=\"processing\"")
       end
+
+      # ⚠️ The job reads a record that is processing, thus its card has no X.
+      it "puts an X on a card only when the file is no longer processing" do
+        library = UploadLibrary.new
+        library.stage(id: "a" * 32, title: "Busy", alt: "", file_name: "a.jpg")
+        library.stage(id: "b" * 32, title: "Done", alt: "", file_name: "b.jpg")
+        library.update("b" * 32, "status" => "published")
+
+        get "/contentful/uploads"
+
+        page = Nokogiri::HTML(response.body)
+        expect(page.at("form[action='/contentful/uploads/#{'a' * 32}']")).to be_nil
+        expect(page.at("form[action='/contentful/uploads/#{'b' * 32}'] input[name='_method']")["value"]).to eq("delete")
+        expect(response.body).to include(ERB::Util.html_escape(I18n.t("admin.contentful_uploads.index.dismiss", title: "Done")))
+      end
+
+      # The X and the poll load the page again, and the owner must not lose the scroll position.
+      it "keeps the scroll position when the page loads itself again" do
+        get "/contentful/uploads"
+
+        expect(Nokogiri::HTML(response.body).at("head meta[name='turbo-refresh-scroll']")["content"]).to eq("preserve")
+      end
     end
   end
 
@@ -180,6 +202,60 @@ RSpec.describe "Admin Contentful uploads", type: :request do
 
         expect(flash[:alert]).to eq(I18n.t("admin.contentful_uploads.flash.unconfigured"))
         expect(ContentfulAssetJob.jobs).to be_empty
+      end
+    end
+  end
+
+  describe "DELETE /contentful/uploads/:id" do
+    let(:id) { "a" * 32 }
+
+    before { UploadLibrary.new.stage(id: id, title: "A photo", alt: "", file_name: "a.jpg") }
+
+    it "needs the owner session" do
+      UploadLibrary.new.update(id, "status" => "published")
+
+      delete "/contentful/uploads/#{id}"
+
+      expect(response).to redirect_to("/signin")
+      expect(UploadLibrary.new.find(id)).to be_present
+    end
+
+    context "when the owner is signed in" do
+      before { sign_in_as(email: owner_email) }
+
+      it "takes a published record off the list" do
+        UploadLibrary.new.update(id, "status" => "published")
+
+        delete "/contentful/uploads/#{id}"
+
+        expect(response).to redirect_to("/contentful/uploads")
+        expect(response).to have_http_status(:see_other)
+        expect(UploadLibrary.new.find(id)).to be_nil
+      end
+
+      it "takes a failed record off the list" do
+        UploadLibrary.new.update(id, "status" => "failed", "error" => "nope")
+
+        delete "/contentful/uploads/#{id}"
+
+        expect(UploadLibrary.new.find(id)).to be_nil
+      end
+
+      # ⚠️ The job reads this record. A removal while it is processing would stop the publish.
+      it "refuses a record that is still processing" do
+        delete "/contentful/uploads/#{id}"
+
+        expect(response).to redirect_to("/contentful/uploads")
+        expect(flash[:alert]).to eq(I18n.t("admin.contentful_uploads.flash.still_processing", title: "A photo"))
+        expect(UploadLibrary.new.find(id)).to be_present
+      end
+
+      # A double click sends the second request after the first one removed the record.
+      it "goes back to the list with no message for a record that is gone" do
+        delete "/contentful/uploads/#{'b' * 32}"
+
+        expect(response).to redirect_to("/contentful/uploads")
+        expect(flash[:alert]).to be_nil
       end
     end
   end
