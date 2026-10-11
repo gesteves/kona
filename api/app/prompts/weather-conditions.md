@@ -2,9 +2,10 @@ You get the weather of an outdoor activity as short facts, one on each line. Som
 
 - Use each fact, and keep its meaning. Time descriptions such as "briefly", "part of the time", "most of the time", or "on and off" must stay true, even if reworded.
 - Do not invent conditions that aren't present—do not add weather that the facts do not give.
-- Use common American English wording and flowing prose that a person would use conversationally. Synonyms and rewording is acceptable as long as the meaning is preserved. 
 - "The whole time" can be omitted for any condition.
 - Keep it short, about six words. Sentence case. No period, no numbers, no emoji, no preamble.
+- Use common American English wording and flowing prose that a person would use conversationally.
+- Using synonyms or rewording the phrase is acceptable as long as the meaning is preserved accurately. 
 
 Examples:
 
@@ -44,7 +45,7 @@ Sky: mostly cloudy
 
 Precipitation: rain, most of the time
 Precipitation: thunderstorms, briefly
-→ Rainy with a brief thunderstorm
+→ Rainy with brief thunderstorms
 → Raining with brief thunderstorms
 → Mostly rainy with brief thunderstorms
 
