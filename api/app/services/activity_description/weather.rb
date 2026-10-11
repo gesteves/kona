@@ -42,12 +42,10 @@ module ActivityDescription
     }.freeze
     # A condition that is shorter than this is noise, and the sequence omits it.
     MIN_CONDITION_SECONDS = 900
-    # ⚠️ The headwind is the wind within this angle of the direction of travel, on each side.
-    # Intervals.icu uses sectors too (its headwind and tailwind do not add up to 100%), thus the
-    # number keeps the meaning that it had.
-    HEADWIND_DEGREES = 45
-    # Below this mean wind speed, in km/h, the direction does not matter, and the summary has no
-    # headwind.
+    # The least head component of the wind, in km/h, for a leg with a headwind. The head component
+    # is the wind speed × the cosine of the angle between the wind and the direction of travel.
+    # Thus a stronger wind counts from a wider angle. The Intervals.icu fallback has no wind for
+    # each leg, thus it uses this value as the least mean wind.
     HEADWIND_MIN_KPH = 8
     # Below this share of the time, a headwind is not worth a word.
     HEADWIND_MIN_PERCENT = 50
@@ -114,6 +112,11 @@ module ActivityDescription
     #   config/conditions.yml, or FALLBACK_EMOJI. Nil only when #summary is nil.
     def emoji = report&.dig(:emoji)
 
+    # The inspect task reads this to tune HEADWIND_MIN_KPH and HEADWIND_MIN_PERCENT.
+    # @return [Integer, nil] The share of the moving time with a headwind, in percent, also below
+    #   HEADWIND_MIN_PERCENT. Nil for an activity that is not a bike ride, and with no wind.
+    def headwind_share = report&.dig(:headwind_share)
+
     # The weather along the track. The inspect task reads its calls and its query points.
     # @return [TrackWeather, nil] Nil with no start time.
     def track_weather
@@ -155,12 +158,14 @@ module ActivityDescription
       main = main_condition(runs)
       summary = aggregate(weathered, runs, main)
       summary[:aqi] = highest_aqi(start, weighted)
+      headwind = headwind_percent(weathered) if @headwind && summary[:wind]
+      summary[:headwind_percent] = headwind if headwind && headwind >= HEADWIND_MIN_PERCENT
       adverse = adverse?(main&.dig(:code)) || summary[:precipitation].present?
       emoji = report_emoji(
         condition_emoji(main), adverse: adverse, start: start, samples: weighted,
         feels_like: weathered.map { |sample| sample[:weather][:temperatureApparent] }
       )
-      { summary: summary.compact, emoji: emoji }
+      { summary: summary.compact, emoji: emoji, headwind_share: headwind }
     end
 
     # The report from the weather of the Intervals.icu activity: its temperatures, its wind range
@@ -184,8 +189,10 @@ module ActivityDescription
         wind: wind,
         aqi: highest_aqi(start, weighted)
       }
-      headwind = data[:headwind_percent].to_f.round
-      summary[:headwind_percent] = headwind if @headwind && wind && kph(data[:average_wind_speed]) >= HEADWIND_MIN_KPH && headwind >= HEADWIND_MIN_PERCENT
+      # ⚠️ This share comes from a sector of Intervals.icu, and not from the head component of
+      # #headwind_percent. Thus the two numbers do not have the same meaning.
+      headwind = data[:headwind_percent]&.to_f&.round if @headwind && wind
+      summary[:headwind_percent] = headwind if headwind && kph(data[:average_wind_speed]) >= HEADWIND_MIN_KPH && headwind >= HEADWIND_MIN_PERCENT
 
       middle = weighted[weighted.size / 2]
       daylight = daylight?(start + middle[:offset], middle[:latitude], middle[:longitude])
@@ -193,7 +200,7 @@ module ActivityDescription
         condition_emoji(code: code, daylight: daylight), adverse: adverse?(code), start: start, samples: weighted,
         feels_like: data.values_at(:min_feels_like, :max_feels_like)
       )
-      { summary: summary.compact, emoji: emoji }
+      { summary: summary.compact, emoji: emoji, headwind_share: headwind }
     end
 
     # The emoji of the line: HOT_EMOJI or COLD_EMOJI for a hot or a cold activity with no adverse
@@ -447,10 +454,6 @@ module ActivityDescription
         precipitation: precipitation_spell(runs, main)
       }
       add_facts(result, condition_facts(samples, runs, share))
-      if headwind?(samples, share)
-        percent = headwind_percent(samples)
-        result[:headwind_percent] = percent if percent && percent >= HEADWIND_MIN_PERCENT
-      end
       result.compact
     end
 
@@ -653,34 +656,36 @@ module ActivityDescription
 
     def precipitation_type(code) = CONDITIONS.dig(code.to_sym, :precipitation)
 
-    # @return [Boolean] True for a bike ride with a mean wind of at least HEADWIND_MIN_KPH.
-    def headwind?(samples, share)
-      @headwind && mean(samples, :windSpeed, share).to_f >= HEADWIND_MIN_KPH
-    end
-
-    # The share of the moving time where the wind comes from ahead. Each leg of #track_legs gets
-    # the wind direction of the sample nearest to it in time, because the wind changes slowly.
+    # The share of the moving time with a headwind. A leg of #track_legs has a headwind when its
+    # head component is HEADWIND_MIN_KPH or more. Each leg gets the wind of the sample nearest to it
+    # in time, because the wind changes slowly.
     # ⚠️ WeatherKit gives the direction that the wind comes FROM. Thus a headwind is a wind
     # direction near the direction of travel, and not near its opposite.
-    # @return [Integer, nil] Nil when no leg has moving time and a wind direction.
+    # ⚠️ A leg with no sample inside SAMPLE_SECONDS is past the WeatherKit coverage, and it does not
+    # count. Each track point has a sample at most SAMPLE_SECONDS before it.
+    # @param samples [Array<Hash>] The samples with weather, in time order.
+    # @return [Integer, nil] Nil when no leg has moving time and a wind.
     def headwind_percent(samples)
-      winds = samples.select { |sample| sample[:weather][:windDirection] }
+      winds = samples.select { |sample| sample[:weather][:windDirection] && sample[:weather][:windSpeed] }
       return if winds.empty?
-
-      measured = track_legs.select { |leg| leg[:seconds].positive? }
-      weight = measured.sum { |leg| leg[:seconds] }
-      return if weight.zero?
 
       # Both lists are in time order, thus one walk finds the nearest sample of each leg.
       nearest = 0
-      ahead = measured.select do |leg|
+      measured = track_legs.filter_map do |leg|
+        next unless leg[:seconds].positive?
+
         nearest += 1 while nearest + 1 < winds.size &&
                            (winds[nearest + 1][:offset] - leg[:offset]).abs < (winds[nearest][:offset] - leg[:offset]).abs
-        wind = winds[nearest][:weather][:windDirection]
-        difference = (wind - leg[:bearing]).abs % 360
-        [ difference, 360 - difference ].min <= HEADWIND_DEGREES
+        wind = winds[nearest]
+        next if (wind[:offset] - leg[:offset]).abs > SAMPLE_SECONDS
+
+        radians = (wind[:weather][:windDirection] - leg[:bearing]) * Math::PI / 180
+        leg.merge(ahead: wind[:weather][:windSpeed] * Math.cos(radians) >= HEADWIND_MIN_KPH)
       end
-      (ahead.sum { |leg| leg[:seconds] } * 100.0 / weight).round
+      weight = measured.sum { |leg| leg[:seconds] }
+      return if weight.zero?
+
+      (measured.select { |leg| leg[:ahead] }.sum { |leg| leg[:seconds] } * 100.0 / weight).round
     end
 
     def distance(a, b)

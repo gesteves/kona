@@ -31,6 +31,11 @@ namespace :activity_weather do
       puts summary ? JSON.pretty_generate(summary) : "(no weather)"
       next unless summary
 
+      if weather.headwind_share
+        puts "Headwind: #{weather.headwind_share}% of the moving time (the line shows it from " \
+             "#{ActivityDescription::Weather::HEADWIND_MIN_PERCENT}%)"
+      end
+
       puts [ weather.emoji, ActivityDescription::WeatherSentence.call(summary) ].compact.join(" ")
       changing = summary[:conditions] && ActivityDescription::Llm.weather_conditions(summary[:conditions])
       puts "LLM: #{[ weather.emoji, ActivityDescription::WeatherSentence.call(summary, changing) ].compact.join(' ')}" if changing

@@ -137,6 +137,38 @@ RSpec.describe ActivityDescription::Weather do
     expect(summary(streams_for(north(30)), headwind: false)).not_to have_key(:headwind_percent)
     expect(described_class.new(activity, streams_for(north(30)), unit: :celsius, weather_kit: weather_kit, air_quality: air_quality).summary)
       .not_to have_key(:headwind_percent)
+    expect(weather(streams_for(north(30)), headwind: false).headwind_share).to be_nil
+  end
+
+  # The head component is the wind speed × the cosine of the angle to the direction of travel.
+  it "counts a wind from an angle when its head component is HEADWIND_MIN_KPH or more" do
+    allow(weather_kit).to receive(:hourly).and_return((0..3).map { |offset| hour(offset, windSpeed: 20.0, windDirection: 60) })
+    expect(summary(streams_for(north(30)))[:headwind_percent]).to eq(100)
+
+    allow(weather_kit).to receive(:hourly).and_return((0..3).map { |offset| hour(offset, windSpeed: 10.0, windDirection: 60) })
+    expect(summary(streams_for(north(30)))).not_to have_key(:headwind_percent)
+  end
+
+  # The mean wind is 12 km/h, but the first 15 minutes have less than 8 km/h.
+  it "uses the wind of each leg, and not the mean wind of the ride" do
+    allow(weather_kit).to receive(:hourly).and_return([ hour(0, windSpeed: 4.0), hour(1, windSpeed: 20.0), hour(2, windSpeed: 20.0) ])
+
+    expect(summary(streams_for(north(61)))[:headwind_percent]).to be_within(3).of(75)
+  end
+
+  # WeatherKit has hours at the start longitude only, thus the east legs have no weather.
+  it "omits the legs past the WeatherKit coverage" do
+    hours = (0..3).map { |offset| hour(offset) }
+    allow(weather_kit).to receive(:hourly) { |_latitude, longitude, **| hours if longitude == -119.0 }
+
+    expect(summary(streams_for(north(30) + east(15)))[:headwind_percent]).to eq(100)
+  end
+
+  it "gives the share of the moving time also below HEADWIND_MIN_PERCENT" do
+    result = weather(streams_for(north(15) + east(15) + south(15) + west(15)))
+
+    expect(result.summary).not_to have_key(:headwind_percent)
+    expect(result.headwind_share).to be_within(2).of(25)
   end
 
   it "converts to °F and mph for an athlete who uses Fahrenheit" do
@@ -580,6 +612,12 @@ RSpec.describe ActivityDescription::Weather do
       expect(fallback(headwind: true).summary[:headwind_percent]).to eq(62)
       expect(fallback(headwind_percent: 37.4, headwind: true).summary).not_to have_key(:headwind_percent)
       expect(fallback.summary).not_to have_key(:headwind_percent)
+    end
+
+    it "gives the headwind share of Intervals.icu for a bike ride only" do
+      expect(fallback(headwind: true).headwind_share).to eq(62)
+      expect(fallback(headwind_percent: 37.4, headwind: true).headwind_share).to eq(37)
+      expect(fallback.headwind_share).to be_nil
     end
 
     it "gives no wind when the average rounds to zero" do

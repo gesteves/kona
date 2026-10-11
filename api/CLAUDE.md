@@ -571,9 +571,13 @@ Thus that shared window is safe.
     ice, mixed). Thus "Rain with some snow", and never "Rain with some heavy rain". An hourly code
     cannot give minutes.
     That flag is not `adverse_weather`, which also marks wind, haze, smoke, fog, and cold.
-  - The headwind shows on a bike ride only, at `HEADWIND_MIN_PERCENT` (50) or more, and with a
-    mean wind of `HEADWIND_MIN_KPH`. It reads each GPS point, in legs of `LEG_METERS`, and it
-    counts the moving time only. Thus a stop does not count as wind.
+  - The headwind shows on a bike ride only, at `HEADWIND_MIN_PERCENT` (50) or more of the moving
+    time. It reads each GPS point, in legs of `LEG_METERS`, and a stop does not count as wind. A
+    leg has a headwind when its head component is `HEADWIND_MIN_KPH` or more: the wind speed of
+    that leg × the cosine of the angle to the direction of travel. Thus a stronger wind counts from
+    a wider angle. ⚠️ The Intervals.icu fallback gives the share of Intervals.icu, which uses a
+    sector, thus the two numbers do not have the same meaning. `rake activity_weather:inspect`
+    prints the share also below the limit: use it to tune the two limits.
   - **The AQI is the highest of three points**: the start, the middle, and the end, from
     `GoogleAirQuality.history`, whatever its value. ⚠️ Google keeps 30 days, thus an older activity
     gets no AQI, and the line then has no AQI part. A point with no reading goes away, and the
