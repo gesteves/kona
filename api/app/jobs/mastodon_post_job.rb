@@ -5,8 +5,7 @@
 # instance then answers with the status that it made already. That window is not for ever, thus the
 # service also keeps the status in Redis for the length of the retries.
 class MastodonPostJob < SocialPostJob
-  # The prefix of each lock key. `spec/support/at_proto_session.rb` removes these keys before each
-  # example.
+  # The prefix of each lock key.
   ENQUEUE_LOCK_PREFIX = "mastodon:thread:".freeze
 
   # @param posts [Array<Hash>] `[{ "key" =>, "text" =>, "link" =>, "photos" => }, …]`, the whole

@@ -118,6 +118,17 @@ RSpec.describe "Widgets::Events upcoming", type: :request do
     expect(response.body).to match(%r{<a[^>]*href="https://example.com/race"[^>]*>[^<]+<span class="sr-only"> \(opens in a new tab\)</span></a>})
   end
 
+  # The web placeholder renders no location line for an event with no location.
+  it "renders no location line for an event with no location" do
+    allow(later_event).to receive(:location).and_return(nil)
+
+    get "/widgets/events/upcoming", headers: auth_headers
+
+    meta = response.body[%r{id="event-later456".*?<p class="entry__meta">(.*?)</p>}m, 1]
+    expect(meta).to be_present
+    expect(meta).not_to match(%r{<span><svg[^>]*></svg>\s*</span>})
+  end
+
   it "sets a one-hour edge caching header" do
     get "/widgets/events/upcoming", headers: auth_headers
 

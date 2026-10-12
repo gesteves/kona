@@ -65,12 +65,18 @@ RSpec.describe IndexNow do
   end
 
   context 'with a previous submission' do
-    it 'submits a URL that is new and a URL whose lastmod moved, and no other one' do
+    it 'submits a URL that is new, a URL whose lastmod moved, and a URL that went away, and no other one' do
       stored('https://example.com/' => '2026-09-05T18:57:14+00:00', 'https://example.com/old/' => '2026-01-01T00:00:00+00:00')
       allow(HTTParty).to receive(:post).and_return(response(200))
 
       # The home page did not move, the post is new, and /old/ is gone from the sitemap.
-      expect(submit).to eq([ 'https://example.com/2026/09/01/a-post/' ])
+      expect(submit).to eq([ 'https://example.com/2026/09/01/a-post/', 'https://example.com/old/' ])
+    end
+
+    it 'leaves out a URL that went away from another host' do
+      stored(sitemap.merge('https://old-host.example/gone/' => '2026-01-01T00:00:00+00:00'))
+      expect(HTTParty).not_to receive(:post)
+      expect(submit).to be_empty
     end
 
     it 'sends the host, the key, the keyLocation, and the URLs' do

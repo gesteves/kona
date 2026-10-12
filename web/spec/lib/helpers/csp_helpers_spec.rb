@@ -26,7 +26,7 @@ RSpec.describe CspHelpers do
 
   it 'starts each list with the hosts that every page needs' do
     expect(csp_frame_src.first).to eq('https://challenges.cloudflare.com')
-    expect(csp_script_src.first(3)).to eq([ "'self'", plausible_init_script_hash, 'https://challenges.cloudflare.com' ])
+    expect(csp_script_src.first(4)).to eq([ "'self'", plausible_init_script_hash, "'wasm-unsafe-eval'", 'https://challenges.cloudflare.com' ])
     expect(csp_script_src).to include('https://embed.bsky.app')
     expect(csp_script_src).not_to include("'unsafe-inline'")
   end

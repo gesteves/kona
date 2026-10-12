@@ -80,6 +80,14 @@ describe('cleanUpUrl', () => {
     expect(window.location.search).toBe('?q=hi&page=2');
   });
 
+  it('keeps the fragment', () => {
+    window.history.replaceState({}, '', '/post?utm_source=news#results');
+
+    analytics.cleanUpUrl();
+
+    expect(window.location.href).toBe('http://localhost:3000/post#results');
+  });
+
   it('leaves the history alone when there is nothing to strip', () => {
     // The check before the replaceState is important: a replaceState with no check would change the
     // history at each Turbo page view, for no purpose.

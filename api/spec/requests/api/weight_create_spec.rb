@@ -33,11 +33,24 @@ RSpec.describe "Weight", type: :request do
   end
 
   it "converts pounds to kilograms" do
-    post "/api/weight", params: { weight: 160, unit: "lb", date: "2026-10-01" }, headers: headers
+    travel_to Time.utc(2026, 10, 1, 18, 0) do
+      post "/api/weight", params: { weight: 160, unit: "lb", date: "2026-10-01" }, headers: headers
+    end
 
     expect(response).to have_http_status(:no_content)
     expect(IntervalsWeightJob).to have_enqueued_sidekiq_job(72.57, "2026-10-01")
     expect(StravaWeightJob).to have_enqueued_sidekiq_job(72.57)
+  end
+
+  # Strava keeps one current weight, thus an old value must not replace it.
+  it "sends a weight for a past day to Intervals.icu only" do
+    travel_to Time.utc(2026, 10, 6, 18, 0) do
+      post "/api/weight", params: { weight: 72.4, date: "2026-10-01" }, headers: headers
+    end
+
+    expect(response).to have_http_status(:no_content)
+    expect(IntervalsWeightJob).to have_enqueued_sidekiq_job(72.4, "2026-10-01")
+    expect(StravaWeightJob.jobs).to be_empty
   end
 
   {

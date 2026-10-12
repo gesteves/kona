@@ -489,6 +489,7 @@ DEPENDENCIES
   oj
   omniauth-google-oauth2
   omniauth-rails_csrf_protection
+  ostruct
   propshaft
   puma (>= 5.0)
   rack-attack

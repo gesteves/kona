@@ -124,11 +124,11 @@ have no proxy, on purpose: they need `wrangler dev` (refer to [`web/CLAUDE.md`](
 
 ## Duplicated across the two apps
 
-The aqi-map copy above is not the only one: five helpers are in both `api/` and `web/`, because they
-render markup that goes onto the **same page**. The static build renders an article, and the api
-renders the same summary text again, into the trending fragment and the related fragment that
-replace parts of that page. A difference between the two changes the typography, or the behavior of
-a link, in the middle of a page:
+The aqi-map copy above is not the only one: the logic in this table is in both `api/` and `web/`,
+because it renders markup that goes onto the **same page**. The static build renders an article and
+the upcoming races, and the api renders the same summary text again into the trending fragment, and
+the same races into the upcoming-races fragment. A difference between the two changes the
+typography, or the behavior of a link, in the middle of a page:
 
 | Logic | api | web |
 |---|---|---|
@@ -142,6 +142,7 @@ a link, in the middle of a page:
 | The blurhash placeholder | `services/blurhash_placeholder.rb` | `helpers/image_helpers.rb` |
 | The card `sizes` and its widths | `config/srcsets.yml` | `data/srcsets.yml` |
 | `article_click_classes` + `ARTICLE_CLICK_EVENT` | `helpers/plausible_helper.rb` | `helpers/site_helpers.rb` |
+| `upcoming_races`, `event_collection_variant`, `event_timestamp_tag`, `parse_event_date` | `helpers/events_helper.rb` | `helpers/event_helpers.rb` |
 
 ⚠️ **The cover image of a card is in two places, and no check compares them.** The api renders the
 card of the trending widget, and the build renders each other card, and the two go on the same page.
@@ -330,11 +331,12 @@ full site. The live-data widgets — `weather/current`, `activity-stats`, `whoop
 `plausible/pageviews/:id` — render nothing from Contentful and are in their own namespaces, and that
 is what keeps them out of this rule.
 
-⚠️ **The OG card paths are NOT outside the first part, on purpose.** The content addresses each
-article card, thus such a card needs no purge. But a **listing page** — the blog index, a tag
-archive, and the home page — is not a Contentful entry. Thus its card URL never changes, and its
-`og:title` can change. For those pages, the deploy purge is the only automatic refresh, and it is
-always correct, because a Contentful publish is the thing that changes such a title.
+⚠️ **The content addresses each OG card URL, thus a card needs no purge.** The Worker stores a card
+with `caches.default.put` and writes no `Cache-Tag`, and the Cloudflare docs give that header as
+the method to tag a Cache API entry. Thus do not trust the deploy purge to reach a card. An article
+card has its `published_version` in its URL. A **listing page** — the blog index, a tag archive,
+and the home page — is not a Contentful entry, thus its URL has a digest of its `og:title` (refer to
+[`web/CLAUDE.md`](web/CLAUDE.md)).
 
 ⚠️ **The host of the image mirror is absent from both parts, on purpose.** Each of its objects is
 immutable and the content gives its address, thus a purge can correct nothing. And with the tag,

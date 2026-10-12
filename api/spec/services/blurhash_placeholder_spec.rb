@@ -34,6 +34,19 @@ describe BlurhashPlaceholder do
       expect(service.generate("asset1")).to eq(:stored)
     end
 
+    # ImagesHelper puts the value in `url('...')`, thus a raw quote would end that CSS string.
+    it "escapes each quote and angle bracket, and keeps a slash as it is" do
+      stub_fetch
+      stored = nil
+      allow($redis).to receive(:set) { |_key, value, **| stored = value }
+
+      service.generate("asset1")
+
+      body = stored.delete_prefix("data:image/svg+xml;charset=utf-8,")
+      expect(body).not_to match(/['"<> #]/)
+      expect(body).to include("http://www.w3.org/2000/svg")
+    end
+
     it "gets the thumbnail from the Contentful Images API, and not from the mirror" do
       stub_fetch
 

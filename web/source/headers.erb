@@ -49,6 +49,9 @@
 /stylesheets/*
   Cache-Control: public, max-age=31536000, immutable
 
+/fonts/*
+  Cache-Control: public, max-age=31536000, immutable
+
 # These URLs stay the same but their content changes at each build. Their extensions are in the
 # default edge cache of Cloudflare (.xml, .json, .txt, .png, .ico). Store them, but always check
 # them against the ETag. A deploy does NOT invalidate the edge by itself: Cloudflare serves its

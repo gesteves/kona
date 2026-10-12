@@ -7,6 +7,13 @@ class LocationSyncJob < ApplicationJob
   # @param latitude [Float]
   # @param longitude [Float]
   def perform(latitude, longitude)
+    # ⚠️ Send the stored location only. Two saves close together, or a retry that runs late, would
+    # otherwise put an older location on Intervals.icu after the newer one.
+    unless Location.stored == [ latitude.to_f, longitude.to_f ]
+      Rails.logger.info("Location sync skipped: (#{latitude}, #{longitude}) is no longer the stored location")
+      return
+    end
+
     LocationSync.new.call(latitude, longitude)
     Rails.logger.info("Location synced to Intervals.icu (#{latitude}, #{longitude})")
   end

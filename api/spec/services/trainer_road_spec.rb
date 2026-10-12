@@ -146,6 +146,17 @@ RSpec.describe TrainerRoad do
       expect(service.planned_workouts(date)).to eq([])
     end
 
+    it "caches a day with no planned workout, and reads that copy as an empty list" do
+      stub_calendar([ { all_day: true, summary: "Rest Day" } ])
+
+      service.planned_workouts(date)
+      expect($redis).to have_received(:setex)
+        .with(a_string_starting_with("trainerroad:planned:"), 5.minutes.to_i, ApplicationService::EMPTY_SENTINEL)
+
+      allow($redis).to receive(:get).and_return(ApplicationService::EMPTY_SENTINEL)
+      expect(service.planned_workouts(date)).to eq([])
+    end
+
     it "excludes race legs whose stripped name matches a same-day race umbrella" do
       stub_calendar([
         { all_day: true, summary: "Escape from Alcatraz" },
@@ -261,6 +272,28 @@ RSpec.describe TrainerRoad do
 
       expect(service.workouts.map { |w| w[:name] }).to eq([ "Escape from Alcatraz" ])
       expect(service.planned_workouts(Date.new(2026, 7, 9))).to eq([])
+    end
+
+    # A rest day is a usual answer, thus a miss must not read the full feed again.
+    it "caches a day with no workout, and reads that copy as an empty list" do
+      stub_calendar([ { all_day: true, date: "20260709", summary: "Rest Week" } ])
+
+      expect(service.workouts).to eq([])
+      expect($redis).to have_received(:setex)
+        .with(a_string_starting_with("trainerroad:workouts:"), 5.minutes.to_i, ApplicationService::EMPTY_SENTINEL)
+
+      allow($redis).to receive(:get).and_return(ApplicationService::EMPTY_SENTINEL)
+      expect(service.workouts).to eq([])
+    end
+
+    it "does not cache a failure of the feed, thus the next request tries again" do
+      allow(HTTParty).to receive(:get).and_return(
+        instance_double(HTTParty::Response, success?: false, code: 500, body: "boom")
+      )
+      allow(service).to receive(:report_upstream_error)
+
+      expect(service.workouts).to eq([])
+      expect($redis).not_to have_received(:setex)
     end
 
     it "does not count an annotation, which is an all-day event with no duration" do

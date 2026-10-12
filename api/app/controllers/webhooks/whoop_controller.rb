@@ -34,8 +34,10 @@ module Webhooks
       # The signature check accepts a timestamp of some minutes, thus a replay inside that window
       # would add the job again. The job can run more than one time, but each run makes a new
       # description with a new text. This id stays for the window.
-      unless $redis.set("whoop:webhook:#{payload['type']}:#{payload['id']}", "1", nx: true, ex: WhoopRequestVerification::MAX_TIMESTAMP_SKEW.to_i)
-        Rails.logger.info("Whoop webhook repeated: #{payload['type']} (id=#{payload['id']})")
+      # ⚠️ The key is the trace id of the event, and not its type and resource id. Whoop can send a
+      # second update for one workout when its score is ready, and that event must not go away.
+      unless $redis.set("whoop:webhook:#{payload['trace_id']}", "1", nx: true, ex: WhoopRequestVerification::MAX_TIMESTAMP_SKEW.to_i)
+        Rails.logger.info("Whoop webhook repeated: #{payload['type']} (id=#{payload['id']}, trace=#{payload['trace_id']})")
         return render json: { ok: true, duplicate: true }
       end
 

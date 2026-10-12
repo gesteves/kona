@@ -4,8 +4,9 @@
 #
 # ⚠️ `expire_after` is the reason for this file. A cookie session has no record on the server, thus
 # there is nothing to remove: without a new `secret_key_base`, a cookie that an attacker takes works
-# until the browser removes it, and for a session cookie that can be a very long time. This value
-# gives a maximum.
+# until the browser removes it, and for a session cookie that can be a very long time. Rack writes
+# the cookie again at each request, thus this value is an idle limit. The maximum is
+# Authentication::MAX_SESSION_AGE, from the sign-in time in the session.
 Rails.application.config.session_store :cookie_store,
   key: "_api_session",
   same_site: :lax,

@@ -36,9 +36,7 @@ class SidekiqOwnerGuard
   end
 
   def call(env)
-    session = env["rack.session"]
-    owner = ENV["OWNER_EMAIL"].to_s
-    return @app.call(env) if owner.present? && session && session["owner_email"] == owner
+    return @app.call(env) if Authentication.owner_session?(env["rack.session"])
 
     [ 302, { "location" => "/signin" }, [] ]
   end

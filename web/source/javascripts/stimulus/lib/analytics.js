@@ -113,10 +113,8 @@ export function cleanUpUrl() {
   });
 
   if (paramRemoved) {
-    const cleanURL =
-      window.location.origin +
-      window.location.pathname +
-      (params.toString() ? '?' + params.toString() : '');
+    // The URL object keeps the #fragment, and it writes no "?" when no parameter stays.
+    const cleanURL = currentUrl.toString();
     // ⚠️ Keep the state that exists. Turbo holds its restorationIdentifier in the history state,
     // and this code runs at each turbo:load. If it writes {} for a URL with a utm_ or ref
     // parameter, the scroll position and the snapshot do not come back on a back navigation, and

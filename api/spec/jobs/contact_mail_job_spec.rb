@@ -28,7 +28,8 @@ RSpec.describe ContactMailJob do
       hash_including(
         "to" => "owner@example.test",
         "reply_to" => "jane@example.com",
-        "text" => a_string_including("Boise, Idaho, US", "203.0.113.7", "Mozilla/5.0")
+        "text" => a_string_including("Boise, Idaho, US", "203.0.113.7", "Mozilla/5.0"),
+        "idempotency_key" => a_string_matching(/\A\h{8}-\h{4}-\h{4}-\h{4}-\h{12}\z/)
       )
     )
   end

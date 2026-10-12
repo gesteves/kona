@@ -230,9 +230,6 @@ class SocialPresenter
     network&.connected? && selected?(TOPIC_NETWORK) || false
   end
 
-  # @return [Boolean] True when the draft is a thread and not one post.
-  def thread? = @posts.length > 1
-
   # @return [Integer]
   def max_posts = MAX_POSTS
 

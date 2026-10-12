@@ -218,6 +218,17 @@ RSpec.describe "Webhooks::Contentful", type: :request do
       expect(response).to have_http_status(:unauthorized)
       expect(StandardSiteSyncJob.jobs).to be_empty
     end
+
+    # The two clocks are not the same, and Contentful never sends a refused webhook again.
+    it "accepts a timestamp some seconds in the future" do
+      post_webhook(entry_payload("entry123", "article"), topic: "ContentManagement.Entry.publish", timestamp: now_ms + 2_000)
+      expect(response).to have_http_status(:no_content)
+    end
+
+    it "rejects a timestamp far in the future" do
+      post_webhook(entry_payload("entry123", "article"), topic: "ContentManagement.Entry.publish", timestamp: now_ms + 60_000)
+      expect(response).to have_http_status(:unauthorized)
+    end
   end
 
   context "when the secret is not configured" do

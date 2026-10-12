@@ -107,19 +107,27 @@ function cardElement(title: string): Element {
   );
 }
 
-let ready: Promise<void> | undefined;
+let yogaReady: Promise<void> | undefined;
+let resvgReady: Promise<void> | undefined;
 
 /**
  * Starts both wasm modules, one time for each isolate.
  * It keeps a promise, and not a boolean. resvg sets its own flag only after it waits for the load.
  * Thus two first requests at the same time would both go past that flag, and the second one would
  * raise "Already initialized" and make the isolate unusable.
+ * ⚠️ Each module has its own promise, and a rejection clears that promise only. A kept rejection
+ * fails each later card of the isolate, and a second initWasm after a success raises.
  */
-function init(): Promise<void> {
-  ready ??= (async () => {
-    await Promise.all([initYoga(yogaWasm), initWasm(resvgWasm)]);
-  })();
-  return ready;
+function init(): Promise<unknown> {
+  yogaReady ??= initYoga(yogaWasm).catch((error: unknown) => {
+    yogaReady = undefined;
+    throw error;
+  });
+  resvgReady ??= initWasm(resvgWasm).catch((error: unknown) => {
+    resvgReady = undefined;
+    throw error;
+  });
+  return Promise.all([yogaReady, resvgReady]);
 }
 
 /**
@@ -146,15 +154,19 @@ export async function renderCard(
 
   // satori puts the font in the SVG as vector paths, thus resvg needs no font database.
   const resvg = new Resvg(svg, { fitTo: { mode: 'width', value: WIDTH } });
-  const rendered = resvg.render();
-  // The type of asPng() is ArrayBufferLike, and a Response body does not accept that type.
-  // wasm-bindgen copies the bytes into a new ArrayBuffer, thus a narrower type is correct.
-  const png = rendered.asPng() as Uint8Array<ArrayBuffer>;
   // The JS garbage collector does not reach the linear heap of the wasm module. Thus the code must
-  // free both, or an isolate that lives a long time uses more and more memory and reaches the
-  // memory limit during a render.
-  rendered.free();
-  resvg.free();
-
-  return png;
+  // free both, also after a throw, or an isolate that lives a long time uses more and more memory
+  // and reaches the memory limit during a render.
+  try {
+    const rendered = resvg.render();
+    try {
+      // The type of asPng() is ArrayBufferLike, and a Response body does not accept that type.
+      // wasm-bindgen copies the bytes into a new ArrayBuffer, thus a narrower type is correct.
+      return rendered.asPng() as Uint8Array<ArrayBuffer>;
+    } finally {
+      rendered.free();
+    }
+  } finally {
+    resvg.free();
+  }
 }

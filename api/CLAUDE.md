@@ -45,7 +45,7 @@ edge serves a cached copy before it gets a new one.
 | GET | `/widgets/whoop` | sleep/recovery/strain | 5 min |
 | GET | `/widgets/plausible/pageviews/:id` | pageview count by Contentful id | 5 min |
 | POST | `/api/location` | sets Redis `location:current` + enqueues `LocationSyncJob`, via `Location.store` | — |
-| POST | `/api/weight` | `weight`, `unit` (`kg` or `lb`, default `kg`), `date` (default: today in the location time zone). Enqueues `IntervalsWeightJob` and `StravaWeightJob`; 204 or 422 | — |
+| POST | `/api/weight` | `weight`, `unit` (`kg` or `lb`, default `kg`), `date` (default: today in the location time zone). Enqueues `IntervalsWeightJob`, and `StravaWeightJob` for today only; 204 or 422 | — |
 | POST | `/api/ftp` | `ftp` in watts. Enqueues `IntervalsFtpJob` and `StravaFtpJob`; 204 or 422 | — |
 | POST | `/api/contact` | drops honeypot hits + enqueues `ContactMailJob`; JSON → 204/422, HTML → 303 | — |
 | POST | `/api/build` | enqueues `SiteBuildJob`; 202, or 429 inside the 60s dedupe lock, which `POST /republish` shares | — |
@@ -294,9 +294,9 @@ Poisson mean from its own rate in the `BASELINE_DAYS` before that window.
   because `sort_by` is not stable.
 - ⚠️ **The `RECENT_EXCLUDED` newest Articles are never in the list.** The home page lists them as
   "Recent Articles" directly above the widget, and the widget repeated one of them. **That number
-  must stay equal to the `count: 4` of `recent_articles` in `web/lib/helpers/article_helpers.rb`,
-  and no check compares the two.** The widget is one shared edge-cache entry, thus the exclusion
-  is the same on a Page.
+  must stay equal to the `count: 4` of `recent_articles` in `web/lib/helpers/article_helpers.rb`.**
+  `spec/contracts/trending_recent_contract_spec.rb` compares the two. The widget is one shared
+  edge-cache entry, thus the exclusion is the same on a Page.
 - ⚠️ **There is no blend of `visit:entry_page` and `event:page` any more.** A measurement gave
   the loop that it protected against as absent: internal navigation is 16% of the visits, and the
   widget had no recorded click. The blend cost four query bodies.
@@ -433,7 +433,7 @@ Thus that shared window is safe.
 | `ActivityDescriptionJob(activity_id)` | (re)generates an activity's description and tidies its name, and PUTs both to Strava |
 | `LocationSyncJob(latitude, longitude)` | propagates the current location to Intervals.icu |
 | `IntervalsWeightJob(kg, date)` | writes the weight to the Intervals.icu wellness record of that day. ⚠️ The controller gives the day, thus a retry after midnight does not move it |
-| `StravaWeightJob(kg)` | writes the weight to the Strava profile. With no connection or no `profile:write` scope, it fails permanently |
+| `StravaWeightJob(kg)` | writes the weight to the Strava profile. ⚠️ `Weight.save` adds it for today only: Strava keeps one current weight, thus an old value would replace it. With no connection or no `profile:write` scope, it fails permanently |
 | `IntervalsFtpJob(watts)` | writes the FTP and the indoor FTP to the Ride sport settings of Intervals.icu. ⚠️ It sets both. The indoor FTP has a value, and Intervals.icu uses it for an indoor ride |
 | `StravaFtpJob(watts)` | writes the FTP to the Strava profile. ⚠️ Strava documents `weight` only for that PUT, but it saves the FTP. The response gives a nil `ftp`, thus the job does not check it |
 | `BlueskyPostJob(posts, index, reply)` | posts one post of a thread to Bluesky, then adds the job of the next. ⚠️ The three post jobs inherit from `SocialPostJob`, which holds the enqueue lock: a retry after the enqueue must not add the next job a second time, and Threads has no idempotency on its side |
@@ -872,8 +872,8 @@ the click appears to do nothing. The Connected apps view puts the attribute on t
 each card. For a card whose path is an ordinary admin page, which is the form of Bluesky, the only
 cost is a full page load.
 
-The header has the wordmark of the site, `layouts/_logo.html.erb`, which is a **copy word for word**
-of `web/source/partials/_logo.svg.erb`. ⚠️ Its paths contain `fill="#020a0a"`, which you cannot see
+The header has the wordmark of the site, `layouts/_logo.html.erb`. Its paths are a **copy word for
+word** of the paths in `web/source/partials/_logo_symbol.svg.erb`. ⚠️ Its paths contain `fill="#020a0a"`, which you cannot see
 on the dark theme. `_admin-header.scss` changes that to `currentColor`, and that is also the reason
 for the inline SVG in place of an image: an `<img>` cannot take the color of the text. A difference
 between the two copies costs no more than an old admin logo.
@@ -2474,7 +2474,11 @@ it needs an edit in the dashboard. The full reason, and the manual `widgets` tag
 - **The session of the owner** is the cookie store of Rails, and
   `config/initializers/session_store.rb` declares it to add `expire_after` only. ⚠️ A cookie session
   has no record on the server, thus there is nothing to revoke. Except for a new `secret_key_base`,
-  a stolen cookie stays valid until the browser removes it. The expiry is the maximum.
+  a stolen cookie stays valid until the browser removes it.
+  ⚠️ **`expire_after` is an idle limit and not the maximum**: Rack writes the cookie again at each
+  request with a new expiry. The maximum is `Authentication::MAX_SESSION_AGE`, from the
+  `signed_in_at` that the sign-in writes. `Authentication.owner_session?` checks both values, and
+  the controllers and `SidekiqOwnerGuard` all call it.
 - **Redis** — the global `$redis` comes from `config/initializers/redis.rb` and from `REDIS_URL`.
   The same Redis holds the Sidekiq queues.
 

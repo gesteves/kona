@@ -142,6 +142,12 @@ RSpec.describe SiteHelpers do
       expect(text).to end_with('…')
       expect(text).not_to include('...')
     end
+
+    it 'cuts between two words' do
+      long = OpenStruct.new(summary: 'abcdefghij ' * 30, entry_type: 'Article', intro: nil)
+      text = content_summary(long)
+      expect(text).to end_with('abcdefghij…')
+    end
   end
 
   describe '#title_tag' do

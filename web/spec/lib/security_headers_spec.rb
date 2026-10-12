@@ -21,3 +21,16 @@ RSpec.describe 'the security headers of the asset layer' do
     expect(asset_layer_headers).to eq(fixture)
   end
 end
+
+# asset_hash puts a fingerprint in each of these names, thus each one can stay in a cache for all
+# time. A directory with no rule gets the default of the asset layer, and the browser checks each
+# file again at each page load.
+RSpec.describe 'the cache rules of the asset layer' do
+  let(:headers) { File.read(File.expand_path('../../source/headers.erb', __dir__)) }
+
+  %w[/javascripts/* /stylesheets/* /fonts/*].each do |path|
+    it "marks #{path} as immutable" do
+      expect(headers).to include("#{path}\n  Cache-Control: public, max-age=31536000, immutable\n")
+    end
+  end
+end

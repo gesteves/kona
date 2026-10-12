@@ -30,6 +30,8 @@ class SessionsController < ActionController::Base
       destination = safe_return_path(session[:return_to])
       reset_session # guard against session fixation (after reading return_to above)
       session[:owner_email] = email
+      # Authentication::MAX_SESSION_AGE counts from this time.
+      session[:signed_in_at] = Time.current.to_i
       redirect_to(destination)
     else
       # The address is data about a person, thus the log holds a digest of it and not the address.

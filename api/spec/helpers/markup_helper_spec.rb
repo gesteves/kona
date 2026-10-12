@@ -41,6 +41,11 @@ RSpec.describe MarkupHelper do
       expect(result).to include('rel="noopener"')
     end
 
+    it "keeps the rel that the author wrote on an external link" do
+      result = helper.render_summary_body('See <a href="https://example.com" rel="nofollow">the site</a>.')
+      expect(result).to include('rel="nofollow noopener"')
+    end
+
     it "converts inline unit spans into the metric/imperial toggle" do
       result = helper.render_summary_body('Run <span data-imperial="6.2 mi">10 km</span> today.')
       expect(result).to include('data-units-metric-value="10 km"')

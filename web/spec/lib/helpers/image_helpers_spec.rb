@@ -92,6 +92,11 @@ RSpec.describe ImageHelpers do
       expect(url).to eq("https://example.com/cdn-cgi/image/width=100/#{original}")
     end
 
+    it 'trims a trailing slash on IMAGES_URL' do
+      stub_env(images_url: 'https://example.com/')
+      expect(cdn_image_url(original, w: 100)).to eq("https://example.com/cdn-cgi/image/width=100/#{original}")
+    end
+
     it 'upgrades protocol-relative URLs to https' do
       url = cdn_image_url('//images.ctfassets.net/space/a/t/p.jpg', w: 100)
       expect(url).to eq('https://example.com/cdn-cgi/image/width=100/https://images.ctfassets.net/space/a/t/p.jpg')
@@ -291,9 +296,22 @@ RSpec.describe ImageHelpers do
         .to eq("https://example.com/og.png?v=#{template}-7")
     end
 
-    it 'busts on OG_TEMPLATE_VERSION alone when version is nil (listing pages have no sys)' do
+    it 'busts on OG_TEMPLATE_VERSION alone when version and title are both nil' do
       result = generate_open_graph_image_url('/blog/', nil)
       expect(result).to eq("https://example.com/blog/og.png?v=#{template}")
+    end
+
+    # A listing page has no sys. Its card is a Cache API entry with no `Cache-Tag`, thus the title
+    # must address the card.
+    it 'busts on a CRC32 of the title when version is nil' do
+      result = generate_open_graph_image_url('/blog/', nil, title: 'Blog')
+      expect(result).to eq("https://example.com/blog/og.png?v=#{template}-#{Zlib.crc32('Blog')}")
+      expect(generate_open_graph_image_url('/blog/', nil, title: 'Archive')).not_to eq(result)
+    end
+
+    it 'prefers the published version to the title' do
+      expect(generate_open_graph_image_url('/post/', 7, title: 'Post'))
+        .to eq("https://example.com/post/og.png?v=#{template}-7")
     end
 
     # ⚠️ src/og.ts checks `v` against /^v\d+(-\d+)?$/ before it makes the cache key. A value
@@ -302,6 +320,7 @@ RSpec.describe ImageHelpers do
     it 'keeps the v<number> shape that the Worker checks' do
       expect(template).to match(/\Av\d+\z/)
       expect(generate_open_graph_image_url('/blog/', 7)).to match(/\?v=v\d+-7\z/)
+      expect(generate_open_graph_image_url('/blog/', nil, title: 'Blog')).to match(/\?v=v\d+-\d+\z/)
     end
   end
 
@@ -623,6 +642,17 @@ RSpec.describe ImageHelpers do
 
       expect(card_ratio).to eq(Rational(h, w))
       expect(card_aspect_ratio).to eq("#{w} / #{h}")
+    end
+  end
+
+  describe '#card_widths' do
+    it 'drops each width above a small asset, and adds the asset width' do
+      expect(card_widths([ 400, 800, 1200 ], 1000)).to eq([ 400, 800, 1000 ])
+    end
+
+    it 'keeps each width for an asset with a width of 0 or nil' do
+      expect(card_widths([ 400, 800 ], 0)).to eq([ 400, 800 ])
+      expect(card_widths([ 400, 800 ], nil)).to eq([ 400, 800 ])
     end
   end
   describe '.warm_blurhashes!' do

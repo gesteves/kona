@@ -96,6 +96,52 @@ RSpec.describe "Owner sessions", type: :request do
     end
   end
 
+  # ⚠️ Rack writes the cookie again at each request, thus `expire_after` alone never ends a session
+  # that the owner uses. The sign-in time is the limit.
+  describe "the maximum session age" do
+    include ActiveSupport::Testing::TimeHelpers
+
+    it "ends a session that is older than MAX_SESSION_AGE, although each visit renewed the cookie" do
+      travel_to Time.utc(2026, 10, 1, 12, 0) do
+        sign_in_as(email: owner_email)
+      end
+
+      travel_to Time.utc(2026, 10, 10, 12, 0) do
+        get "/whoop/auth"
+        expect(response).not_to redirect_to("/signin")
+      end
+
+      travel_to Time.utc(2026, 10, 16, 12, 0) do
+        get "/whoop/auth"
+        expect(response).to redirect_to("/signin")
+      end
+    end
+
+    it "closes the Sidekiq UI to a session that is older than MAX_SESSION_AGE" do
+      travel_to Time.utc(2026, 10, 1, 12, 0) do
+        sign_in_as(email: owner_email)
+      end
+
+      travel_to Time.utc(2026, 10, 10, 12, 0) do
+        get "/signin"
+      end
+
+      travel_to Time.utc(2026, 10, 16, 12, 0) do
+        get "/sidekiq"
+        expect(response).to redirect_to("/signin")
+      end
+    end
+
+    it "refuses an owner session with no sign-in time" do
+      expect(Authentication.owner_session?({ "owner_email" => owner_email })).to be(false)
+    end
+
+    it "accepts an owner session inside the limit" do
+      session = { "owner_email" => owner_email, "signed_in_at" => 1.day.ago.to_i }
+      expect(Authentication.owner_session?(session)).to be(true)
+    end
+  end
+
   describe "POST /signout" do
     it "clears the owner session" do
       sign_in_as(email: owner_email)

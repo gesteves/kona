@@ -6,7 +6,7 @@ RSpec.describe ContactDeliveryJob do
     {
       "to" => "owner@example.test", "reply_to" => "jane@example.com",
       "subject" => "Question about Alcatraz wetsuit rules",
-      "text" => "text body", "html" => "<p>html body</p>"
+      "text" => "text body", "html" => "<p>html body</p>", "idempotency_key" => "key-1"
     }
   end
 
@@ -20,7 +20,8 @@ RSpec.describe ContactDeliveryJob do
 
     expect(mailer).to have_received(:send_email).with(
       to: "owner@example.test", reply_to: "jane@example.com",
-      subject: "Question about Alcatraz wetsuit rules", text: "text body", html: "<p>html body</p>"
+      subject: "Question about Alcatraz wetsuit rules", text: "text body", html: "<p>html body</p>",
+      idempotency_key: "key-1"
     )
   end
 

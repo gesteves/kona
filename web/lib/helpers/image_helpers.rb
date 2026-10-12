@@ -3,6 +3,7 @@ require "open-uri"
 require "base64"
 require "blurhash"
 require "erb"
+require "zlib"
 
 module ImageHelpers
   # The app raises this when IMAGES_URL has no value. It stops the build, on purpose. The
@@ -108,7 +109,7 @@ module ImageHelpers
     original_url = asset_url if asset_url.present?
 
     original_url = "https:#{original_url}" if original_url.start_with?("//")
-    "#{ENV['IMAGES_URL']}#{CDN_IMAGE_PATH}#{cdn_image_options(params)}/#{original_url}"
+    "#{ENV['IMAGES_URL'].chomp('/')}#{CDN_IMAGE_PATH}#{cdn_image_options(params)}/#{original_url}"
   end
 
   # Changes the transformation parameters into the Cloudflare option string, with a comma
@@ -250,7 +251,8 @@ module ImageHelpers
   # @return [Array<Integer>] The widths, in order, with no duplicate.
   def card_widths(widths, asset_width)
     candidates = widths.dup
-    if asset_width.present?
+    # A width of 0 is present, and it would leave [0] as the only candidate.
+    if asset_width.to_i.positive?
       candidates << asset_width if asset_width < candidates.max
       candidates = candidates.reject { |w| w > asset_width }
     end
@@ -284,9 +286,21 @@ module ImageHelpers
   # @param path [String] The root-relative path of the page (current_page.url).
   # @param version [Integer, String, nil] The sys.published_version of the entry, thus a new
   #   publish makes a new URL. It is nil for a listing page, which is not a Contentful entry.
+  # @param title [String, nil] The og:title of the page. With no version, a CRC32 of it addresses
+  #   the card, thus a new title makes a new URL.
   # @return [String] The URL of the card.
-  def generate_open_graph_image_url(path, version = nil)
-    v = version.present? ? "#{OG_TEMPLATE_VERSION}-#{version}" : OG_TEMPLATE_VERSION
+  #
+  # ⚠️ A listing page needs the title. The Worker stores each card with the Cache API and writes no
+  # `Cache-Tag`, thus do not trust the deploy purge to reach it. Without the title, the URL never
+  # changes and a cache can keep an old card for a year.
+  def generate_open_graph_image_url(path, version = nil, title: nil)
+    v = if version.present?
+      "#{OG_TEMPLATE_VERSION}-#{version}"
+    elsif title.present?
+      "#{OG_TEMPLATE_VERSION}-#{Zlib.crc32(title)}"
+    else
+      OG_TEMPLATE_VERSION
+    end
     query = URI.encode_www_form(v: v)
     "#{root_url.to_s.chomp('/')}#{path.to_s.chomp('/')}/og.png?#{query}"
   end

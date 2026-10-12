@@ -4,14 +4,15 @@
 # parent class cover a temporary failure.
 class ContactDeliveryJob < ApplicationJob
   # @param payload [Hash] The email that ContactMailJob makes: "to", "reply_to", "subject", "text",
-  #   and "html".
+  #   "html", and "idempotency_key".
   def perform(payload)
     Resend.new.send_email(
       to: payload["to"],
       reply_to: payload["reply_to"],
       subject: payload["subject"],
       text: payload["text"],
-      html: payload["html"]
+      html: payload["html"],
+      idempotency_key: payload["idempotency_key"]
     )
     Rails.logger.info("Contact form: emailed a submission to the owner")
   end

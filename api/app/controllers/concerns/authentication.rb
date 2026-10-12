@@ -5,12 +5,29 @@
 module Authentication
   extend ActiveSupport::Concern
 
+  # The longest time that one sign-in lasts. ⚠️ The `expire_after` of the session store is not this
+  # limit: Rack writes the cookie again at each request with a new expiry, thus that value is an
+  # idle limit only.
+  MAX_SESSION_AGE = 2.weeks
+
+  # The one owner check. The controllers and the Rack guard of the Sidekiq UI both call it.
+  # @param session [ActionDispatch::Request::Session, Hash, nil] The session of the request.
+  # @return [Boolean] True when the session belongs to the owner in the configuration, and the
+  #   sign-in is not older than MAX_SESSION_AGE.
+  def self.owner_session?(session)
+    owner = ENV["OWNER_EMAIL"].to_s
+    return false if owner.blank? || session.nil?
+    return false unless session["owner_email"].present? && session["owner_email"] == owner
+
+    signed_in_at = session["signed_in_at"]
+    signed_in_at.is_a?(Integer) && Time.zone.at(signed_in_at) > MAX_SESSION_AGE.ago
+  end
+
   private
 
   # @return [Boolean] True when the session belongs to the owner in the configuration.
   def owner_signed_in?
-    owner = ENV["OWNER_EMAIL"].to_s
-    owner.present? && session[:owner_email].present? && session[:owner_email] == owner
+    Authentication.owner_session?(session)
   end
 
   # Redirects to the login page when the owner is not signed in. It keeps the path that they wanted,

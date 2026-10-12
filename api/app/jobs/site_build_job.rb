@@ -20,6 +20,8 @@ class SiteBuildJob < ApplicationJob
   CONTENTFUL_EVENT_TYPE = "contentful-publish".freeze
   MANUAL_EVENT_TYPE = "api-build".freeze
   ADMIN_EVENT_TYPE = "admin-republish".freeze
+  # The GitHub answers that no retry can correct.
+  PERMANENT_STATUSES = [ 401, 404, 422 ].freeze
 
   # The window that stops a second "build now" from a person. The code never removes the lock: it
   # expires.
@@ -119,7 +121,14 @@ class SiteBuildJob < ApplicationJob
       body: { event_type: event_type }.to_json
     )
 
-    raise "SiteBuildJob: GitHub repository_dispatch failed (HTTP #{response.code})" unless response.success?
+    unless response.success?
+      message = "SiteBuildJob: GitHub repository_dispatch failed (HTTP #{response.code})"
+      # A token that expired or that cannot reach the repo gives a 401 or a 404, and a retry for 24
+      # hours cannot correct it. ⚠️ A 403 is NOT here: GitHub also gives a 403 for a rate limit.
+      raise PermanentError, message if PERMANENT_STATUSES.include?(response.code.to_i)
+
+      raise message
+    end
 
     Rails.logger.info("SiteBuildJob: triggered web rebuild via repository_dispatch (#{event_type})")
   end

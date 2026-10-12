@@ -5,9 +5,8 @@
 # `Threads#post!` keeps the id of the media container in Redis below `key`. A retry then publishes
 # the container that it made already, in place of a second one.
 class ThreadsPostJob < SocialPostJob
-  # The prefix of each lock key. `spec/support/at_proto_session.rb` removes these keys before each
-  # example. ⚠️ Threads has no idempotency on its side, thus this lock is the one thing that stops
-  # a second post below a key.
+  # The prefix of each lock key. ⚠️ Threads has no idempotency on its side, thus this lock is the
+  # one thing that stops a second post below a key.
   ENQUEUE_LOCK_PREFIX = "threads:thread:".freeze
 
   # @param posts [Array<Hash>] `[{ "key" =>, "text" =>, "link" =>, "photos" => }, …]`, the whole

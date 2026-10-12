@@ -224,7 +224,7 @@ jobs:
         uses: ./.github/actions/ci-context
 
       - name: Notify Slack (success)
-        if: ${{ needs.checks.result == 'success' }}
+        if: ${{ needs.checks.result == 'success' && needs.security.result == 'success' }}
         continue-on-error: true
         uses: ./.github/actions/notify-slack
         with:
@@ -234,7 +234,7 @@ jobs:
           fallback: "Web checks passed on ${{ env.BRANCH_NAME }}"
 
       - name: Notify Slack (failure)
-        if: ${{ needs.checks.result == 'failure' }}
+        if: ${{ needs.checks.result == 'failure' || needs.security.result == 'failure' }}
         continue-on-error: true
         uses: ./.github/actions/notify-slack
         with:
@@ -404,19 +404,6 @@ jobs:
       # keep_vars:true, and wrangler.jsonc has no `routes`. Thus this never replaces the vars and
       # secrets in the dashboard or the www custom domain. It runs with no user, thus the drift
       # question does not occur. It uploads build/ (assets.directory).
-      # The HTML only, thus the artifact stays small. The accessibility job below reads it.
-      # ⚠️ This uploads and nothing more. The check itself is a SEPARATE job, thus it cannot delay
-      # or stop this deploy.
-      - name: Save the pages for the accessibility check
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: web-html
-          path: web/build/**/*.html
-          retention-days: 1
-          # An error here stops the check with a message, and not a check that finds no page and
-          # reports "violations".
-          if-no-files-found: error
-
       - name: Deploy to Cloudflare
         run: npx wrangler deploy
         env:
@@ -596,6 +583,21 @@ jobs:
           color: "#439FE0"
           fallback: "Web cache purge successful"
 
+      # The HTML only, thus the artifact stays small. The accessibility job below reads it.
+      # ⚠️ This step is after the deploy and the purge, and it has continue-on-error. Thus a
+      # failure of the artifact service cannot stop a deploy or send "deploy failed". The check
+      # itself is a SEPARATE job.
+      - name: Save the pages for the accessibility check
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: web-html
+          path: web/build/**/*.html
+          retention-days: 1
+          # An error here stops the check with a message, and not a check that finds no page and
+          # reports "violations".
+          if-no-files-found: error
+
       # IndexNow is a push: it takes the URLs that changed and gives them to each participating
       # search engine (Bing, Yandex, Seznam, Naver, but NOT Google). Without it, robots.txt names
       # the sitemap and each crawler comes when it decides to come.
@@ -610,11 +612,14 @@ jobs:
       # the two Slack messages, thus a failure here cannot stop a report of a deploy that was
       # successful. Nothing waits for this step.
       #
-      # It fails the run on a 400, a 403, or a 422, which all mean that the key, the keyLocation,
-      # or the host does not match /indexnow.txt. A 429, a 5xx, and a network error only log a
-      # warning: the task stores no sitemap, thus the next deploy finds the same difference and
-      # submits it again.
+      # The task fails on a 400, a 403, or a 422, which all mean that the key, the keyLocation,
+      # or the host does not match /indexnow.txt. The step has continue-on-error, thus the deploy
+      # stays green, the accessibility job still runs, and the message below reports it. A 429, a
+      # 5xx, and a network error only log a warning: the task stores no sitemap, thus the next
+      # deploy finds the same difference and submits it again.
       - name: Submit the changed URLs to IndexNow
+        id: indexnow
+        continue-on-error: true
         env:
           INDEXNOW_KEY: ${{ secrets.INDEXNOW_KEY }}
           URL: ${{ secrets.URL }}
@@ -625,6 +630,17 @@ jobs:
           CONTENTFUL_SPACE: ${{ secrets.CONTENTFUL_SPACE }}
           CONTENTFUL_TOKEN: ${{ secrets.CONTENTFUL_TOKEN }}
         run: bundle exec rake indexnow:submit
+
+      # The site is live and the purge worked, thus this is a `warning` and not "deploy failed".
+      - name: Notify Slack (IndexNow failed)
+        if: steps.indexnow.outcome == 'failure'
+        continue-on-error: true
+        uses: ./.github/actions/notify-slack
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          text: "Web IndexNow submit <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|failed> :warning:"
+          color: "warning"
+          fallback: "Web IndexNow submit failed"
 
       # This has its own message, because the success message already went out. A plain "deploy
       # failed" after "deploy successful" would look like a contradiction and would send you to

@@ -7,9 +7,14 @@ require "openssl"
 module ContentfulRequestVerification
   extend ActiveSupport::Concern
 
-  # This limits a replay: the code refuses a timestamp that is older than this value, and a
-  # timestamp in the future. It is the same as the default of Contentful.
+  # This limits a replay: the code refuses a timestamp that is older than this value. It is the same
+  # as the default of Contentful.
   TIMESTAMP_TTL = 30_000 # milliseconds
+
+  # The code accepts a timestamp this far in the future. ⚠️ The clocks of Contentful and fly are not
+  # the same, and Contentful never sends a refused webhook again. Thus a refusal for a difference
+  # of some milliseconds loses that publish.
+  CLOCK_SKEW = 5_000 # milliseconds
 
   TIMESTAMP_HEADER = "x-contentful-timestamp".freeze
 
@@ -33,10 +38,10 @@ module ContentfulRequestVerification
   end
 
   # @param timestamp [String] The milliseconds after the epoch.
-  # @return [Boolean] True if it is in the replay window and it is not in the future.
+  # @return [Boolean] True if it is in the replay window, and not more than CLOCK_SKEW in the future.
   def fresh_timestamp?(timestamp)
     age = (Time.now.to_f * 1000) - timestamp.to_i
-    age >= 0 && age <= TIMESTAMP_TTL
+    age >= -CLOCK_SKEW && age <= TIMESTAMP_TTL
   end
 
   # Makes again the exact string that Contentful signed: the method, the path, the signed headers,

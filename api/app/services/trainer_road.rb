@@ -51,16 +51,15 @@ class TrainerRoad < ApplicationService
     # day before stays for the TTL after midnight, and rest_day? changes with it.
     today = Time.current.in_time_zone(@timezone).to_date
     cache_key = "trainerroad:workouts:#{@timezone}:#{today.iso8601}:#{calendar_version}"
-    cached_json(cache_key, expires_in: 5.minutes) do
-      events = begin
-        fetch_calendar_events
-      rescue ApplicationService::HttpError
-        # The fetch reported the failure already. The widget counts no events as a rest day.
-        next []
-      end
-
-      scheduled_workouts(events, today, @timezone, races: true)
-    end
+    # A rest day is a usual answer, thus the cache holds an empty list too. Without that, each
+    # widget miss on a rest day gets and parses the full feed again.
+    cached_json(cache_key, expires_in: 5.minutes, empty_expires_in: 5.minutes) do
+      scheduled_workouts(fetch_calendar_events, today, @timezone, races: true)
+    end || []
+  rescue ApplicationService::HttpError
+    # The fetch reported the failure already. The widget counts no events as a rest day. The cache
+    # does not hold this answer, thus the next request reads the feed again.
+    []
   end
 
   # The planned workouts for a date, to compare with the completed activities. An all-day event
@@ -76,9 +75,10 @@ class TrainerRoad < ApplicationService
     return [] if @calendar_url.blank?
 
     cache_key = "trainerroad:planned:#{date}:#{timezone}:#{calendar_version}"
-    cached_json(cache_key, expires_in: 5.minutes) do
+    # ⚠️ The cache gives nil for an empty list that it holds, thus the `|| []`.
+    cached_json(cache_key, expires_in: 5.minutes, empty_expires_in: 5.minutes) do
       scheduled_workouts(fetch_calendar_events, date, timezone, races: false)
-    end
+    end || []
   end
 
   # The name of the race on a date, for the names of the legs of a triathlon.

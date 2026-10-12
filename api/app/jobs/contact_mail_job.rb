@@ -1,4 +1,5 @@
 require "erb"
+require "securerandom"
 require "time"
 
 # The contact-form intake: the spam check and the email, outside the request path. It gives the
@@ -39,12 +40,14 @@ class ContactMailJob < ApplicationJob
     generated = ContactSubject.generate(name: name, message: message).presence
     subject = "#{SUBJECT_PREFIX} #{generated || "New message from #{name}"}"
 
+    # ⚠️ The key goes into the arguments, thus each attempt of the delivery job sends the same key.
     ContactDeliveryJob.perform_async(
       "to" => ENV["CONTACT_TO_ADDRESS"],
       "reply_to" => email,
       "subject" => subject,
       "text" => text_body(name, email, message, context),
-      "html" => html_body(name, email, message, context)
+      "html" => html_body(name, email, message, context),
+      "idempotency_key" => SecureRandom.uuid
     )
   end
 

@@ -27,6 +27,26 @@ RSpec.describe Resend do
     )
   end
 
+  it "sends the idempotency key as a header, thus a retry sends the email one time only" do
+    stub_response(success: true, body: { id: "abc-123" }.to_json)
+
+    service.send_email(**send_args, idempotency_key: "key-1")
+
+    expect(HTTParty).to have_received(:post).with(
+      anything, hash_including(headers: hash_including("Idempotency-Key" => "key-1"))
+    )
+  end
+
+  it "sends no idempotency header with no key" do
+    stub_response(success: true, body: { id: "abc-123" }.to_json)
+
+    service.send_email(**send_args)
+
+    expect(HTTParty).to have_received(:post).with(
+      anything, hash_including(headers: hash_excluding("Idempotency-Key"))
+    )
+  end
+
   it "raises on a non-2xx response so the job retries" do
     stub_response(success: false, body: { statusCode: 422, message: "Invalid" }.to_json)
     expect { service.send_email(**send_args) }.to raise_error(ApplicationService::HttpError)

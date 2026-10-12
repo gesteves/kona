@@ -6,7 +6,7 @@ class Intervals < ApplicationService
   # Gives the Intervals.icu activity types for each group of distances in the summary.
   SPORT_TYPES = {
     swim_distance: %w[Swim OpenWaterSwim],
-    bike_distance: %w[Ride VirtualRide],
+    bike_distance: %w[Ride VirtualRide GravelRide MountainBikeRide TrackRide],
     run_distance:  %w[Run VirtualRun TrailRun]
   }.freeze
 

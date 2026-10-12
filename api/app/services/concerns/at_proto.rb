@@ -35,8 +35,7 @@ module AtProto
   # thus this is well below it.
   SESSION_TTL = 55.minutes
 
-  # The prefix of each session key. ⚠️ `spec/support/at_proto_session.rb` removes these keys before
-  # each example, thus a session cannot go from one example to the next one.
+  # The prefix of each session key.
   SESSION_KEY_PREFIX = "atproto:session:".freeze
 
   # The PDS refused the token. The caller opens a new session and does the request one time more.

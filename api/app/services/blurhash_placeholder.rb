@@ -234,7 +234,8 @@ class BlurhashPlaceholder < ApplicationService
                        .copy(interpretation: :srgb)
                        .extract_band(0, n: 3)
 
-    "data:image/jpeg;base64,#{Base64.strict_encode64(image.write_to_buffer('.jpg'))}"
+    # `strip` removes the Exif block, which was a fifth of each placeholder.
+    "data:image/jpeg;base64,#{Base64.strict_encode64(image.jpegsave_buffer(strip: true))}"
   rescue StandardError => e
     Rails.logger.warn("blurhash: decode failed (#{e.message})")
     nil
@@ -259,7 +260,19 @@ class BlurhashPlaceholder < ApplicationService
       </svg>
     SVG
 
-    "data:image/svg+xml;charset=utf-8,#{ERB::Util.url_encode(svg.gsub(/\s+/, ' ').strip)}"
+    "data:image/svg+xml;charset=utf-8,#{escape_svg_for_url(svg.gsub(/\s+/, ' ').strip)}"
+  end
+
+  # Escapes the few characters that an SVG in a `url()` cannot hold. This is a copy of the method of
+  # the web build. `url_encode` escapes `/` and `+` as well, and those are legal there.
+  #
+  # ⚠️ The two quote characters must stay in this set. The SVG writes each attribute with `'`, and
+  # ImagesHelper puts the result in `url('...')`. A raw `'` closes that CSS string, and the card then
+  # gets no placeholder and gives no message.
+  # @param svg [String]
+  # @return [String]
+  def escape_svg_for_url(svg)
+    svg.gsub(/[#%"'<> ]/) { |char| format("%%%02X", char.ord) }
   end
 
   def log(message, result = nil)

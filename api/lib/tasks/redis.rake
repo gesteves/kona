@@ -23,7 +23,6 @@ namespace :redis do
       [ "strava",               StravaCredentials::REDIS_KEY ],
       [ "threads",              ThreadsCredentials::REDIS_KEY ],
       [ "trainerroad",          TrainerRoadCredentials::REDIS_KEY ],
-      [ "whoop (store)",        WhoopCredentials::REDIS_KEY ],
       [ "standard.site prints", StandardSite::FINGERPRINTS_KEY ]
     ]
   end

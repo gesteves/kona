@@ -11,7 +11,13 @@ class ActivityDescriptionJob < ApplicationJob
   # The wait before a run that found the lock of another run tries again.
   BUSY_DELAY = 1.minute
 
+  # The answers of Intervals.icu and Strava that no retry can correct: a credential that is not
+  # valid, a scope that is absent, or an activity that is gone. Each retry would also call
+  # Anthropic and WeatherKit again.
+  PERMANENT_STATUSES = [ 401, 403, 404 ].freeze
+
   # @param activity_id [String, Integer] The Intervals.icu activity id.
+  # @raise [ApplicationJob::PermanentError] On an answer in PERMANENT_STATUSES.
   def perform(activity_id)
     # The jid is the token of the lock, thus a retry of this job can enter the lock that its own
     # attempt left.
@@ -21,5 +27,9 @@ class ActivityDescriptionJob < ApplicationJob
     end
 
     Rails.logger.info("Activity description generated for activity #{activity_id}")
+  rescue ApplicationService::HttpError => e
+    raise unless PERMANENT_STATUSES.include?(e.status)
+
+    raise PermanentError, "Activity #{activity_id}: #{e.message}"
   end
 end

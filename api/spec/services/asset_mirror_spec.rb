@@ -39,11 +39,14 @@ describe AssetMirror do
   # reason that it cannot use HTTParty. Thus the stub gives a true response object with a body in
   # parts.
   # @return [Array] The request URIs that the code under test got.
-  def stub_download(body: "IMAGEBYTES", code: 200)
+  def stub_download(body: "IMAGEBYTES", code: 200, read_error: nil)
     requested = []
     klass = code == 200 ? Net::HTTPOK : Net::HTTPForbidden
     response = klass.new("1.1", code.to_s, "")
-    allow(response).to receive(:read_body) { |&block| block.call(body) }
+    allow(response).to receive(:read_body) do |&block|
+      block.call(body)
+      raise read_error if read_error
+    end
 
     http = instance_double(Net::HTTP)
     allow(http).to receive(:request) do |request, &block|
@@ -188,6 +191,19 @@ describe AssetMirror do
     it "raises, and uploads nothing, when a 2xx has no body" do
       stub_download(body: "")
       expect { mirror.sync("asset1") }.to raise_error(ApplicationService::HttpError)
+      expect(client).not_to have_received(:put_object)
+    end
+
+    # ⚠️ A body that ends early must raise, because #object_exists? skips each object that exists.
+    it "refuses a body that ends before its Content-Length" do
+      stub_download
+      mirror.sync("asset1")
+      expect(Net::HTTP).to have_received(:start).with(anything, anything, hash_including(ignore_eof: false))
+    end
+
+    it "raises, and uploads nothing, when the body stops early" do
+      stub_download(read_error: EOFError)
+      expect { mirror.sync("asset1") }.to raise_error(EOFError)
       expect(client).not_to have_received(:put_object)
     end
 

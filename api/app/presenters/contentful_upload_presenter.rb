@@ -32,9 +32,6 @@ class ContentfulUploadPresenter
   # @return [Boolean] True while the job still makes the asset.
   def processing? = status == "processing"
 
-  # @return [Boolean] True when the asset is in Contentful and published.
-  def published? = status == "published"
-
   # @return [Boolean] True when the publish stopped after the last attempt.
   def failed? = status == "failed"
 

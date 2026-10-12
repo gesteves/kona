@@ -21,6 +21,10 @@ Bugsnag.configure do |config|
   # to that one endpoint.
   config.add_on_error(->(report) { ContactBadRequestFilter.call(report) })
 
+  # Removes the arguments of a contact-form job, which are the data of a sender, from the Sidekiq
+  # tab. The report still goes out.
+  config.add_on_error(->(report) { ContactJobArgsFilter.call(report) })
+
   # Removes each "not synced yet" miss of StravaActivityJob. A miss is the normal wait for
   # Intervals.icu, and the job logs the last one. ⚠️ This is a string, because the job class does not
   # load before this file.

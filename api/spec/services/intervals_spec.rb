@@ -15,6 +15,7 @@ RSpec.describe Intervals do
         { "type" => "OpenWaterSwim", "distance" => 1500 },
         { "type" => "Ride",         "distance" => 20000 },
         { "type" => "VirtualRide",  "distance" => 10000 },
+        { "type" => "GravelRide",   "distance" => 5000 },
         { "type" => "Run",          "distance" => 5000 },
         { "type" => "TrailRun",     "distance" => 8000 },
         { "type" => "Walk",         "distance" => 3000 } # ignored
@@ -22,7 +23,7 @@ RSpec.describe Intervals do
       allow(service).to receive(:get_json).and_return(activities)
 
       expect(service.stats).to eq(
-        swim_distance: 2500, bike_distance: 30000, run_distance: 13000, total_activities: 6
+        swim_distance: 2500, bike_distance: 35000, run_distance: 13000, total_activities: 7
       )
     end
 

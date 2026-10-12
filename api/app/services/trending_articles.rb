@@ -37,7 +37,8 @@ class TrendingArticles < ApplicationService
   FILL_DAYS = Integer(ENV["TRENDING_FILL_DAYS"].presence || 30)
   # The newest Articles, which the list never holds.
   # ⚠️ This must stay equal to the `count: 4` of `recent_articles` in
-  # web/lib/helpers/article_helpers.rb, and no check compares the two.
+  # web/lib/helpers/article_helpers.rb. spec/contracts/trending_recent_contract_spec.rb compares
+  # the two.
   RECENT_EXCLUDED = 4
   # The days of the series: the baseline and the longest window.
   SERIES_DAYS = BASELINE_DAYS + WINDOWS.max

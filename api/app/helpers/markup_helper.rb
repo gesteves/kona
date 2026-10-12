@@ -85,7 +85,8 @@ module MarkupHelper
       link_host = URI.parse(href).host rescue next
       next if link_host.blank?
 
-      a["rel"] = "noopener"
+      # Add to the rel that the author wrote: a `nofollow` or a `ugc` must stay.
+      a["rel"] = (a["rel"].to_s.split + [ "noopener" ]).uniq.join(" ")
       a["target"] = "_blank"
     end
     doc

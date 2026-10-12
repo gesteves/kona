@@ -72,14 +72,6 @@ RSpec.describe SocialPresenter do
       expect(presenter.posts.first.link).to eq("")
       expect(presenter).not_to be_scheduled
     end
-
-    it "knows a thread from one post" do
-      one = described_class.new(networks: [ network ], posts: [ { text: "One" } ])
-      many = described_class.new(networks: [ network ], posts: [ { text: "One" }, { text: "Two" } ])
-
-      expect(one).not_to be_thread
-      expect(many).to be_thread
-    end
   end
 
   describe "the limits" do

@@ -142,7 +142,8 @@ module SiteHelpers
     end
     # ⚠️ The omission is the one character, and not "...": smartypants would make the three dots
     # into `&hellip;`, and the Atom summary, which is plain text, would then show that entity.
-    sanitize(summary)&.truncate(SUMMARY_LENGTH, omission: "…")
+    # The separator puts the cut between two words.
+    sanitize(summary)&.truncate(SUMMARY_LENGTH, omission: "…", separator: " ")
   end
 
   # @return [DateTime] The latest publish time of the pages, the articles, and the site entry.

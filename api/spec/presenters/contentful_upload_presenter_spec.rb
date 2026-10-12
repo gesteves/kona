@@ -21,7 +21,7 @@ RSpec.describe ContentfulUploadPresenter do
 
   it "answers each state, one at a time" do
     expect(present).to be_processing
-    expect(present("status" => "published")).to be_published
+    expect(present("status" => "published")).not_to be_processing
     expect(present("status" => "failed")).to be_failed
   end
 

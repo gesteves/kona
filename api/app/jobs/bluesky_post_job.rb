@@ -5,8 +5,7 @@
 # the first job, and `Bluesky#post!` writes with `putRecord` at that key. Thus a retry replaces the
 # same record. The reply reference travels in the arguments, thus it is the same at each attempt.
 class BlueskyPostJob < SocialPostJob
-  # The prefix of each lock key. ⚠️ `spec/support/at_proto_session.rb` removes these keys before
-  # each example, thus a lock cannot go from one example to the next one.
+  # The prefix of each lock key.
   ENQUEUE_LOCK_PREFIX = "bluesky:thread:".freeze
 
   # @param posts [Array<Hash>] `[{ "key" =>, "text" =>, "link" =>, "photos" => }, …]`, the whole

@@ -175,7 +175,8 @@ it the one stylesheet that stops the render.
 A page with no cover image gets an `og:image` that **the Worker of this app renders when it is
 necessary**: `src/og.ts` is the route and `src/og-render.ts` is the card. `run_worker_first` takes
 `/og.png` **and** `/*/og.png`. `generate_open_graph_image_url` makes
-`<root_url><page path>og.png?v=<OG_TEMPLATE_VERSION>-<published_version>`. A page with a cover image
+`<root_url><page path>og.png?v=<OG_TEMPLATE_VERSION>-<published_version>`, or
+`…-<CRC32 of the og:title>` for a listing page. A page with a cover image
 uses `open_graph_image_url`, which gives a Cloudflare Images URL.
 
 - **The path of the card names the page.** That is the reason for the two `run_worker_first`
@@ -201,12 +202,12 @@ uses `open_graph_image_url`, which gives a Cloudflare Images URL.
   middle of a glyph** and only a listing page shows it, because an article title has many words.
   ⚠️ Never set `textWrap` to `undefined` to turn it off: the CSS parser of satori reads that value
   and raises. Spread the property, as the code does.
-- ⚠️ **A card of a listing page does NOT change by itself.** The blog index, each tag archive, and
-  the home page are not Contentful entries. Thus `v` is `OG_TEMPLATE_VERSION` only, and the URL
-  never changes. Today that is 43 of the 73 pages with a card. Their `og:title` comes from
-  `data.site.meta_title` or from a tag name. The `Cache-Tag: site` purge of the deploy is what makes
-  them new, and that is why the zone still tags the card paths, on purpose (refer to the root
-  `CLAUDE.md`).
+- ⚠️ **The title addresses the card of a listing page.** The blog index, each tag archive, and
+  the home page are not Contentful entries and have no `published_version`. Thus `v` holds a CRC32
+  of the `og:title`, and a new title makes a new URL. ⚠️ **Do not trust the deploy purge to reach a
+  card.** The Worker stores a card with `caches.default.put` and writes no `Cache-Tag`, and the
+  Cloudflare docs give that header as the method to tag a Cache API entry. A URL that does not
+  change can keep the old card for a year, at the edge and in the browser (`immutable`).
 - ⚠️ **This needs the Workers Paid plan**: a render takes approximately 100 ms of CPU, and the Free
   plan permits 10 ms.
 - ⚠️ **`wrangler dev` covers a render, and the test suite does not.** Refer to **The two local
@@ -224,8 +225,9 @@ needs a key file at the root of the site, and `source/indexnow.txt.erb` renders 
 
 - **The sitemap is the list of URLs, and Redis holds the list of the last submission.** The task
   reads `build/sitemap.xml`, compares it with the `indexnow:sitemap` key, and submits the URLs that
-  are new and the URLs whose `lastmod` moved. Thus a code-only deploy submits nothing, and a publish
-  submits approximately five: the entry, the home page, `/blog/`, and its tag archives.
+  are new, the URLs whose `lastmod` moved, and the URLs that went away. Thus a code-only deploy
+  submits nothing, and a publish submits approximately five: the entry, the home page, `/blog/`,
+  and its tag archives. A URL that went away gives a 404, and the engine then removes it.
 - ⚠️ **`<lastmod>` holds the time, and not the date alone.** `sitemap_lastmod` in
   `lib/helpers/site_helpers.rb` writes a W3C datetime, and the task compares that string. With a
   date, a second edit of the same entry on the same day gives the same value, thus the diff finds

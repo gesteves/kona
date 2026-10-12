@@ -357,21 +357,6 @@ class Contentful
     result
   end
 
-  # @return [Array<String>] All the child concept ids, in depth-first order.
-  def descendant_ids(id, children)
-    result = []
-    # Use a Set, not Array#include?. Array#include? made this much slower on a large subtree.
-    seen = Set.new
-    stack = children[id].dup
-    until stack.empty?
-      cid = stack.pop
-      next unless seen.add?(cid)
-      result << cid
-      stack.concat(children[cid])
-    end
-    result
-  end
-
   # The archive summary for a concept that has no description of its own.
   def default_tag_summary(name, size)
     "Browse #{size.humanize} #{'entry'.pluralize(size)} tagged “#{name}.”"

@@ -1,4 +1,5 @@
-// The on-demand Open Graph card route: <page path>og.png?v=<template ver>-<published ver>.
+// The on-demand Open Graph card route: <page path>og.png?v=<template ver>-<published ver>, or
+// -<CRC32 of the og:title> for a listing page.
 // The path of the card identifies the page, and not a query parameter. Thus /2026/06/26/post/
 // gets /2026/06/26/post/og.png, and the home page gets /og.png. The page names its own `v` in
 // its og:image, and this code renders that version only: a request with another `v` gets a
@@ -155,8 +156,8 @@ function declaredVersion(
 }
 
 /**
- * The only shape that `v` has. `image_helpers.rb` writes `OG_TEMPLATE_VERSION` alone for a
- * listing page, or `<template>-<published_version>` for an article.
+ * The only shape that `v` has. `image_helpers.rb` writes `<template>-<published_version>` for an
+ * article, and `<template>-<CRC32 of the og:title>` for a listing page.
  */
 const VERSION_FORMAT = /^v\d+(-\d+)?$/;
 

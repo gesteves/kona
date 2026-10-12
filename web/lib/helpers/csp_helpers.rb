@@ -52,8 +52,10 @@ module CspHelpers
   end
 
   # @return [Array<String>] The sources of `script-src`.
+  # ⚠️ 'wasm-unsafe-eval' is for Pagefind, which compiles WebAssembly at each search. It permits
+  # WebAssembly only, and not eval. Without it, an enforced policy stops the search.
   def csp_script_src
-    ([ "'self'", plausible_init_script_hash ] + CSP_BASE_HOSTS + embed_origins[:script]).uniq
+    ([ "'self'", plausible_init_script_hash, "'wasm-unsafe-eval'" ] + CSP_BASE_HOSTS + embed_origins[:script]).uniq
   end
 
   private

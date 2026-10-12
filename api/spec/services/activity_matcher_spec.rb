@@ -5,6 +5,11 @@ RSpec.describe ActivityMatcher do
     it "maps Intervals.icu and Whoop type names to the shared set" do
       expect(described_class.normalize_type("Ride")).to eq("Cycling")
       expect(described_class.normalize_type("VirtualRide")).to eq("Cycling")
+      expect(described_class.normalize_type("GravelRide")).to eq("Cycling")
+      expect(described_class.normalize_type("MountainBikeRide")).to eq("Cycling")
+      expect(described_class.normalize_type("TrackRide")).to eq("Cycling")
+      expect(described_class.normalize_type("Mountain Biking")).to eq("Cycling")
+      expect(described_class.normalize_type("VirtualRow")).to eq("Rowing")
       expect(described_class.normalize_type("spin")).to eq("Cycling")
       expect(described_class.normalize_type("OpenWaterSwim")).to eq("Swimming")
       expect(described_class.normalize_type("TrailRun")).to eq("Running")

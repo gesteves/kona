@@ -16,7 +16,8 @@ name: "API"
 # in that spec.
 # ⚠️ `web/data/srcsets.yml` is there for the same reason:
 # api/spec/contracts/srcsets_contract_spec.rb reads it and compares it with api/config/srcsets.yml,
-# which is a copy of it.
+# which is a copy of it. The two `web/lib/helpers/` files are there because more contract specs
+# read them.
 on:
   push:
     branches: [main]
@@ -29,6 +30,7 @@ on:
       - 'web/source/partials/article/_full.html.erb'
       - 'web/data/srcsets.yml'
       - 'web/lib/helpers/site_helpers.rb'
+      - 'web/lib/helpers/article_helpers.rb'
   pull_request:
     branches: [main]
     paths:
@@ -40,6 +42,7 @@ on:
       - 'web/source/partials/article/_full.html.erb'
       - 'web/data/srcsets.yml'
       - 'web/lib/helpers/site_helpers.rb'
+      - 'web/lib/helpers/article_helpers.rb'
 
 # No job writes to the repository. The deploy uses FLY_API_TOKEN for fly, and not GITHUB_TOKEN.
 # Set GITHUB_TOKEN to read-only here. Do not use the default value of the repository.
@@ -190,11 +193,30 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push' && !contains(github.event.head_commit.message, '[skip deploy]') && !contains(github.event.head_commit.message, '[no deploy]')
 
     steps:
+      # The full history, thus the step below can compare with the commit before this push.
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
 
       - name: CI context
         uses: ./.github/actions/ci-context
+
+      # The `paths:` above also runs this workflow for the web files that the contract specs read.
+      # A push that changes only those files needs the checks and not a deploy, which restarts the
+      # worker. A diff that cannot run (for example, no commit before the push) gives "true", thus
+      # an error deploys and never skips.
+      - name: Check for a change to the api
+        id: changes
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if git diff --quiet "$BEFORE" "$GITHUB_SHA" -- api/ .github/workflows/api.yml; then
+            echo "api=false" >> "$GITHUB_OUTPUT"
+            echo "This push changes nothing below api/. The deploy does not run."
+          else
+            echo "api=true" >> "$GITHUB_OUTPUT"
+          fi
 
       # (There is no "deploy starting" message, and web.yml is the same. A deploy already sends a
       # message on a success or on a failure, and a third message for each deploy was too much.
@@ -208,6 +230,7 @@ jobs:
       # comment at the end gives the version for a person to read. The github-actions updater of
       # Dependabot changes both.
       - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6
+        if: steps.changes.outputs.api == 'true'
 
       # ⚠️ --remote-only builds on the builder of fly, and not on this runner. Thus the token for
       # the private registry must go with the build. --build-secret is what puts it on the BuildKit
@@ -215,6 +238,7 @@ jobs:
       # fails.
       - name: Deploy to Fly.io
         id: fly_deploy
+        if: steps.changes.outputs.api == 'true'
         working-directory: api
         run: flyctl deploy --remote-only --build-secret WEBAWESOME_NPM_TOKEN="$WEBAWESOME_NPM_TOKEN"
         env:
@@ -222,7 +246,7 @@ jobs:
           WEBAWESOME_NPM_TOKEN: ${{ secrets.WEBAWESOME_NPM_TOKEN }}
 
       - name: Notify Slack (deploy successful)
-        if: success()
+        if: success() && steps.changes.outputs.api == 'true'
         continue-on-error: true
         uses: ./.github/actions/notify-slack
         with:

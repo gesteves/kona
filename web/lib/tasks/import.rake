@@ -16,14 +16,12 @@ namespace :import do
   desc "Imports Contentful content"
   task content: [ :dotenv ] do
     setup_data_directory
-    RedisConnection.connection
     measure_and_output(:import_contentful, "Importing site content")
   end
 
   desc "Fetches standard.site verification data (DID + publication URI) from the api"
   task standard_site: [ :dotenv ] do
     setup_data_directory
-    RedisConnection.connection
     measure_and_output(:import_standard_site, "Fetching standard.site verification data")
   end
 
@@ -35,7 +33,6 @@ namespace :import do
   desc "Fetches the related-articles ranking from the api"
   task related: [ :dotenv ] do
     setup_data_directory
-    RedisConnection.connection
     measure_and_output(:import_related, "Fetching related articles")
     report_related_coverage
   end
@@ -55,7 +52,6 @@ task import: [ :dotenv, :clobber ] do
 
   overall_start_time = Time.now
   setup_data_directory
-  RedisConnection.connection
 
   output_mutex = Mutex.new
 

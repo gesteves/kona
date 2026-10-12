@@ -2,8 +2,8 @@ require "securerandom"
 
 # Does the Whoop OAuth2 authorization flow. The owner session controls the authorize endpoint, thus
 # only the owner can connect an account. A visitor can reach the callback with no session, because
-# Whoop redirects directly to it. A state value that works one time, and that the code compares with
-# Redis, protects that callback.
+# Whoop redirects directly to it. A state value that works one time, and that the code keeps in the
+# session, protects that callback.
 #
 # ⚠️ This uses OwnerFacing for the `no-store` header: the callback has the authorization `code` and
 # the `state` in its query string, thus a browser and each server between must not store it.
@@ -14,7 +14,7 @@ class WhoopOauthController < ActionController::Base
 
   before_action :require_owner!, only: :authorize
 
-  # Starts the flow: stores a one-time state in Redis and redirects to Whoop.
+  # Starts the flow: stores a one-time state in the session and redirects to Whoop.
   def authorize
     url = Whoop.new.get_authorization_url(issue_oauth_state(:whoop))
 

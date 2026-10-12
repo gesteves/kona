@@ -27,6 +27,19 @@ RSpec.describe ActivityDescriptionJob do
     expect(described_class).to have_enqueued_sidekiq_job("i1").in(described_class::BUSY_DELAY)
   end
 
+  it "fails permanently when Strava or Intervals.icu refuses the credential or has no activity" do
+    allow(generator).to receive(:generate!).and_raise(ApplicationService::HttpError.new(404, "", "https://www.strava.com/api/v3/activities/1"))
+
+    expect { described_class.new.perform("i1") }.to raise_error(ApplicationJob::PermanentError, /HTTP 404/)
+  end
+
+  it "lets each other HTTP failure raise as it is, thus Sidekiq retries" do
+    error = ApplicationService::HttpError.new(503, "", "https://intervals.icu/api/v1/activity/i1")
+    allow(generator).to receive(:generate!).and_raise(error)
+
+    expect { described_class.new.perform("i1") }.to raise_error(error)
+  end
+
   it "retries failed jobs for up to 24 hours" do
     expect(described_class.get_sidekiq_options["retry_for"]).to eq(24.hours)
   end

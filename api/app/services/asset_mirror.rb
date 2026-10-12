@@ -183,8 +183,10 @@ class AssetMirror < ApplicationService
 
     # ⚠️ The timeouts go here. The defaults of config/initializers/http_timeouts.rb apply to
     # HTTParty alone, and Net::HTTP waits 60 seconds by itself, for each read, on a Sidekiq thread.
+    # ⚠️ `ignore_eof: false` is necessary. The default accepts a body that ends before its
+    # Content-Length, and #object_exists? would then skip that broken object for all time.
     Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == "https",
-                    open_timeout: OPEN_TIMEOUT, read_timeout: READ_TIMEOUT) do |http|
+                    open_timeout: OPEN_TIMEOUT, read_timeout: READ_TIMEOUT, ignore_eof: false) do |http|
       http.request(Net::HTTP::Get.new(uri)) do |response|
         if response.is_a?(Net::HTTPRedirection) && redirects_left.positive? && response["location"].present?
           # ⚠️ The code resolves this and checks it against the same list. It does not use it as

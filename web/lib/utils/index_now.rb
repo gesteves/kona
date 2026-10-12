@@ -8,8 +8,8 @@ require_relative "redis_connection"
 # The deploy calls it after the edge purge, thus each URL is already live.
 #
 # The state is one Redis key that holds the sitemap of the last submission, as a map of a URL to its
-# lastmod. The changed set is the URLs that are new and the URLs whose lastmod moved. Thus a deploy
-# with no content change sends nothing.
+# lastmod. The changed set is the URLs that are new, the URLs whose lastmod moved, and the URLs that
+# went away. Thus a deploy with no content change sends nothing.
 module IndexNow
   # The shared endpoint. It gives each URL to every participating engine, thus one POST is enough.
   ENDPOINT = "https://api.indexnow.org/indexnow".freeze
@@ -137,9 +137,21 @@ module IndexNow
       urls = if all || previous.nil?
         current.keys
       else
-        current.reject { |loc, lastmod| previous[loc] == lastmod }.keys
+        changed = current.reject { |loc, lastmod| previous[loc] == lastmod }.keys
+        changed + removed_urls(current, previous)
       end
       urls.first(MAX_URLS)
+    end
+
+    # The protocol takes a URL that went away, thus an engine gets the 404 and removes the page.
+    # A URL on another host stays out: IndexNow answers 422 for it, for example after a change of
+    # the site host.
+    # @param current [Hash{String => String}] The sitemap of this build, on one host only.
+    # @param previous [Hash{String => String}] The sitemap of the last submission.
+    # @return [Array<String>] The URLs of the last submission that this build does not list.
+    def removed_urls(current, previous)
+      host = host_of(current.keys.first)
+      (previous.keys - current.keys).select { |loc| host_of(loc) == host }
     end
 
     # Sends the URLs.

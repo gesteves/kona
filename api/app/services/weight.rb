@@ -28,21 +28,28 @@ class Weight
   #   of the current location.
   # @return [Date, nil] The day, or nil if the value is incorrect.
   def self.parse_date(value)
-    return Time.current.in_time_zone(Location.new.time_zone).to_date if value.blank?
+    return today if value.blank?
 
     Date.iso8601(value.to_s)
   rescue Date::Error
     nil
   end
 
-  # Adds the two sync jobs.
+  # @return [Date] Today in the time zone of the current location.
+  def self.today
+    Time.current.in_time_zone(Location.new.time_zone).to_date
+  end
+
+  # Adds the sync jobs.
   #
   # ⚠️ The caller gives the day, and each job gets it as a string. A retry after midnight must not
   # move the weight to the next day.
+  # ⚠️ Strava keeps one current weight and no history. Thus a weight for a past day goes to
+  # Intervals.icu only, or it would replace the current weight on Strava.
   # @param kg [Float] The weight in kilograms.
   # @param date [Date] The day of the weight.
   def self.save(kg, date)
     IntervalsWeightJob.perform_async(kg, date.iso8601)
-    StravaWeightJob.perform_async(kg)
+    StravaWeightJob.perform_async(kg) if date >= today
   end
 end

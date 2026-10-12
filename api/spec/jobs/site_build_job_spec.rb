@@ -46,7 +46,15 @@ RSpec.describe SiteBuildJob do
 
   it "raises on a non-2xx response so Sidekiq retries" do
     allow(HTTParty).to receive(:post).and_return(instance_double(HTTParty::Response, success?: false, code: 403))
-    expect { described_class.new.perform }.to raise_error(/repository_dispatch failed \(HTTP 403\)/)
+    expect { described_class.new.perform }.to raise_error(RuntimeError, /repository_dispatch failed \(HTTP 403\)/)
+  end
+
+  # An expired token, or one that cannot reach the repo, must not retry for 24 hours.
+  [ 401, 404, 422 ].each do |code|
+    it "fails permanently on a #{code}" do
+      allow(HTTParty).to receive(:post).and_return(instance_double(HTTParty::Response, success?: false, code: code))
+      expect { described_class.new.perform }.to raise_error(ApplicationJob::PermanentError, /HTTP #{code}/)
+    end
   end
 
   it "is a no-op (no HTTP call) when GITHUB_DISPATCH_TOKEN is unset" do
