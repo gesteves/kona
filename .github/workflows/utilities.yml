@@ -48,7 +48,7 @@ jobs:
       # the job level applies to a `run:` step only. Thus without this input, setup-ruby looks for
       # .ruby-version at the root of the repo, where there is none, and it stops with an ENOENT.
       - name: Set up Ruby
-        uses: ruby/setup-ruby@14594264cd68ce8a2345dd349bc3d138a4ef85c8 # v1.327.0
+        uses: ruby/setup-ruby@e81a8fa391b11a595c1b7ed84177cc0fe02faf83 # v1.328.0
         with:
           working-directory: utilities/aqi-map
           bundler-cache: false
@@ -72,7 +72,7 @@ jobs:
 
       # ⚠️ working-directory must be an input of the action. Refer to the aqi-map job.
       - name: Set up Ruby
-        uses: ruby/setup-ruby@14594264cd68ce8a2345dd349bc3d138a4ef85c8 # v1.327.0
+        uses: ruby/setup-ruby@e81a8fa391b11a595c1b7ed84177cc0fe02faf83 # v1.328.0
         with:
           working-directory: utilities/race-weather
           bundler-cache: false
