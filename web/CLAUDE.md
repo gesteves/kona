@@ -264,6 +264,24 @@ build does this host serve now", and that stays correct after a manual rollback.
 - A local build renders an empty file, because `BUILD_ID` has no value. That is correct: the gate
   runs in CI only.
 
+### `/.well-known/about.md`
+
+This is the about page as [AboutSpec](https://aboutspec.org/) Markdown, for a feed reader or a
+social client on another site. `AboutHelpers#about_markdown` writes it: front matter with the
+`summary` of the page, then the body. `_headers` gives it `text/markdown`, CORS, and an ETag check.
+
+- **The body goes from Markdown to HTML and back to Markdown.** `render_markdown_body` runs the
+  feed transforms, thus each image is a CDN URL on the mirror, with the asset description as its
+  alt text. Then `normalize_for_markdown` changes each construct with no Markdown form: a figure,
+  an iframe, an embed, a `<cite>`, and a units span. ⚠️ A new kind of markup in a body goes out
+  as its text only. Add a step there for it.
+- ⚠️ **It is a proxy to `about_md.txt.erb`**, and not a source file with the name `about.md.erb`.
+  Middleman reads `.md` as a template extension and renders that file into HTML.
+- ⚠️ **The front matter must be the first line of the file.** Thus the template is one ERB tag with
+  no comment and no newline.
+- The page is the published Page with the slug `about`. With no such page, the build writes no
+  file.
+
 ### `_headers` and `_redirects`
 
 The build makes these from `source/headers` and `source/redirects.erb`, and it then renames them. A

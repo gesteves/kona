@@ -39,6 +39,7 @@ ignore "/javascripts/stimulus/*"
 ignore "/page.html"
 ignore "/short.html"
 ignore "/tag_feed.xml"
+ignore "/about_md.txt"
 
 # Each page that the build makes — an article, a page, the blog index, and a tag page — proxies its
 # template with itself as the `content` local.
@@ -61,6 +62,16 @@ end
 
 # The standard.site verification endpoint. It has no layout and no directory index.
 page "/.well-known/site.standard.publication", layout: false, directory_index: false
+
+# The about page as AboutSpec Markdown. ⚠️ This is a proxy to a `.txt.erb` template, and not a
+# source file named `about.md.erb`. Middleman reads `.md` as a template extension and would render
+# that file into HTML.
+# `_headers` gives the Content-Type in production. `content_type` gives it to `middleman server`,
+# which otherwise sends `text/plain` with no charset, and the browser then shows UTF-8 as Latin-1.
+if (about_page = AboutHelpers.about_page(@app.data.pages))
+  proxy "/.well-known/about.md", "/about_md.txt", locals: { content: about_page }, layout: false,
+    directory_index: false, content_type: "text/markdown; charset=utf-8", ignore: true
+end
 
 # ⚠️ The build renders in forked workers, and a memo in a helper is copied into each one. This reads
 # each blurhash placeholder from Redis one time, here in the parent, and the forks inherit the

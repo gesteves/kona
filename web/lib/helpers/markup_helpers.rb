@@ -10,6 +10,10 @@ module MarkupHelpers
   EMOJI_REGEX = /([\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E6}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F900}-\u{1F9FF}]|[\u{1F018}-\u{1F270}])[\u{FE00}-\u{FE0F}\u{1F3FB}-\u{1F3FF}]?/
   # A group of adjacent emoji, and the spaces between them.
   EMOJI_RUN_REGEX = /((?:#{EMOJI_REGEX.source}(?:\s*#{EMOJI_REGEX.source})*))/
+  # The default title of a YouTube embed. It names the player and not the video.
+  YOUTUBE_PLAYER_TITLE = "YouTube video player".freeze
+  # The id of the video in a YouTube embed URL.
+  YOUTUBE_EMBED_REGEX = %r{\Ahttps?://(?:www\.)?youtube(?:-nocookie)?\.com/embed/([\w-]+)}
 
   # Renders the body of an entry through the full transform pipeline.
   #
@@ -85,6 +89,31 @@ module MarkupHelpers
       set_alt_text(doc)
       mark_affiliate_links(doc)
     end
+  end
+
+  # Renders a body as portable Markdown, for a reader on another site. It uses the feed transforms,
+  # then changes each construct with no Markdown form into plain Markdown.
+  #
+  # ⚠️ A construct that normalize_for_markdown does not know goes out as its text only. Add a step
+  # there for each new kind of markup in a body.
+  # @param text [String] The Markdown text from Contentful.
+  # @param base_url [String] The URL of the page. Each relative link resolves against it.
+  # @return [String, nil] The Markdown, or nil for a blank input.
+  def render_markdown_body(text, base_url:)
+    return if text.blank?
+
+    html = render_markup(text) do |doc|
+      add_image_data_attributes(doc)
+      add_figure_elements_to_images(doc)
+      add_figure_elements_to_iframes(doc)
+      add_figure_elements_to_embeds(doc)
+      set_caption_credit(doc)
+      resize_images(doc, width: data.srcsets.entry.widths.max)
+      set_alt_text(doc)
+      set_iframe_titles(doc)
+      normalize_for_markdown(doc, base_url: base_url)
+    end
+    html_to_markdown(html)
   end
 
   # Renders a body for the home page, with square images and no change to the degree notation.
@@ -630,6 +659,101 @@ module MarkupHelpers
   end
 
   private
+
+  # Changes the HTML of the feed transforms into HTML that has a Markdown form.
+  # @param doc [Nokogiri::HTML::DocumentFragment] The parsed body.
+  # @param base_url [String] The URL that each relative link resolves against.
+  # @return [void]
+  def normalize_for_markdown(doc, base_url:)
+    doc.css("script, style").remove
+    doc.css("figure").each { |figure| unwrap_figure(doc, figure) }
+    doc.css("iframe").each { |iframe| iframe.replace(iframe_link(doc, iframe)) }
+    doc.css("cite").each { |cite| cite.name = "em" }
+    doc.css("[data-imperial]").each do |element|
+      element.replace(Nokogiri::XML::Text.new("#{element.text} (#{element['data-imperial']})", doc))
+    end
+    doc.css("a[href]").each { |a| a["href"] = absolute_url(base_url, a["href"]) }
+    doc.css("img[src]").each { |img| img["src"] = absolute_url(base_url, img["src"]) }
+  end
+
+  # Replaces a <figure> with its content and a paragraph for its caption. An image goes in a
+  # paragraph, and an iframe becomes a link.
+  # @param doc [Nokogiri::HTML::DocumentFragment] The parsed body.
+  # @param figure [Nokogiri::XML::Node] The figure.
+  # @return [void]
+  def unwrap_figure(doc, figure)
+    figcaption = figure.at_css("figcaption")&.remove
+    nodes = figure.element_children.map do |child|
+      case child.name
+      when "img" then wrap_node(doc, "p", child)
+      when "iframe" then wrap_node(doc, "p", iframe_link(doc, child))
+      else child
+      end
+    end
+    nodes << caption_paragraph(doc, figcaption) if figcaption&.text.present?
+    nodes.each { |node| figure.add_previous_sibling(node) }
+    figure.remove
+  end
+
+  # A caption in italics, and its credit after it in plain text.
+  # @param doc [Nokogiri::HTML::DocumentFragment] The parsed body.
+  # @param figcaption [Nokogiri::XML::Node] The figcaption.
+  # @return [Nokogiri::XML::Node] The paragraph.
+  def caption_paragraph(doc, figcaption)
+    credit = figcaption.at_xpath("./cite")&.remove
+    paragraph = Nokogiri::XML::Node.new("p", doc)
+    if figcaption.text.strip.present?
+      em = Nokogiri::XML::Node.new("em", doc)
+      em.children = figcaption.children
+      em.children.last.content = em.children.last.content.rstrip if em.children.last&.text?
+      paragraph.add_child(em)
+    end
+    if credit
+      paragraph.add_child(Nokogiri::XML::Text.new(" ", doc)) if paragraph.children.any?
+      paragraph.add_child(credit.children)
+    end
+    paragraph
+  end
+
+  # A link to the content of an iframe. A YouTube embed links to the watch page of its video.
+  # @param doc [Nokogiri::HTML::DocumentFragment] The parsed body.
+  # @param iframe [Nokogiri::XML::Node] The iframe.
+  # @return [Nokogiri::XML::Node] The link.
+  def iframe_link(doc, iframe)
+    src = iframe["src"].to_s
+    youtube_id = src[YOUTUBE_EMBED_REGEX, 1]
+    title = iframe["title"].presence || iframe_title(iframe)
+
+    a = Nokogiri::XML::Node.new("a", doc)
+    if youtube_id
+      a["href"] = "https://www.youtube.com/watch?v=#{youtube_id}"
+      a.content = title == YOUTUBE_PLAYER_TITLE ? "Watch on YouTube" : title
+    else
+      a["href"] = src
+      a.content = title
+    end
+    a
+  end
+
+  # @param doc [Nokogiri::HTML::DocumentFragment] The parsed body.
+  # @param name [String] The name of the new element.
+  # @param node [Nokogiri::XML::Node] The node to put in it.
+  # @return [Nokogiri::XML::Node] The new element.
+  def wrap_node(doc, name, node)
+    wrapper = Nokogiri::XML::Node.new(name, doc)
+    wrapper.add_child(node)
+    wrapper
+  end
+
+  # Resolves a URL against the URL of the page. A URL with an incorrect shape stays as it is.
+  # @param base_url [String] The URL of the page.
+  # @param url [String] The URL to resolve.
+  # @return [String] The absolute URL.
+  def absolute_url(base_url, url)
+    URI.join(base_url, url).to_s
+  rescue URI::Error
+    url
+  end
 
   # The name for an iframe with no title: the caption of its figure, or the host that it embeds.
   # @param iframe [Nokogiri::XML::Node] The iframe.

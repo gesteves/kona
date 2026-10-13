@@ -9,6 +9,15 @@ RSpec.describe MarkdownHelpers do
     end
   end
 
+  describe '#html_to_markdown' do
+    it 'changes HTML into Markdown and gives the text of an element with no Markdown form' do
+      html = '<h2 id="x">Hi</h2><p>A <em>b</em> <a href="https://example.com">c</a> <abbr>d</abbr>.</p><ul><li>e</li></ul>'
+
+      expect(html_to_markdown(html)).to eq("## Hi\n\nA _b_ [c](https://example.com) d.\n\n- e")
+      expect(html_to_markdown('')).to be_nil
+    end
+  end
+
   describe '#markdown_to_html' do
     context 'when text is provided' do
       let(:markdown) { '**bold** _italic_ [link](http://example.com)' }

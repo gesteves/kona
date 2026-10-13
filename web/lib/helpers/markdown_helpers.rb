@@ -1,4 +1,5 @@
 require "redcarpet"
+require "reverse_markdown"
 require "sanitize"
 
 module MarkdownHelpers
@@ -41,5 +42,13 @@ module MarkdownHelpers
   def heading_text(text)
     return if text.blank?
     Sanitize.fragment(smartypants(text))
+  end
+
+  # Changes HTML back into Markdown. An element with no Markdown form gives its text only.
+  # @param html [String, nil] The HTML to change.
+  # @return [String, nil] The Markdown, or nil for a blank input.
+  def html_to_markdown(html)
+    return if html.blank?
+    ReverseMarkdown.convert(html, unknown_tags: :bypass, github_flavored: true).strip
   end
 end

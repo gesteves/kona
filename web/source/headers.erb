@@ -41,6 +41,13 @@
 /.well-known/site.standard.publication
   Content-Type: text/plain; charset=utf-8
 
+# The AboutSpec document. A reader on another site gets it, thus it needs CORS. The asset layer
+# sends the ETag and answers If-None-Match.
+/.well-known/about.md
+  Content-Type: text/markdown; charset=utf-8
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=0, must-revalidate
+
 # asset_hash (config.rb) puts a fingerprint in each of these names. New content gives a new URL,
 # thus a cached copy is never old and the cache can keep it for all time.
 /javascripts/*
