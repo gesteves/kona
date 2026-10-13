@@ -26,6 +26,11 @@ const AXE_SOURCE = await readFile(require.resolve('axe-core/axe.min.js'), 'utf8'
 // A rule that needs a rendered box. jsdom reports these incorrectly.
 const DISABLED_RULES = ['color-contrast'];
 
+// The third-party embed markup that axe does not check. Each selector matches the outer element.
+// ⚠️ The Reddit embed code writes the "from discussion" link with no text, and its script fills it
+// at run time. This check runs no script, thus it would report an empty link.
+const EXCLUDED_SELECTORS = ['blockquote.reddit-embed-bq'];
+
 // Report a violation at these levels only. `minor` is mostly advice.
 const REPORTED_IMPACTS = new Set(['serious', 'critical']);
 
@@ -89,7 +94,11 @@ async function checkPage(root, page) {
   });
   try {
     dom.window.eval(AXE_SOURCE);
-    const results = await dom.window.axe.run(dom.window.document, {
+    const context = {
+      include: [dom.window.document],
+      exclude: EXCLUDED_SELECTORS,
+    };
+    const results = await dom.window.axe.run(context, {
       rules: Object.fromEntries(
         DISABLED_RULES.map((rule) => [rule, { enabled: false }])
       ),
