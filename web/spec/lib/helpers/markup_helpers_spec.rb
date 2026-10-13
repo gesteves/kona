@@ -305,10 +305,16 @@ RSpec.describe MarkupHelpers do
       expect(markdown).not_to include('ctfassets')
     end
 
-    it 'puts the caption of an image in italics, and its credit after it' do
+    it 'puts the caption of an image in a paragraph, and its credit after the separator' do
       markdown = render("![IMG 1](#{image_url})\nIn the lake. | Credit: Kate")
 
-      expect(markdown).to eq("![A swimmer, mid-stroke](#{cdn_url})\n\n_In the lake._ Credit: Kate")
+      expect(markdown).to eq("![A swimmer, mid-stroke](#{cdn_url})\n\nIn the lake. | Credit: Kate")
+    end
+
+    it 'gives a credit with no caption no separator' do
+      markdown = render("![IMG 1](#{image_url})\n | Credit: Kate")
+
+      expect(markdown).to end_with("\n\nCredit: Kate")
     end
 
     it 'keeps the typography of SmartyPants and corrects the degrees' do

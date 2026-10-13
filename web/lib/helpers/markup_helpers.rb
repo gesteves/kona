@@ -690,29 +690,25 @@ module MarkupHelpers
       else child
       end
     end
-    nodes << caption_paragraph(doc, figcaption) if figcaption&.text.present?
+    nodes << caption_paragraph(figcaption) if figcaption&.text.present?
     nodes.each { |node| figure.add_previous_sibling(node) }
     figure.remove
   end
 
-  # A caption in italics, and its credit after it in plain text.
-  # @param doc [Nokogiri::HTML::DocumentFragment] The parsed body.
+  # Changes a figcaption into a paragraph. Its credit becomes plain text after the caption, with the
+  # " | " separator that the author wrote.
   # @param figcaption [Nokogiri::XML::Node] The figcaption.
   # @return [Nokogiri::XML::Node] The paragraph.
-  def caption_paragraph(doc, figcaption)
-    credit = figcaption.at_xpath("./cite")&.remove
-    paragraph = Nokogiri::XML::Node.new("p", doc)
-    if figcaption.text.strip.present?
-      em = Nokogiri::XML::Node.new("em", doc)
-      em.children = figcaption.children
-      em.children.last.content = em.children.last.content.rstrip if em.children.last&.text?
-      paragraph.add_child(em)
-    end
+  def caption_paragraph(figcaption)
+    credit = figcaption.at_xpath("./cite")
     if credit
-      paragraph.add_child(Nokogiri::XML::Text.new(" ", doc)) if paragraph.children.any?
-      paragraph.add_child(credit.children)
+      # set_caption_credit already put a space before the credit.
+      caption = credit.xpath("preceding-sibling::node()").map(&:text).join.strip
+      credit.add_previous_sibling(Nokogiri::XML::Text.new("| ", figcaption.document)) if caption.present?
+      credit.replace(credit.children)
     end
-    paragraph
+    figcaption.name = "p"
+    figcaption
   end
 
   # A link to the content of an iframe. A YouTube embed links to the watch page of its video.
