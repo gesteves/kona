@@ -49,6 +49,8 @@ module ActivityDescription
     HEADWIND_MIN_KPH = 8
     # Below this share of the time, a headwind is not worth a word.
     HEADWIND_MIN_PERCENT = 50
+    # The ActivityMatcher types that get the headwind.
+    HEADWIND_TYPES = %w[Cycling Running].freeze
 
     # The cloud cover, in percent, below which each condition applies, for a sky with no sky code:
     # the Intervals.icu fallback, and a track where each hour is, for example, Windy. Above the last
@@ -88,11 +90,16 @@ module ActivityDescription
     #   stream holds the latitudes in `data` and the longitudes in `data2`.
     # @param unit [Symbol] :celsius or :fahrenheit, from Intervals#temperature_unit. Fahrenheit
     #   also gives mph and inches.
-    # @param headwind [Boolean] True to measure the headwind, which is for a bike ride only.
+    # @param headwind [Boolean] True to measure the headwind. Refer to .headwind?.
     # @param weather_kit [#hourly] The source of the hours. The specs replace it.
     # @param air_quality [#history] The source of the past AQI. The specs replace it.
     # @param intervals [#activity_weather_summary, nil] The source of the full weather summary for
     #   the fallback. With nil, the fallback reads the fields of the activity only.
+    # @param activity [Hash] The Intervals.icu activity.
+    # @return [Boolean] True for a bike ride and a run, which get the headwind. An indoor activity
+    #   gets no weather line at all.
+    def self.headwind?(activity) = HEADWIND_TYPES.include?(ActivityMatcher.normalize_type(activity[:type]))
+
     def initialize(activity, streams, unit:, headwind: false, weather_kit: WeatherKit, air_quality: GoogleAirQuality, intervals: nil)
       @activity = activity
       @streams = Array(streams)
@@ -114,7 +121,7 @@ module ActivityDescription
 
     # The inspect task reads this to tune HEADWIND_MIN_KPH and HEADWIND_MIN_PERCENT.
     # @return [Integer, nil] The share of the moving time with a headwind, in percent, also below
-    #   HEADWIND_MIN_PERCENT. Nil for an activity that is not a bike ride, and with no wind.
+    #   HEADWIND_MIN_PERCENT. Nil for an activity with no headwind measurement, and with no wind.
     def headwind_share = report&.dig(:headwind_share)
 
     # The weather along the track. The inspect task reads its calls and its query points.

@@ -21,9 +21,9 @@ namespace :activity_weather do
         next
       end
 
-      cycling = ActivityMatcher.normalize_type(activity[:type]) == "Cycling"
       streams = intervals.activity_streams(id, types: %w[latlng time])
-      weather = ActivityDescription::Weather.new(activity, streams, unit: unit, headwind: cycling, intervals: intervals)
+      headwind = ActivityDescription::Weather.headwind?(activity)
+      weather = ActivityDescription::Weather.new(activity, streams, unit: unit, headwind: headwind, intervals: intervals)
       summary = weather.summary
 
       track = weather.track_weather

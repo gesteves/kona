@@ -571,8 +571,9 @@ Thus that shared window is safe.
     ice, mixed). Thus "Rain with some snow", and never "Rain with some heavy rain". An hourly code
     cannot give minutes.
     That flag is not `adverse_weather`, which also marks wind, haze, smoke, fog, and cold.
-  - The headwind shows on a bike ride only, at `HEADWIND_MIN_PERCENT` (50) or more of the moving
-    time. It reads each GPS point, in legs of `LEG_METERS`, and a stop does not count as wind. A
+  - The headwind shows on an outdoor bike ride and an outdoor run only (`Weather::HEADWIND_TYPES`),
+    at `HEADWIND_MIN_PERCENT` (50) or more of the moving time. It reads each GPS point, in legs of
+    `LEG_METERS`, and a stop does not count as wind. A
     leg has a headwind when its head component is `HEADWIND_MIN_KPH` or more: the wind speed of
     that leg × the cosine of the angle to the direction of travel. Thus a stronger wind counts from
     a wider angle. ⚠️ The Intervals.icu fallback gives the share of Intervals.icu, which uses a
