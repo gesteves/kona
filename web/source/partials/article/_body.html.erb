@@ -1,8 +1,10 @@
 <%# The full text of an entry: the intro, the body, and the affiliate-link disclosure. The article
     template and the page template share it. `pagefind`, which is an optional local, adds the
-    data-pagefind-body attribute, which lets the site search index the div. `track_article_links`,
-    which is an optional local, adds the Article Click analytics to each link to an article. %>
-<% link_section = (MarkupHelpers::ARTICLE_BODY_SECTION if defined?(track_article_links) && track_article_links) %>
+    data-pagefind-body attribute, which lets the site search index the div. `track_body_links`,
+    which is an optional local, adds the Article Click analytics to each link to an article.
+    ⚠️ A local must not have the name of a helper. Without the local, defined? finds the helper and
+    the code calls it. %>
+<% link_section = (MarkupHelpers::ARTICLE_BODY_SECTION if defined?(track_body_links) && track_body_links) %>
 <div class="entry__body"<%= ' data-pagefind-body'.html_safe if defined?(pagefind) && pagefind %>>
   <%# first_image marks the FIRST image of the two calls only. Refer to claim_lcp_image.
       ⚠️ :priority, and NOT :eager. A measurement gave the LCP element of an article as text: the

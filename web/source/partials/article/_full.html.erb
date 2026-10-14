@@ -10,5 +10,5 @@
       <span data-nosnippet <%= live_update_attrs(views_url) %>><%= icon_svg("classic", "light", "eye") %> <span class="sr-only">Loading view count</span><wa-skeleton class="view-count-skeleton" effect="sheen"></wa-skeleton></span>
     </p>
   </header>
-  <%= partial 'partials/article/body', locals: { article: article, pagefind: !article.draft, track_article_links: true } %>
+  <%= partial 'partials/article/body', locals: { article: article, pagefind: !article.draft, track_body_links: true } %>
 </article>
