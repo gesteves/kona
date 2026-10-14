@@ -14,6 +14,10 @@ module MarkupHelpers
   YOUTUBE_PLAYER_TITLE = "YouTube video player".freeze
   # The id of the video in a YouTube embed URL.
   YOUTUBE_EMBED_REGEX = %r{\Ahttps?://(?:www\.)?youtube(?:-nocookie)?\.com/embed/([\w-]+)}
+  # The analytics section of a link to an article in the text of an entry.
+  ARTICLE_BODY_SECTION = "Article Body".freeze
+  # ⚠️ The permalink shape of a published article. It must match Contentful#set_article_path.
+  ARTICLE_PATH_REGEX = %r{\A/\d{4}/\d{2}/\d{2}/[^/]+/?\z}
 
   # Renders the body of an entry through the full transform pipeline.
   #
@@ -23,14 +27,20 @@ module MarkupHelpers
   # the LCP image of THIS page, thus the code renders it each time.
   # @param text [String] The Markdown text to render.
   # @param image_variant [Symbol] The responsive-images configuration to use.
+  # @param link_section [String, nil] The analytics section of each link to an article. With nil,
+  #   the links get no analytics classes.
   # @return [String] The HTML after the transforms.
-  def render_body(text, image_variant: :entry, first_image: nil)
-    return render_body_now(text, image_variant: image_variant, first_image: first_image) if first_image
+  def render_body(text, image_variant: :entry, first_image: nil, link_section: nil)
+    if first_image
+      return render_body_now(text, image_variant: image_variant, first_image: first_image,
+                             link_section: link_section)
+    end
 
     rendered = false
-    html = memoize_entry(:rendered_bodies, [ text, image_variant ], data.articles, data.assets) do
+    key = [ text, image_variant, link_section ]
+    html = memoize_entry(:rendered_bodies, key, data.articles, data.assets) do
       rendered = true
-      render_body_now(text, image_variant: image_variant, first_image: nil)
+      render_body_now(text, image_variant: image_variant, first_image: nil, link_section: link_section)
     end
     # The icons of a body that another page rendered go in the sprite of this page as well.
     record_icons_in(html) unless rendered
@@ -38,10 +48,11 @@ module MarkupHelpers
   end
 
   # @see #render_body
-  def render_body_now(text, image_variant:, first_image:)
+  def render_body_now(text, image_variant:, first_image:, link_section: nil)
     srcset = data.srcsets[image_variant]
     render_markup(text) do |doc|
       open_external_links_in_new_tabs(doc)
+      track_article_links(doc, link_section) if link_section
       copy_feed_links(doc)
       add_unit_data_attributes(doc)
       add_image_data_attributes(doc)
@@ -598,6 +609,26 @@ module MarkupHelpers
         # Add to the rel that the author wrote: a `nofollow` or a `ugc` must stay.
         a["rel"] = (a["rel"].to_s.split + [ "noopener" ]).uniq.join(" ")
         a["target"] = "_blank"
+      end
+    end
+  end
+
+  # Adds the Article Click analytics classes to each link to an article on this site.
+  # @param html [String, Nokogiri::XML::Node] The HTML to change.
+  # @param section [String] The analytics section of the links.
+  # @return [String, Nokogiri::XML::Node] The HTML after the change.
+  def track_article_links(html, section)
+    with_nokogiri_doc(html) do |doc|
+      current_host = URI.parse(root_url).host
+      doc.css("a[href]").each do |a|
+        next if a["class"].to_s.include?("plausible-event-name")
+
+        # A link from the author can be incorrect. Ignore such a link and do not stop the build.
+        uri = URI.parse(a["href"]) rescue next
+        next unless uri.host.nil? || uri.host == current_host
+        next unless uri.path&.match?(ARTICLE_PATH_REGEX)
+
+        a["class"] = [ a["class"], article_click_classes(section) ].reject(&:blank?).join(" ")
       end
     end
   end

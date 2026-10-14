@@ -4,6 +4,7 @@ require 'padrino-helpers'
 
 RSpec.describe MarkupHelpers do
   include Padrino::Helpers
+  include SiteHelpers
   include Padrino::Helpers::TagHelpers
 
   let(:affiliate_link) { 'https://www.amazon.com/abc123?tag=example-20' }
@@ -112,6 +113,37 @@ RSpec.describe MarkupHelpers do
     it 'does not open internal links in new tabs' do
       transformed_html = open_external_links_in_new_tabs(html_without_external_link)
       expect(transformed_html).to eq(html_without_external_link)
+    end
+  end
+
+  describe '#track_article_links' do
+    let(:classes) { 'plausible-event-name=Article+Click plausible-event-section=Article+Body' }
+
+    def link_class(href, extra = '')
+      html = track_article_links("<a href=\"#{href}\"#{extra}>Link</a>", 'Article Body')
+      Nokogiri::HTML::DocumentFragment.parse(html).at_css('a')['class']
+    end
+
+    it 'tags a relative link and a same-host link to an article' do
+      expect(link_class('/2024/05/01/a-race/')).to eq(classes)
+      expect(link_class('https://www.example.com/2024/05/01/a-race')).to eq(classes)
+      expect(link_class('/2024/05/01/a-race/#results')).to eq(classes)
+    end
+
+    it 'keeps the classes that the author wrote' do
+      expect(link_class('/2024/05/01/a-race/', ' class="note"')).to eq("note #{classes}")
+    end
+
+    it 'ignores a link to another site, to a page, to a tag, or to an anchor' do
+      expect(link_class('https://www.example.org/2024/05/01/a-race/')).to be_nil
+      expect(link_class('/about/')).to be_nil
+      expect(link_class('/tags/running/')).to be_nil
+      expect(link_class('#results')).to be_nil
+      expect(link_class('mailto:me@example.com')).to be_nil
+    end
+
+    it 'ignores a link that it cannot parse' do
+      expect { link_class('http://[') }.not_to raise_error
     end
   end
 
@@ -240,6 +272,17 @@ RSpec.describe MarkupHelpers do
       render_body('Hello.')
 
       expect(self).to have_received(:record_icons_in).once
+    end
+
+    it 'tags the article links with a link section only, and keeps the two results apart' do
+      text = 'Read [this](/2024/05/01/a-race/).'
+      allow(self).to receive(:amazon_associates_link?).and_return(false)
+
+      tagged = render_body(text, link_section: 'Article Body')
+      plain = render_body(text)
+
+      expect(tagged).to include('plausible-event-section=Article+Body')
+      expect(plain).not_to include('plausible-event')
     end
   end
 

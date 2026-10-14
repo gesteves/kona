@@ -1,13 +1,15 @@
 <%# The full text of an entry: the intro, the body, and the affiliate-link disclosure. The article
     template and the page template share it. `pagefind`, which is an optional local, adds the
-    data-pagefind-body attribute, which lets the site search index the div. %>
+    data-pagefind-body attribute, which lets the site search index the div. `track_article_links`,
+    which is an optional local, adds the Article Click analytics to each link to an article. %>
+<% link_section = (MarkupHelpers::ARTICLE_BODY_SECTION if defined?(track_article_links) && track_article_links) %>
 <div class="entry__body"<%= ' data-pagefind-body'.html_safe if defined?(pagefind) && pagefind %>>
   <%# first_image marks the FIRST image of the two calls only. Refer to claim_lcp_image.
       ⚠️ :priority, and NOT :eager. A measurement gave the LCP element of an article as text: the
       first body image of a race report is at 2531px, and the fold is at 664px. Thus the image
       stays lazy, and the mark only raises the priority of the fetch that the browser starts. %>
-  <%= render_body(article.intro, image_variant: :full, first_image: :priority) %>
-  <%= render_body(article.body, image_variant: :full, first_image: :priority) %>
+  <%= render_body(article.intro, image_variant: :full, first_image: :priority, link_section: link_section) %>
+  <%= render_body(article.body, image_variant: :full, first_image: :priority, link_section: link_section) %>
   <%# The contact form is a partial, and it is not raw HTML in the Contentful body. SmartyPants, in
       render_body, makes the quotation marks in a raw HTML attribute curly, and that breaks the
       form. Refer to partials/_contact_form. %>

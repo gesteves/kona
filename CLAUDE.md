@@ -794,10 +794,12 @@ lines. Change a heading when you want that measurement.
 | `Previous` / `Next` | The two halves of the read-next navigation |
 | `Blog List` | The blog index and each tag archive. **An override.** ⚠️ Those pages have **no** section heading: the `<h1>` is the name of the page, and for a tag archive that is the name of the tag. Thus the heading would make one value for each tag, and `event:page` already gives you that. |
 | `Recent Articles (404)` | The 404 page. **An override.** ⚠️ Its heading is the same as the one on the home page. The plain heading would merge the two, and `event:page` cannot separate them: a 404 is served at whatever URL the reader asked for. |
+| `Article Body` | A link to an article in the intro or the body of an article page or of the page of a Short. **An override**, because the text has no heading. Pages and the cards of a list do not get it. |
 
-The first five come from the heading and no call site names them. The last two are the only
-`tracking_section` locals in the repo, and each one is there because its heading cannot be the
-value.
+The first five come from the heading and no call site names them. `Blog List` and
+`Recent Articles (404)` are the only `tracking_section` locals in the repo, and each one is there
+because its heading cannot be the value. `Article Body` is the `link_section` of `render_body`, and
+`track_article_links` tags a link only when its path has the permalink shape of an article.
 
 ⚠️ **The goal must exist in the Plausible dashboard, with that exact text.** Plausible accepts an
 event that no goal matches, shows nothing, and does not fill in the data from before. A custom event
