@@ -18,9 +18,9 @@ index_in_search_engines: false
       <%# markdown_to_html runs SmartyPants itself. A second pass would change an entity again. %>
       <%= markdown_to_html(current_page.data.body) %>
     </div>
-    </section>
-    <% recent = recent_articles %>
-    <% if recent.present? %>
-      <%= partial 'partials/collection', locals: { title: "Recent Articles", items: recent, variant: "centered", tracking_section: "Recent Articles (404)" } %>
-    <% end %>
+  </section>
+  <% recent = recent_articles %>
+  <% if recent.present? %>
+    <%= partial 'partials/collection', locals: { title: "Recent Articles", items: recent, variant: "halves", tracking_section: "Recent Articles (404)" } %>
+  <% end %>
 </div>
