@@ -9,6 +9,10 @@ console_command = '/rails/bin/rails console'
 kill_signal = 'SIGTERM'
 kill_timeout = 30
 
+# The swap applies to each machine. At the memory limit, a machine with no swap does not get an OOM
+# kill. It thrashes and stops, and only a manual restart corrects it. Swap makes it slow, not stopped.
+swap_size_mb = 512
+
 [build]
 
 [env]

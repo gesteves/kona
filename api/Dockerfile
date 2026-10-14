@@ -28,15 +28,20 @@ WORKDIR /rails
 # ⚠️ The package name is `libvips42t64`, and not `libvips42`. ruby:$RUBY_VERSION-slim is Debian
 # trixie, and the 64-bit time_t transition renamed it. On bookworm it is `libvips42`. A change of
 # the base image can need a change here, and the build then fails at this line.
+# ⚠️ jemalloc replaces glibc malloc through LD_PRELOAD. With glibc, the threads of Puma fragment
+# the heap, and the RSS grows until the 512MB VM thrashes and stops. The symlink gives one path
+# for each CPU architecture.
 RUN apt-get update -qq && \
-    apt-get install --no-install-recommends -y curl libyaml-0-2 libvips42t64 && \
+    apt-get install --no-install-recommends -y curl libjemalloc2 libyaml-0-2 libvips42t64 && \
+    ln -s /usr/lib/$(uname -m)-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives
 
 # Set production environment
 ENV RAILS_ENV="production" \
     BUNDLE_DEPLOYMENT="1" \
     BUNDLE_PATH="/usr/local/bundle" \
-    BUNDLE_WITHOUT="development:test"
+    BUNDLE_WITHOUT="development:test" \
+    LD_PRELOAD="/usr/local/lib/libjemalloc.so"
 
 
 # Throw-away build stage to reduce size of final image
