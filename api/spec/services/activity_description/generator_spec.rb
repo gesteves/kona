@@ -660,7 +660,7 @@ RSpec.describe ActivityDescription::Generator do
       expect(strava).to have_received(:update_activity!).with("s1", description: "☀️ Clear · 18°C · 5 km/h S wind\n⚡️ Avg 200 W")
     end
 
-    it "measures the headwind of a bike ride only" do
+    it "measures the headwind of a bike ride and a run only" do
       allow(ActivityDescription::Weather).to receive(:new).and_call_original
       ride = activity.merge(trainer: false)
       run = activity.merge(type: "Run", trainer: false, icu_average_watts: nil)
@@ -672,7 +672,7 @@ RSpec.describe ActivityDescription::Generator do
       end
 
       expect(ActivityDescription::Weather).to have_received(:new).with(ride, streams, unit: :celsius, headwind: true, intervals: intervals)
-      expect(ActivityDescription::Weather).to have_received(:new).with(run, streams, unit: :celsius, headwind: false, intervals: intervals)
+      expect(ActivityDescription::Weather).to have_received(:new).with(run, streams, unit: :celsius, headwind: true, intervals: intervals)
       expect(ActivityDescription::Weather).to have_received(:new).with(swim, streams, unit: :celsius, headwind: false, intervals: intervals)
     end
 

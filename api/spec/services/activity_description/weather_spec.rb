@@ -164,6 +164,12 @@ RSpec.describe ActivityDescription::Weather do
     expect(summary(streams_for(north(30) + east(15)))[:headwind_percent]).to eq(100)
   end
 
+  it "measures the headwind of a bike ride and a run only" do
+    %w[Ride GravelRide Run TrailRun].each { |type| expect(described_class.headwind?(type: type)).to be(true) }
+    %w[OpenWaterSwim Hike AlpineSki Rowing].each { |type| expect(described_class.headwind?(type: type)).to be(false) }
+    expect(described_class.headwind?(type: nil)).to be(false)
+  end
+
   it "gives the share of the moving time also below HEADWIND_MIN_PERCENT" do
     result = weather(streams_for(north(15) + east(15) + south(15) + west(15)))
 
@@ -614,7 +620,7 @@ RSpec.describe ActivityDescription::Weather do
       expect(fallback.summary).not_to have_key(:headwind_percent)
     end
 
-    it "gives the headwind share of Intervals.icu for a bike ride only" do
+    it "gives the headwind share of Intervals.icu only when the caller asks for it" do
       expect(fallback(headwind: true).headwind_share).to eq(62)
       expect(fallback(headwind_percent: 37.4, headwind: true).headwind_share).to eq(37)
       expect(fallback.headwind_share).to be_nil
