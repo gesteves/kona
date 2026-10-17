@@ -21,7 +21,7 @@ module Api
 
     # The `contact` Stimulus controller of the site shows the `error` of a 422 in a toast.
     INVALID_INPUT = "Please provide your name, a valid email address, and a message.".freeze
-    UNDELIVERABLE_EMAIL = "That email address can't receive mail. Please check it and try again.".freeze
+    UNDELIVERABLE_EMAIL = "That email address doesn't seem to be valid. Please check it and try again.".freeze
 
     def create
       no_store!
