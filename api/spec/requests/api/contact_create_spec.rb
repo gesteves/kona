@@ -15,6 +15,8 @@ RSpec.describe "Contact", type: :request do
     # By default, Turnstile has no configuration. Thus these specs do not depend on a local .env with
     # TURNSTILE_SECRET in it. The "Turnstile verification" group stubs Turnstile#verify.
     allow(ENV).to receive(:[]).with("TURNSTILE_SECRET").and_return(nil)
+    # No spec makes a real DNS query. The "Email domain" group changes this.
+    allow(EmailDomain).to receive(:accepts_mail?).and_return(true)
   end
 
   describe "authentication" do
@@ -134,6 +136,54 @@ RSpec.describe "Contact", type: :request do
 
       expect(response).to have_http_status(:bad_request)
       expect(ContactMailJob.jobs).to be_empty
+    end
+  end
+
+  describe "Email domain" do
+    it "returns 422 with its own message and does not enqueue for a domain that can't receive mail" do
+      allow(EmailDomain).to receive(:accepts_mail?).with("jane@gmail.con").and_return(false)
+
+      post "/api/contact", params: valid_params.merge(email: "jane@gmail.con"), headers: json
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.parsed_body["error"]).to eq(Api::ContactController::UNDELIVERABLE_EMAIL)
+      expect(ContactMailJob.jobs).to be_empty
+    end
+
+    it "redirects back to the form on the no-JS path for a domain that can't receive mail" do
+      allow(EmailDomain).to receive(:accepts_mail?).and_return(false)
+
+      post "/api/contact", params: valid_params, headers: html
+
+      expect(response).to redirect_to("#{site_url}/contact")
+      expect(ContactMailJob.jobs).to be_empty
+    end
+
+    # ⚠️ The check fails closed: the visitor sends again, and no message skips it.
+    it "returns 503 and does not enqueue when the lookup times out" do
+      allow(EmailDomain).to receive(:accepts_mail?).and_raise(EmailDomain::LookupError)
+
+      post "/api/contact", params: valid_params, headers: json
+
+      expect(response).to have_http_status(:service_unavailable)
+      expect(ContactMailJob.jobs).to be_empty
+    end
+
+    it "redirects back to the form on the no-JS path when the lookup times out" do
+      allow(EmailDomain).to receive(:accepts_mail?).and_raise(EmailDomain::LookupError)
+
+      post "/api/contact", params: valid_params, headers: html
+
+      expect(response).to redirect_to("#{site_url}/contact")
+      expect(ContactMailJob.jobs).to be_empty
+    end
+
+    it "does no lookup for a request that fails Turnstile" do
+      allow_any_instance_of(Turnstile).to receive(:verify).and_return(false)
+
+      post "/api/contact", params: valid_params.merge("cf-turnstile-response" => "bad"), headers: json
+
+      expect(EmailDomain).not_to have_received(:accepts_mail?)
     end
   end
 

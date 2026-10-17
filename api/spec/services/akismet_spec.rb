@@ -74,11 +74,11 @@ RSpec.describe Akismet do
       )
     end
 
-    # ⚠️ This is the opposite of #spam?, on purpose. It is for training, and a failure of it must
-    # never stop a message that the owner already accepted.
-    it "reports failure rather than raising, so a caller can shrug it off" do
+    # ContactHamJob is separate from the delivery, thus a raise retries the report and never stops
+    # the message.
+    it "raises on a non-2xx so ContactHamJob retries the report" do
       stub_response(success: false, body: "")
-      expect(service.submit_ham(**check_args)).to be(false)
+      expect { service.submit_ham(**check_args) }.to raise_error(ApplicationService::HttpError)
     end
 
     it "does nothing when unconfigured" do

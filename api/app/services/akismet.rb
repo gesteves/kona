@@ -59,16 +59,13 @@ class Akismet < ApplicationService
   end
 
   # Tells Akismet that it marked a correct message as spam. Thus Akismet stops the mark on a sender
-  # that the filter continues to catch. The code calls this when the owner sends a message from the
-  # spam quarantine.
-  #
-  # ⚠️ This fails **soft**, which is the opposite of the rule of this class, on purpose. #spam?
-  # raises, thus the app never delivers a message with no check. This method is for training, and a
-  # failure in the training must never stop the delivery of a message that the owner already
-  # accepted. The caller writes a log line and continues.
+  # that the filter continues to catch. ContactHamJob calls this when the owner sends a message from
+  # the spam quarantine. That job is separate from the delivery, thus a failure here retries and
+  # never stops the message.
   #
   # @param (see #spam?)
   # @return [Boolean] True if Akismet accepted the submission. It is false with no configuration.
+  # @raise [ApplicationService::HttpError] If Akismet gives a non-2xx.
   # @see https://akismet.com/developers/submit-ham-false-positive/
   def submit_ham(content:, author: nil, author_email: nil, user_ip: nil, user_agent: nil)
     return false unless configured?
@@ -79,7 +76,9 @@ class Akismet < ApplicationService
       headers: { "Content-Type" => "application/x-www-form-urlencoded" }
     )
 
-    response.success?
+    raise ApplicationService::HttpError.new(response.code, response.body, AKISMET_API_HOST) unless response.success?
+
+    true
   end
 
   private

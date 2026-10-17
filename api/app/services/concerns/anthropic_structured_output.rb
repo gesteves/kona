@@ -1,9 +1,10 @@
 require "anthropic"
 
 # One Anthropic call with a structured output, or with a plain text answer. The services that make
-# such a call share it: the lines of the activity description, the subject line of the contact
-# form, and the alt text of a photo. They are different only in the env var that names their model
-# and in their token and timeout limits, thus each other part is in the code one time.
+# such a call share it: the lines of the activity description, the subject line and the abuse check
+# of the contact form, and the alt text of a photo. They are different only in the env var that
+# names their model and in their token and timeout limits, thus each other part is in the code one
+# time.
 #
 # ⚠️ Use `extend` for this module, and not `include`. Both callers are `module_function` modules,
 # thus their own methods are singleton methods, and they could not see the instance methods of a
@@ -12,6 +13,9 @@ require "anthropic"
 # The module that uses this supplies `DEFAULT_MODEL`, `MAX_TOKENS`, and `TIMEOUT_SECONDS`, and also
 # `anthropic_model_env`, which names the env var that replaces the model.
 module AnthropicStructuredOutput
+  # The model declined the request (`stop_reason: refusal`), thus the answer has no JSON to parse.
+  class Refusal < StandardError; end
+
   # @return [Boolean] True if an API key is available. Each caller gives nil without one.
   def configured?
     ENV["ANTHROPIC_API_KEY"].present?
@@ -32,9 +36,12 @@ module AnthropicStructuredOutput
   # @param user [String] The user message.
   # @param schema [Hash] The JSON schema that the response must agree with.
   # @return [Hash] The parsed output, with symbol keys.
+  # @raise [Refusal] If the model declined the request.
   def structured_call(system:, user:, schema:)
     message = create_message(system: system, content: user,
                              output_config: { format: { type: :json_schema, schema: schema } })
+    raise Refusal, "#{model} declined the request" if message.stop_reason == :refusal
+
     JSON.parse(text_of(message).to_s, symbolize_names: true)
   end
 

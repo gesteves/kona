@@ -22,6 +22,13 @@ RSpec.describe SpamMessagePresenter do
     )
   end
 
+  it "gives the check that marked the message, and Akismet for an entry with no reason" do
+    expect(presenter.reason).to eq(SpamQuarantine::AKISMET)
+
+    abusive = described_class.new(payload: payload.merge("reason" => SpamQuarantine::ABUSIVE), not_spam_path: "", delete_path: "")
+    expect(abusive.reason).to eq(SpamQuarantine::ABUSIVE)
+  end
+
   it "joins the forwarded geo fields the way the email does" do
     expect(presenter.location).to eq("Boise, Idaho, US")
   end

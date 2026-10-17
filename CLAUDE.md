@@ -609,24 +609,30 @@ in the Contentful body. SmartyPants would make the quotation marks in its attrib
 would break the field names and the Stimulus attributes. The intro text stays in Contentful.
 
 `Api::ContactController` removes each submission with a value in the honeypot, which is the hidden
-`comment` field, and it adds a `ContactMailJob` to the queue. That job does the spam check with
-**Akismet** and sends the email with **Resend**, which is an HTTPS API, because fly blocks outbound
-SMTP. It sets `Reply-To` to the sender. The form also works with no JavaScript: with JavaScript, the
-`contact` Stimulus controller posts with `fetch` and `Accept: application/json`, and it gets a 204 or
-a 422, shows a toast, and does not navigate. With no JavaScript, the native POST sends
-`Accept: text/html` and gets a 303 to `/contact/success`. Both use the same endpoint and the same
-checks.
+`comment` field. It refuses an address whose domain has no MX record, and it then adds a
+`ContactMailJob` to the queue. That job does the spam check with **Akismet** and the abuse check with
+**Claude**, and it sends the email with **Resend**, which is an HTTPS API, because fly blocks
+outbound SMTP. It sets `Reply-To` to the sender. The form also works with no JavaScript: with
+JavaScript, the `contact` Stimulus controller posts with `fetch` and `Accept: application/json`, and
+it gets a 204 or a 422, shows a toast, and does not navigate. With no JavaScript, the native POST
+sends `Accept: text/html` and gets a 303 to `/contact/success`. Both use the same endpoint and the
+same checks.
 
-The layers of protection: the honeypot and Akismet on both paths, the length limits on the server, a
-rack-attack throttle for each visitor on the `X-Kona-Client-IP` from the proxy, and **Cloudflare
-Turnstile**. ⚠️ Turnstile needs JavaScript, thus the app checks it **on the JSON path only**.
-Turnstile and Akismet both permit the message when there is *no configuration*. When Akismet *has* a
-configuration, it fails **closed**: a failure of the service makes the intake job run again, and the
-app does not deliver a message with no check.
+The layers of protection: the honeypot, the MX lookup, Akismet, and the abuse check on both paths,
+the length limits on the server, a rack-attack throttle for each visitor on the `X-Kona-Client-IP`
+from the proxy, and **Cloudflare Turnstile**. ⚠️ Turnstile needs JavaScript, thus the app checks it
+**on the JSON path only**. Turnstile, Akismet, and the abuse check permit the message when there is
+*no configuration*.
 
-A message that Akismet marks goes to the **quarantine, and the app does not remove it**: Redis holds
-it for a month and the Spam page of the admin lists it. On that page, the owner sends the email and
-the app tells Akismet that the mark was incorrect. Refer to [`api/CLAUDE.md`](api/CLAUDE.md).
+⚠️ **A contact message must never go away. The Claude subject line is the only step that can fail
+and be skipped.** Each other step fails **closed**. A timeout of the MX lookup gives a 503, and the
+visitor sends again. A failure of Akismet or of the abuse check makes the intake job run again, and
+the contact jobs use the default retries of Sidekiq and not the 24-hour window of the other jobs.
+
+A message that Akismet or the abuse check marks goes to the **quarantine, and the app does not
+remove it**: Redis holds it for a month and the Spam page of the admin lists it. On that page, the
+owner sends the email, and for an Akismet mark the app tells Akismet that the mark was incorrect.
+Refer to [`api/CLAUDE.md`](api/CLAUDE.md).
 
 ## The image mirror
 

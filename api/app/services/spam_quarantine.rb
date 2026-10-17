@@ -1,9 +1,10 @@
 require "securerandom"
 require "time"
 
-# Holds each contact-form submission that Akismet marks as spam. Thus the owner can read a correct
-# message that Akismet marked and send it, and the message does not go away. One Redis hash holds
-# them (refer to JsonHashStore), with a message id as the key of each field.
+# Holds each contact-form submission that Akismet marks as spam or that ContactModeration marks as
+# abusive. Thus the owner can read a correct message that a check marked and send it, and the
+# message does not go away. One Redis hash holds them (refer to JsonHashStore), with a message id as
+# the key of each field.
 #
 # It is not an ApplicationService, because that base class is for HTTP integrations and this class
 # makes no network call.
@@ -20,14 +21,25 @@ class SpamQuarantine
   # A second limit, for a large number of messages in a short time. The oldest go first.
   MAX_ENTRIES = 200
 
+  # The check that marked a message.
+  AKISMET = "akismet".freeze
+  ABUSIVE = "abusive".freeze
+
+  # @param payload [Hash] One entry, as #store writes it.
+  # @return [String] The check that marked the entry. An entry with no reason is an Akismet mark.
+  def self.reason_of(payload)
+    payload["reason"].presence || AKISMET
+  end
+
   # Holds one marked submission.
   # @param name [String] The name of the sender.
   # @param email [String] The email address of the sender.
   # @param message [String] The body of the message.
   # @param context [Hash] The sender data that the proxy sends (ip, user_agent, city, region, and
   #   country), as ContactMailJob got it.
+  # @param reason [String] AKISMET or ABUSIVE.
   # @return [String] The new message id.
-  def store(name:, email:, message:, context: {})
+  def store(name:, email:, message:, reason:, context: {})
     id = SecureRandom.uuid
 
     records.write(id, {
@@ -36,6 +48,7 @@ class SpamQuarantine
       "email" => email,
       "message" => message,
       "context" => context || {},
+      "reason" => reason,
       "received_at" => Time.now.utc.iso8601
     })
 

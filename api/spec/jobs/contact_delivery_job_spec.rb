@@ -31,7 +31,9 @@ RSpec.describe ContactDeliveryJob do
     expect { described_class.new.perform(payload) }.to raise_error(ApplicationService::HttpError)
   end
 
-  it "retries failed jobs for up to 24 hours" do
-    expect(described_class.get_sidekiq_options["retry_for"]).to eq(24.hours)
+  # ⚠️ A contact message must never go away, thus the job uses the default retries of Sidekiq.
+  it "retries with the default retries of Sidekiq and not for 24 hours" do
+    expect(described_class.ancestors).to include(ContactJob)
+    expect(described_class.get_sidekiq_options).to include("retry" => true, "retry_for" => nil)
   end
 end

@@ -14,10 +14,10 @@ class SpamMessagePresenter
   # read.
   PREVIEW_LIMIT = 280
 
-  attr_reader :id, :name, :email, :message, :not_spam_path, :delete_path
+  attr_reader :id, :name, :email, :message, :reason, :not_spam_path, :delete_path
 
   # @param payload [Hash] One SpamQuarantine entry: "id", "name", "email", "message", "context",
-  #   and "received_at".
+  #   "reason", and "received_at".
   # @param not_spam_path [String] The path that the "Not spam" form posts to.
   # @param delete_path [String] The path that the "Delete forever" form posts to.
   def initialize(payload:, not_spam_path:, delete_path:)
@@ -27,6 +27,7 @@ class SpamMessagePresenter
     @message = payload["message"].to_s
     @context = payload["context"] || {}
     @received_at = payload["received_at"].to_s
+    @reason = SpamQuarantine.reason_of(payload)
     @not_spam_path = not_spam_path
     @delete_path = delete_path
   end

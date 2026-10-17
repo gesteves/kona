@@ -38,7 +38,7 @@ RSpec.describe AnthropicStructuredOutput do
 
   it "makes one call with the schema, the limits of the caller, and no thinking, and parses the first text block" do
     text_block = double("block", type: :text, text: { line: "A summary." }.to_json)
-    allow(messages).to receive(:create).and_return(double("message", content: [ double("tool", type: :tool_use), text_block ]))
+    allow(messages).to receive(:create).and_return(double("message", content: [ double("tool", type: :tool_use), text_block ], stop_reason: :end_turn))
     schema = { type: "object", properties: { line: { type: "string" } } }
 
     result = host.structured_call(system: "Be brief.", user: "Summarize.", schema: schema)
@@ -84,8 +84,15 @@ RSpec.describe AnthropicStructuredOutput do
     expect(host.text_call(system: "s", content: "c")).to be_nil
   end
 
+  it "raises Refusal for a declined structured call, and does not parse the answer" do
+    allow(messages).to receive(:create).and_return(double("message", content: [], stop_reason: :refusal))
+
+    expect { host.structured_call(system: "s", user: "u", schema: {}) }
+      .to raise_error(AnthropicStructuredOutput::Refusal)
+  end
+
   it "keeps one client across the calls" do
-    allow(messages).to receive(:create).and_return(double("message", content: [ double("block", type: :text, text: "{}") ]))
+    allow(messages).to receive(:create).and_return(double("message", content: [ double("block", type: :text, text: "{}") ], stop_reason: :end_turn))
 
     2.times { host.structured_call(system: "s", user: "u", schema: {}) }
 

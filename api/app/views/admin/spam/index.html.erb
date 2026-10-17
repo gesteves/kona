@@ -19,7 +19,7 @@
           <div class="wa-stack wa-gap-m">
             <div class="wa-cluster wa-gap-s">
               <h2 class="admin-card__title wa-heading-m"><%= message.name %></h2>
-              <wa-badge variant="danger" appearance="outlined"><%= t(".badge") %></wa-badge>
+              <wa-badge variant="danger" appearance="outlined"><%= t(".badge.#{message.reason}") %></wa-badge>
               <wa-relative-time class="admin-card__age wa-caption-s" date="<%= message.received_at %>" sync></wa-relative-time>
             </div>
 
@@ -52,7 +52,7 @@
               <%= form_with url: message.not_spam_path, method: :post do %>
                 <wa-button type="submit" variant="brand" appearance="accent">
                   <%= slotted_icon_svg("classic", "light", "inbox-in") %>
-                  <%= t(".not_spam") %>
+                  <%= t(".release.#{message.reason}") %>
                 </wa-button>
               <% end %>
 

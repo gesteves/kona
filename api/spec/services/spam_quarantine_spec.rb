@@ -23,10 +23,17 @@ RSpec.describe SpamQuarantine do
     }.to_json
   end
 
+  describe ".reason_of" do
+    it "gives the stored reason, and an Akismet mark for an entry with none" do
+      expect(described_class.reason_of("reason" => "abusive")).to eq(described_class::ABUSIVE)
+      expect(described_class.reason_of({})).to eq(described_class::AKISMET)
+    end
+  end
+
   describe "#store" do
     it "writes the submission under a generated id and returns it" do
       id = described_class.new.store(name: "Ivan", email: "ivan@example.com",
-        message: "cheap pills", context: { "ip" => "203.0.113.7" })
+        message: "cheap pills", context: { "ip" => "203.0.113.7" }, reason: described_class::ABUSIVE)
 
       expect(id).to be_present
       payload = JSON.parse(store.fetch(id))
@@ -35,13 +42,14 @@ RSpec.describe SpamQuarantine do
         "name" => "Ivan",
         "email" => "ivan@example.com",
         "message" => "cheap pills",
-        "context" => { "ip" => "203.0.113.7" }
+        "context" => { "ip" => "203.0.113.7" },
+        "reason" => "abusive"
       )
       expect(payload["received_at"]).to be_present
     end
 
     it "tolerates a nil context" do
-      id = described_class.new.store(name: "Ivan", email: "ivan@example.com", message: "hi", context: nil)
+      id = described_class.new.store(name: "Ivan", email: "ivan@example.com", message: "hi", context: nil, reason: described_class::AKISMET)
 
       expect(JSON.parse(store.fetch(id))["context"]).to eq({})
     end
@@ -50,7 +58,7 @@ RSpec.describe SpamQuarantine do
     it "drops expired entries as it writes" do
       seed(id: "old", received_at: 31.days.ago)
 
-      described_class.new.store(name: "Ivan", email: "ivan@example.com", message: "hi")
+      described_class.new.store(name: "Ivan", email: "ivan@example.com", message: "hi", reason: described_class::AKISMET)
 
       expect(store.keys).not_to include("old")
     end
@@ -61,7 +69,7 @@ RSpec.describe SpamQuarantine do
       seed(id: "middle", received_at: 2.days.ago)
       seed(id: "newest", received_at: 1.day.ago)
 
-      described_class.new.store(name: "Ivan", email: "ivan@example.com", message: "hi")
+      described_class.new.store(name: "Ivan", email: "ivan@example.com", message: "hi", reason: described_class::AKISMET)
 
       expect(store.keys).not_to include("oldest", "middle")
       expect(store.keys).to include("newest")

@@ -11,6 +11,8 @@ RSpec.describe ContactMailJob do
     # By default there is no subject from the model. Thus these specs do not call the true Anthropic
     # API when a local .env has ANTHROPIC_API_KEY. Some examples change this.
     allow(ContactSubject).to receive(:generate).and_return(nil)
+    # The same for the abuse check: by default the message is not abusive.
+    allow(ContactModeration).to receive(:abusive?).and_return(false)
     allow(ENV).to receive(:[]).and_call_original
     allow(ENV).to receive(:[]).with("CONTACT_TO_ADDRESS").and_return("owner@example.test")
   end
@@ -61,8 +63,38 @@ RSpec.describe ContactMailJob do
     described_class.new.perform("Spammer", "spam@example.com", "buy now", context)
 
     expect(quarantine).to have_received(:store).with(
-      name: "Spammer", email: "spam@example.com", message: "buy now", context: context
+      name: "Spammer", email: "spam@example.com", message: "buy now", context: context,
+      reason: SpamQuarantine::AKISMET
     )
+    expect(ContactModeration).not_to have_received(:abusive?)
+    expect(ContactDeliveryJob.jobs).to be_empty
+  end
+
+  it "quarantines an abusive submission instead of enqueuing delivery, and makes no subject" do
+    allow(akismet).to receive(:spam?).and_return(false)
+    allow(ContactModeration).to receive(:abusive?).and_return(true)
+    quarantine = instance_double(SpamQuarantine, store: "generated-id")
+    allow(SpamQuarantine).to receive(:new).and_return(quarantine)
+
+    described_class.new.perform("Troll", "troll@example.com", "You're an idiot.", context)
+
+    expect(ContactModeration).to have_received(:abusive?).with(name: "Troll", message: "You're an idiot.")
+    expect(quarantine).to have_received(:store).with(
+      name: "Troll", email: "troll@example.com", message: "You're an idiot.", context: context,
+      reason: SpamQuarantine::ABUSIVE
+    )
+    expect(ContactSubject).not_to have_received(:generate)
+    expect(ContactDeliveryJob.jobs).to be_empty
+  end
+
+  # ⚠️ The abuse check fails closed, as Akismet does.
+  it "lets an abuse-check failure propagate (so the intake retries) without quarantining or delivering" do
+    allow(akismet).to receive(:spam?).and_return(false)
+    allow(ContactModeration).to receive(:abusive?).and_raise(StandardError.new("anthropic down"))
+    expect(SpamQuarantine).not_to receive(:new)
+
+    expect { described_class.new.perform("Jane", "jane@example.com", "Hello!", context) }
+      .to raise_error(StandardError, "anthropic down")
     expect(ContactDeliveryJob.jobs).to be_empty
   end
 
@@ -78,33 +110,24 @@ RSpec.describe ContactMailJob do
   end
 
   describe "a message released from the spam quarantine" do
-    before { allow(akismet).to receive(:submit_ham).and_return(true) }
-
-    it "skips the Akismet check and delivers" do
+    it "skips both checks and delivers" do
       allow(akismet).to receive(:spam?)
+      allow(akismet).to receive(:submit_ham)
 
       described_class.new.perform("Jane Rider", "jane@example.com", "Hello!", context, true)
 
       expect(akismet).not_to have_received(:spam?)
+      expect(ContactModeration).not_to have_received(:abusive?)
       expect(ContactDeliveryJob).to have_enqueued_sidekiq_job(hash_including("reply_to" => "jane@example.com"))
     end
 
-    it "reports the false positive back to Akismet" do
-      described_class.new.perform("Jane Rider", "jane@example.com", "Hello!", context, true)
-
-      expect(akismet).to have_received(:submit_ham).with(
-        content: "Hello!", author: "Jane Rider", author_email: "jane@example.com",
-        user_ip: "203.0.113.7", user_agent: "Mozilla/5.0"
-      )
-    end
-
-    # The training of the filter is not more important than the message.
-    it "still delivers when the ham submission blows up" do
-      allow(akismet).to receive(:submit_ham).and_raise(StandardError.new("akismet down"))
+    # Admin::SpamController adds ContactHamJob, thus a failed report cannot stop the delivery.
+    it "does not report the false positive itself" do
+      allow(akismet).to receive(:submit_ham)
 
       described_class.new.perform("Jane Rider", "jane@example.com", "Hello!", context, true)
 
-      expect(ContactDeliveryJob).to have_enqueued_sidekiq_job(hash_including("reply_to" => "jane@example.com"))
+      expect(akismet).not_to have_received(:submit_ham)
     end
 
     it "reports the original submission time rather than the moment it was released" do
@@ -117,7 +140,9 @@ RSpec.describe ContactMailJob do
     end
   end
 
-  it "retries failed jobs for up to 24 hours" do
-    expect(described_class.get_sidekiq_options["retry_for"]).to eq(24.hours)
+  # ⚠️ A contact message must never go away, thus the job uses the default retries of Sidekiq.
+  it "retries with the default retries of Sidekiq and not for 24 hours" do
+    expect(described_class.ancestors).to include(ContactJob)
+    expect(described_class.get_sidekiq_options).to include("retry" => true, "retry_for" => nil)
   end
 end

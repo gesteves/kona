@@ -74,11 +74,29 @@ RSpec.describe "Admin spam quarantine", type: :request do
         expect(response.body).not_to include("&lt;svg")
       end
 
+      it "labels an entry with no reason as an Akismet mark" do
+        get "/spam"
+
+        expect(response.body).to include(I18n.t("admin.spam.index.badge.akismet"))
+        expect(response.body).to include(I18n.t("admin.spam.index.release.akismet"))
+        expect(response.body).not_to include(I18n.t("admin.spam.index.badge.abusive"))
+      end
+
       it "shows a short message whole, with no disclosure" do
         get "/spam"
 
         expect(response.body).not_to include("<wa-details")
       end
+    end
+
+    it "labels a message that the abuse check marked" do
+      allow(quarantine).to receive(:all).and_return([ message.merge("reason" => SpamQuarantine::ABUSIVE) ])
+
+      get "/spam"
+
+      expect(response.body).to include(I18n.t("admin.spam.index.badge.abusive"))
+      expect(response.body).to include(I18n.t("admin.spam.index.release.abusive"))
+      expect(response.body).not_to include(I18n.t("admin.spam.index.release.akismet"))
     end
 
     it "hides a long message behind a disclosure" do
@@ -144,6 +162,26 @@ RSpec.describe "Admin spam quarantine", type: :request do
       expect(response).to have_http_status(:see_other)
       expect(response).to redirect_to("/spam")
       expect(flash[:notice]).to eq(I18n.t("admin.spam_flash.released"))
+    end
+
+    # An entry with no reason is an Akismet mark.
+    it "reports an Akismet mark as a false positive in its own job" do
+      allow(quarantine).to receive(:take).with("abc123").and_return(message)
+
+      post "/spam/abc123/not-spam"
+
+      expect(ContactHamJob).to have_enqueued_sidekiq_job(
+        "Ivan Petrov", "ivan@example.ru", "Your website is not ranking on Google.", message["context"]
+      )
+    end
+
+    it "sends no ham report for a message that the abuse check marked" do
+      allow(quarantine).to receive(:take).with("abc123").and_return(message.merge("reason" => SpamQuarantine::ABUSIVE))
+
+      post "/spam/abc123/not-spam"
+
+      expect(ContactHamJob.jobs).to be_empty
+      expect(ContactMailJob.jobs.size).to eq(1)
     end
 
     # ⚠️ SpamQuarantine#take reads and deletes in one step, thus two submissions cannot send the

@@ -47,7 +47,7 @@ edge serves a cached copy before it gets a new one.
 | POST | `/api/location` | sets Redis `location:current` + enqueues `LocationSyncJob`, via `Location.store` | — |
 | POST | `/api/weight` | `weight`, `unit` (`kg` or `lb`, default `kg`), `date` (default: today in the location time zone). Enqueues `IntervalsWeightJob`, and `StravaWeightJob` for today only; 204 or 422 | — |
 | POST | `/api/ftp` | `ftp` in watts. Enqueues `IntervalsFtpJob` and `StravaFtpJob`; 204 or 422 | — |
-| POST | `/api/contact` | drops honeypot hits + enqueues `ContactMailJob`; JSON → 204/422, HTML → 303 | — |
+| POST | `/api/contact` | drops honeypot hits, refuses a domain with no MX, + enqueues `ContactMailJob`; JSON → 204/422, or 503 when the MX lookup times out; HTML → 303 | — |
 | POST | `/api/build` | enqueues `SiteBuildJob`; 202, or 429 inside the 60s dedupe lock, which `POST /republish` shares | — |
 | POST | `/api/icons` | resolves the web build's Font Awesome allowlist to SVGs | — |
 | GET | `/api/standard-site` | `{did, publication_uri}` for the build's verification markup | 1 hr |
@@ -139,7 +139,7 @@ makes the reports of `rake trending:*`. Refer to **The article rankings**.
 More classes are not subclasses of `ApplicationService`, because they are not cacheable reads:
 `SpamQuarantine`, `TrackLibrary`, `BlueskyCredentials`, `MastodonCredentials`,
 `ThreadsCredentials`, `StravaCredentials`, and `TrainerRoadCredentials` use Redis only and no HTTP; `GpxTrack` parses
-only; and `MapboxTileset` and `StaticMap` are different (refer to **The
+only; `EmailDomain` makes one DNS lookup; and `MapboxTileset` and `StaticMap` are different (refer to **The
 course-map renderer**). The five credential stores share the `EncryptedCredentials` concern,
 which encrypts each secret field, and `WhoopCredentials` gives the Whoop tokens, which keep their
 own keys with a TTL, the same encryption. ⚠️ **Never change the `ENCRYPTION_SALT` of a store**: the salt is
@@ -185,6 +185,9 @@ keys for the same data. `pageviews_by_path` is a small wrapper over it.
 - `Akismet` fails **closed** when it has a configuration: a failure of the service raises, thus the
   intake job runs again. It permits the message only when it has no configuration. `Turnstile`
   permits the message on a failure.
+- `ContactModeration` fails **closed** when it has an `ANTHROPIC_API_KEY`, as `Akismet` does. A
+  refusal of the model counts as abusive. `EmailDomain` raises on a DNS timeout, and the contact
+  action then gives a 503.
 - `AssetMirror` **raises**, thus Sidekiq does the job again. An asset that the code does not copy,
   with no message, becomes a broken image on a live page later.
 
@@ -419,7 +422,8 @@ event can then only start the description of one of our own activities again.
 `ApplicationJob`, a plain parent class that holds the shared `retry_for: 24.hours`: Sidekiq waits
 the usual time between two attempts, then puts the job in the Dead set 24 hours after its first
 failure. Each job takes plain strings as its arguments, and you can do each job more than one time.
-Thus that shared window is safe.
+Thus that shared window is safe. ⚠️ The contact jobs are the exception: they inherit from
+`ContactJob`, which uses the default retries of Sidekiq. Refer to the contact-form items below.
 
 | Job | What |
 |---|---|
@@ -439,8 +443,9 @@ Thus that shared window is safe.
 | `BlueskyPostJob(posts, index, reply)` | posts one post of a thread to Bluesky, then adds the job of the next. ⚠️ The three post jobs inherit from `SocialPostJob`, which holds the enqueue lock: a retry after the enqueue must not add the next job a second time, and Threads has no idempotency on its side |
 | `MastodonPostJob(posts, index, in_reply_to_id)` | the same, for Mastodon |
 | `ThreadsPostJob(posts, index, reply_to_id)` | the same, for Threads |
-| `ContactMailJob(name, email, message, context, restored_from_spam = false)` | contact intake: Akismet + compose |
+| `ContactMailJob(name, email, message, context, restored_from_spam = false)` | contact intake: Akismet, the abuse check, and compose |
 | `ContactDeliveryJob(payload)` | the one retryable *delivery* unit — sends via Resend |
+| `ContactHamJob(name, email, message, context)` | tells Akismet that its mark was incorrect, after the owner sends the message from the quarantine |
 | `MapTilesetJob(id)` | publishes an uploaded GPX track to Mapbox as a vector tileset |
 | `RaceTrackJob(activity_id, name, sport)` | adds the GPX of one race leg from Intervals.icu to Course maps, then adds its `MapTilesetJob`. Refer to "The course-map renderer" |
 | `WhoopTokenRefreshJob()` | forces a Whoop token refresh on a schedule (see below) |
@@ -628,12 +633,27 @@ Thus that shared window is safe.
   remove one of those, and do not assume that Turnstile does that work. To close this gap, the path
   with no JavaScript needs a second factor also, for example a signed token with an expiry time that
   the server puts in the form.
-- **The contact form uses two jobs**, thus a Resend failure repeats the send only. Akismet fails
-  closed, thus a failure of that service makes the *intake* job run again and the app does not
-  deliver a message with no check. `ContactSubject`, which makes a subject line with Claude, fails
-  soft. A message that Akismet marks goes to the **quarantine, and the app does not remove it**
-  (refer to **The spam quarantine**). `restored_from_spam` means that the owner sends such a
-  message: the code then does no check and tells Akismet that the mark was incorrect.
+- **The contact form uses separate jobs**, thus a Resend failure repeats the send only. The intake
+  job runs Akismet first and then `ContactModeration`, which asks Claude if the message is abusive.
+  Thus a spam message costs no Claude call. Both checks fail closed, thus a failure of either
+  service makes the *intake* job run again and the app does not deliver a message with no check.
+  `ContactSubject`, which makes a subject line with Claude, fails soft. A message that either check
+  marks goes to the **quarantine, and the app does not remove it** (refer to **The spam
+  quarantine**). `restored_from_spam` means that the owner sends such a message: the code then does
+  no check.
+- ⚠️ **The contact jobs do not use the 24-hour window.** They inherit from `ContactJob`, which sets
+  `retry_for: nil`, thus Sidekiq uses its default of 25 attempts, approximately 21 days. A contact
+  message must never go away, and the subject line is the only step that can fail and be skipped.
+  `ContactJobArgsFilter` removes the arguments of each `ContactJob` from a Bugsnag report.
+  ⚠️ Resend keeps an idempotency key for 24 hours only, thus a late retry of `ContactDeliveryJob`
+  can send a second copy. A copy costs less than a lost message.
+- **`Api::ContactController` refuses a domain with no MX record** (`EmailDomain`), with a 422 and
+  a message of its own. It stops a made-up domain and a typo, and it cannot stop a made-up mailbox
+  on a real domain. ⚠️ It needs an MX, and an A record is not sufficient: a parked domain often has
+  one. ⚠️ A DNS timeout gives a 503 and never skips the check. ⚠️ `Resolv` replaces the system
+  configuration with a configuration Hash, thus `EmailDomain` merges its flag into
+  `Config.default_config_hash`. A Hash with the flag alone asks `0.0.0.0`, and each lookup times
+  out.
 
 The configuration is in `config/initializers/sidekiq.rb` and in `config/sidekiq.yml`. Sidekiq runs
 as its own **`worker` fly process**. A worker must run, or nothing does the queued jobs. On your own
@@ -2053,10 +2073,12 @@ container.
 
 ### The spam quarantine
 
-**Spam** (`/spam`) lists each message that Akismet flagged, the newest first, with **Not spam** and
-**Delete forever**. `ContactMailJob` does not drop a flagged message: it stores it with
-`SpamQuarantine`. **Not spam** enqueues that job again with `restored_from_spam`, which does not do
-the check and which calls `Akismet#submit_ham`.
+**Spam** (`/spam`) lists each message that Akismet flagged or that `ContactModeration` marked as
+abusive, the newest first, with a release button and **Delete forever**. `ContactMailJob` does not
+drop a flagged message: it stores it with `SpamQuarantine`, with the `reason` of the check. The badge
+and the release button of a card follow that reason, and an entry with no reason is an Akismet mark.
+The release enqueues that job again with `restored_from_spam`, which does no check. For an Akismet
+mark it also enqueues `ContactHamJob`, which calls `Akismet#submit_ham`. Claude has no such report.
 
 - **There is one Redis hash**, `contact:spam`, through `JsonHashStore`, and each field name is an
   id that the code makes. There is no key for each message, on purpose: no other code here reads the
@@ -2067,9 +2089,9 @@ the check and which calls `Akismet#submit_ham`.
 - ⚠️ **`SpamQuarantine#take` reads and removes, and the return value of `HDEL` is the guard.** Turbo,
   a double click, or a replay from the bfcache can start "Not spam" two times. To release on the
   read alone sends the email two times.
-- ⚠️ **`Akismet#submit_ham` fails soft, which is the opposite of the rest of that class.** `#spam?`
-  raises, thus no message goes out with no check. The ham report is training only, and it must never
-  stop a message that the owner already judged to be good.
+- ⚠️ **The ham report is a separate job, and it is not part of the delivery.** `Akismet#submit_ham`
+  raises, thus the report retries, and its failure never stops a message that the owner already
+  judged to be good.
 - ⚠️ **These cards are the only input from an attacker that this app renders as HTML with no
   filter.** The default escape of ERB is the full defense: use no `raw`, no `html_safe`, and no
   `simple_format` on a message field. The `raw icon_svg(...)` pattern of each other admin page must
@@ -2620,8 +2642,10 @@ value is a secret of fly.io, and Rails also uses `config/credentials.yml.enc` an
   so) and `CONTENTFUL_ENVIRONMENT` (the default is `master`),
   `CSP_ENFORCE` (any value enforces the CSP for the owner; with no value the CSP is Report-Only),
   `FONT_AWESOME_VERSION`, `WHOOP_REFERRAL_URL`, `ANTHROPIC_API_KEY` with
-  `ANTHROPIC_DESCRIPTION_MODEL`, `ANTHROPIC_CONTACT_SUBJECT_MODEL`, and `ANTHROPIC_ALT_TEXT_MODEL`
-  (the default of all three is `claude-sonnet-5-5`), `PURPLEAIR_API_KEY`, `GOODSPEED_API_URL` (with no value the bay-conditions
+  `ANTHROPIC_DESCRIPTION_MODEL`, `ANTHROPIC_CONTACT_SUBJECT_MODEL`,
+  `ANTHROPIC_CONTACT_MODERATION_MODEL`, and `ANTHROPIC_ALT_TEXT_MODEL` (the default of all four is
+  `claude-sonnet-5-5`. ⚠️ With a key, the abuse check of the contact form fails closed, thus an
+  Anthropic outage holds the contact mail in the Sidekiq retries), `PURPLEAIR_API_KEY`, `GOODSPEED_API_URL` (with no value the bay-conditions
   integration is off, and the app omits the sentence about the water temperature and the bay
   readings for a race day in SF), `LOCATION`, `TIME_ZONE`, `BLUESKY_PDS_URL` (⚠️ the handle and the
   app password of Bluesky are **not** environment variables: a person sets them on the Connected

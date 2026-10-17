@@ -2,9 +2,9 @@ require "uri"
 
 module Api
   # Takes the contact-form submissions from the public site, through the proxy of the web app, which
-  # adds the bearer token. The Accept header decides the answer: a JSON caller gets a 204 or a 422,
-  # and an HTML caller gets a 303 to the Thank-You page of the site. The spam check and the email
-  # run in ContactMailJob, thus the request returns quickly.
+  # adds the bearer token. The Accept header decides the answer: a JSON caller gets a 204, a 422, or
+  # a 503 when the MX lookup times out, and an HTML caller gets a 303. The spam check, the abuse
+  # check, and the email run in ContactMailJob, thus the request returns quickly.
   class ContactController < BaseController
     # This is a cross-origin POST. The bearer check from the parent class authenticates it, and not
     # a session.
@@ -18,6 +18,10 @@ module Api
     MAX_NAME = 100
     MAX_EMAIL = 254 # RFC 5321 max
     MAX_MESSAGE = 5000
+
+    # The `contact` Stimulus controller of the site shows the `error` of a 422 in a toast.
+    INVALID_INPUT = "Please provide your name, a valid email address, and a message.".freeze
+    UNDELIVERABLE_EMAIL = "That email address can't receive mail. Please check it and try again.".freeze
 
     def create
       no_store!
@@ -36,8 +40,15 @@ module Api
       # no JavaScript uses the honeypot, Akismet, and the rate limit.
       return respond_error if request.format.json? && !turnstile_ok?
 
+      # This comes after Turnstile, thus a bot that fails Turnstile costs no DNS lookup.
+      return respond_error(UNDELIVERABLE_EMAIL) unless EmailDomain.accepts_mail?(email)
+
       ContactMailJob.perform_async(name, email, message, sender_context)
       respond_success
+    rescue EmailDomain::LookupError
+      # ⚠️ The check fails closed: the visitor sends again, and no message skips it. The site shows
+      # its general error toast for a 503.
+      request.format.json? ? head(:service_unavailable) : respond_error
     end
 
     private
@@ -83,9 +94,10 @@ module Api
       end
     end
 
-    def respond_error
+    # @param error [String] The message for a JSON caller.
+    def respond_error(error = INVALID_INPUT)
       if request.format.json?
-        render json: { error: "Please provide your name, a valid email address, and a message." }, status: :unprocessable_content
+        render json: { error: error }, status: :unprocessable_content
       else
         # The path with no JavaScript does not usually come here, because each field is `required`.
         # Thus this code sends the visitor back to the form and does not render a separate error

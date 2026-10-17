@@ -2,11 +2,11 @@ require "erb"
 require "securerandom"
 require "time"
 
-# The contact-form intake: the spam check and the email, outside the request path. It gives the
-# complete email to ContactDeliveryJob. That is a separate job, thus a Resend failure repeats only
-# the send. Akismet and the subject call each run one time, and not one time for each attempt to
-# send.
-class ContactMailJob < ApplicationJob
+# The contact-form intake: the spam check, the abuse check, and the email, outside the request path.
+# It gives the complete email to ContactDeliveryJob. That is a separate job, thus a Resend failure
+# repeats only the send. The checks and the subject call each run one time, and not one time for
+# each attempt to send.
+class ContactMailJob < ContactJob
   # This goes at the start of each subject, thus the owner can make a filter for it. Do not change
   # it: a change breaks each filter that uses the old text.
   SUBJECT_PREFIX = "[Contact form]".freeze
@@ -17,23 +17,27 @@ class ContactMailJob < ApplicationJob
   # @param context [Hash] The sender data that the web proxy sends: some of "ip", "user_agent",
   #   "city", "region", and "country". The spam quarantine adds "received_at".
   # @param restored_from_spam [Boolean] True when the owner sends this message from the spam queue.
-  #   The code then does not do the Akismet check, because that check already ran and the owner
-  #   decided against it. It also tells Akismet that the mark was incorrect, thus Akismet stops the
-  #   mark on the same sender. The name says the condition, and not one of the two actions, because
-  #   it controls both and they always occur together.
+  #   The code then does no check, because the checks already ran and the owner decided against
+  #   them. Admin::SpamController adds the Akismet ham report as a separate job.
   def perform(name, email, message, context = {}, restored_from_spam = false)
     context ||= {}
 
-    if restored_from_spam
-      report_false_positive(name, email, message, context)
-    elsif Akismet.new.spam?(content: message, author: name, author_email: email,
-      user_ip: context["ip"], user_agent: context["user_agent"])
-      # ⚠️ The Akismet call must stay before this code. It fails closed, thus a failure of the
-      # service raises and the job runs again. A store before it, or a rescue around it, would fill
-      # the quarantine with correct mail that nothing checked, during an Akismet failure.
-      SpamQuarantine.new.store(name: name, email: email, message: message, context: context)
-      Rails.logger.info("Contact form: quarantined a submission flagged as spam by Akismet")
-      return
+    # ⚠️ Each check must stay before its store, and no rescue goes around a check. Both checks fail
+    # closed, thus a failure of the service raises and the job runs again. A store before a check,
+    # or a rescue around it, would put correct mail that nothing checked in the quarantine or in the
+    # inbox.
+    unless restored_from_spam
+      if Akismet.new.spam?(content: message, author: name, author_email: email,
+        user_ip: context["ip"], user_agent: context["user_agent"])
+        quarantine(name, email, message, context, SpamQuarantine::AKISMET)
+        return
+      end
+
+      # This comes after Akismet, thus a spam message costs no Claude call.
+      if ContactModeration.abusive?(name: name, message: message)
+        quarantine(name, email, message, context, SpamQuarantine::ABUSIVE)
+        return
+      end
     end
 
     # This uses a fixed subject when there is no Anthropic configuration or when the call fails.
@@ -53,15 +57,12 @@ class ContactMailJob < ApplicationJob
 
   private
 
-  # Tells Akismet that its mark on a message was incorrect, after the owner sends that message. It
-  # never raises: this is training, and the app sends the message in both conditions.
+  # Holds a marked message, thus the owner can read it and send it.
+  # @param reason [String] The check that marked it: SpamQuarantine::AKISMET or ::ABUSIVE.
   # @return [void]
-  def report_false_positive(name, email, message, context)
-    Akismet.new.submit_ham(content: message, author: name, author_email: email,
-      user_ip: context["ip"], user_agent: context["user_agent"])
-    Rails.logger.info("Contact form: reported a false positive to Akismet")
-  rescue StandardError => e
-    Rails.logger.warn("Contact form: could not report a false positive to Akismet (#{e.class}: #{e.message})")
+  def quarantine(name, email, message, context, reason)
+    SpamQuarantine.new.store(name: name, email: email, message: message, context: context, reason: reason)
+    Rails.logger.info("Contact form: quarantined a submission (#{reason})")
   end
 
   # @return [String] The plain-text body of the email.

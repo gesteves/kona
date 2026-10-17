@@ -79,14 +79,19 @@ en:
 
     spam:
       index:
-        badge: "Spam"
+        # The badge and the release button of a card follow the check that marked the message.
+        badge:
+          abusive: "Abusive"
+          akismet: "Spam"
         delete_body: "This deletes the message from Redis immediately. It can't be undone."
         delete_title: "Delete this message?"
-        empty: "Nothing flagged. Anything Akismet catches shows up here, and is dropped after a
-          month."
+        empty: "Nothing flagged. Anything Akismet or the abuse check catches shows up here, and is
+          dropped after a month."
         ip: "IP"
         location: "Location"
-        not_spam: "Not spam"
+        release:
+          abusive: "Not abusive"
+          akismet: "Not spam"
         show_full: "Show full message"
         submitted: "Submitted"
         user_agent: "User agent"

@@ -18,12 +18,21 @@ RSpec.describe ContactJobArgsFilter do
     expect(metadata[:sidekiq][:msg]["class"]).to eq("ContactMailJob")
   end
 
-  it "removes the arguments of the delivery job" do
-    metadata = sidekiq_tab("ContactDeliveryJob")
+  it "removes the arguments of each other contact job" do
+    %w[ContactDeliveryJob ContactHamJob].each do |job_class|
+      metadata = sidekiq_tab(job_class)
 
-    described_class.call(report(metadata))
+      described_class.call(report(metadata))
 
-    expect(metadata[:sidekiq][:msg]).not_to have_key("args")
+      expect(metadata[:sidekiq][:msg]).not_to have_key("args")
+    end
+  end
+
+  it "keeps the arguments of a class that does not exist" do
+    metadata = sidekiq_tab("NoSuchJob")
+
+    expect(described_class.call(report(metadata))).to be(true)
+    expect(metadata[:sidekiq][:msg]["args"]).to be_present
   end
 
   # The tab holds the job Hash of Sidekiq, and the retry needs its arguments.
