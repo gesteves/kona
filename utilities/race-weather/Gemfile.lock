@@ -1,7 +1,7 @@
 GEM
   remote: https://rubygems.org/
   specs:
-    anthropic (1.77.1)
+    anthropic (1.78.0)
       base64 (~> 0.1)
       connection_pool (>= 2, < 4)
       standardwebhooks (~> 1.0)
@@ -36,7 +36,7 @@ DEPENDENCIES
   tzinfo
 
 CHECKSUMS
-  anthropic (1.77.1) sha256=624501b46be2ee2090dd8a2af3b81ce440605304aab74c545cba65bb0b1eb4f3
+  anthropic (1.78.0) sha256=c72f43c258fbc3fdd37f4fd3afb52ee9ccaa46513b4b62397f8ec543b90a4cfe
   base64 (0.3.0) sha256=27337aeabad6ffae05c265c450490628ef3ebd4b67be58257393227588f5a97b
   bigdecimal (4.1.3) sha256=61ebe1e5e559bdc3cc6f2c0ee7f427321fc838f59611c294356eb04d6e21cf66
   concurrent-ruby (1.3.8) sha256=b2f1be836e968ccc78ccfce277ea79c72a88633f22306782c16ff23fb415d1e1
