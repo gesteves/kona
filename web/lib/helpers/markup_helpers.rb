@@ -14,6 +14,12 @@ module MarkupHelpers
   YOUTUBE_PLAYER_TITLE = "YouTube video player".freeze
   # The id of the video in a YouTube embed URL.
   YOUTUBE_EMBED_REGEX = %r{\Ahttps?://(?:www\.)?youtube(?:-nocookie)?\.com/embed/([\w-]+)}
+  # A Spotify video episode embed. An audio episode embed has no `/video` segment.
+  SPOTIFY_VIDEO_EMBED_REGEX = %r{\Ahttps?://open\.spotify\.com/embed/episode/[^/?#]+/video(?:[/?#]|\z)}
+  # The embeds whose player is a 16:9 video.
+  VIDEO_EMBED_REGEXES = [ YOUTUBE_EMBED_REGEX, SPOTIFY_VIDEO_EMBED_REGEX ].freeze
+  # The inline style properties that responsivize_iframes removes.
+  IFRAME_WIDTH_PROPERTIES = %w[width max-width].freeze
   # The analytics section of a link to an article in the text of an entry.
   ARTICLE_BODY_SECTION = "Article Body".freeze
   # ⚠️ The permalink shape of a published article. It must match Contentful#set_article_path.
@@ -72,6 +78,7 @@ module MarkupHelpers
       split_table_cell_annotations(doc)
       add_heading_permalinks(doc)
       set_iframe_titles(doc)
+      responsivize_iframes(doc)
       lazy_load_iframes(doc)
     end
   end
@@ -675,6 +682,37 @@ module MarkupHelpers
       doc.css("iframe").each do |iframe|
         next if iframe["title"].present?
         iframe["title"] = iframe_title(iframe)
+      end
+    end
+  end
+
+  # Removes the width rules from the inline style of each iframe. Thus the body stylesheet gives each
+  # embed the full width of the text column. A video embed also loses its width and height
+  # attributes, thus the stylesheet gives it a 16:9 ratio at each width.
+  #
+  # ⚠️ An embed code can have its own maximum width, for example `max-width:640px` from Apple
+  # Podcasts. An inline style has more importance than the stylesheet.
+  # ⚠️ Keep the height of each other embed. An audio player has a fixed height, and a ratio would
+  # make it too short on a phone.
+  # @param html [String, Nokogiri::XML::Node] The HTML to change.
+  # @return [String, Nokogiri::XML::Node] The HTML after the change.
+  def responsivize_iframes(html)
+    with_nokogiri_doc(html) do |doc|
+      doc.css("iframe").each do |iframe|
+        if VIDEO_EMBED_REGEXES.any? { |regex| iframe["src"].to_s.match?(regex) }
+          iframe.remove_attribute("width")
+          iframe.remove_attribute("height")
+        end
+        next if iframe["style"].nil?
+
+        declarations = iframe["style"].split(";").map(&:strip).reject do |declaration|
+          declaration.blank? || IFRAME_WIDTH_PROPERTIES.include?(declaration.split(":", 2).first.strip.downcase)
+        end
+        if declarations.empty?
+          iframe.remove_attribute("style")
+        else
+          iframe["style"] = declarations.join(";")
+        end
       end
     end
   end

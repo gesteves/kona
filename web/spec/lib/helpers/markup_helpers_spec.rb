@@ -924,6 +924,38 @@ RSpec.describe MarkupHelpers do
     end
   end
 
+  describe '#responsivize_iframes' do
+    it 'removes the width rules from the inline style and keeps the other rules' do
+      html = '<iframe height="160" width="640" style="width:100%;max-width:640px;overflow:hidden;border-radius:12px;" src="https://embed.podcasts.apple.com/us/podcast/x"></iframe>'
+      expect(responsivize_iframes(html)).to eq('<iframe height="160" width="640" style="overflow:hidden;border-radius:12px" src="https://embed.podcasts.apple.com/us/podcast/x"></iframe>')
+    end
+
+    it 'removes a style that holds only width rules' do
+      html = '<iframe style="Max-Width: 640px; width: 100%" src="https://player.example/embed/1"></iframe>'
+      expect(responsivize_iframes(html)).to eq('<iframe src="https://player.example/embed/1"></iframe>')
+    end
+
+    it 'leaves an iframe with no style unchanged' do
+      html = '<iframe src="https://player.example/embed/1"></iframe>'
+      expect(responsivize_iframes(html)).to eq(html)
+    end
+
+    it 'removes the width and the height of a Spotify video episode' do
+      html = '<iframe style="border-radius:12px" src="https://open.spotify.com/embed/episode/2borPjAt3Ot3ugUdrGAnu4/video?utm_source=generator" width="624" height="351"></iframe>'
+      expect(responsivize_iframes(html)).to eq('<iframe style="border-radius:12px" src="https://open.spotify.com/embed/episode/2borPjAt3Ot3ugUdrGAnu4/video?utm_source=generator"></iframe>')
+    end
+
+    it 'removes the width and the height of a YouTube video' do
+      html = '<iframe width="560" height="315" src="https://www.youtube-nocookie.com/embed/abc_123"></iframe>'
+      expect(responsivize_iframes(html)).to eq('<iframe src="https://www.youtube-nocookie.com/embed/abc_123"></iframe>')
+    end
+
+    it 'keeps the height of an audio player' do
+      html = '<iframe src="https://open.spotify.com/embed/episode/2borPjAt3Ot3ugUdrGAnu4?utm_source=generator" width="100%" height="152"></iframe>'
+      expect(responsivize_iframes(html)).to eq(html)
+    end
+  end
+
   describe '#lazy_load_iframes' do
     it 'adds loading="lazy" to iframes' do
       html = '<iframe src="https://player.example/embed/1"></iframe>'
