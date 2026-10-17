@@ -941,6 +941,18 @@ RSpec.describe MarkupHelpers do
       expect(prepend_title('Really?', '<p>Yes.</p>', hidden_from_at: true)).to eq('<p><b aria-hidden="true">Really?</b> Yes.</p>')
     end
 
+    it 'puts the full stop inside a closing quotation mark' do
+      expect(prepend_title('&ldquo;Learn something&rdquo;', '<p>Body.</p>')).to eq('<p><b>“Learn something.”</b> Body.</p>')
+    end
+
+    it 'adds no full stop when punctuation is inside the closing quotation mark' do
+      expect(prepend_title('&ldquo;Why?&rdquo;', '<p>Body.</p>')).to eq('<p><b>“Why?”</b> Body.</p>')
+    end
+
+    it 'adds a full stop after a letter outside ASCII' do
+      expect(prepend_title('Café', '<p>Body.</p>')).to eq('<p><b>Café.</b> Body.</p>')
+    end
+
     it 'makes a paragraph when the body does not start with one' do
       expect(prepend_title('Race day', '<ul><li>A</li></ul>')).to eq('<p><b>Race day.</b></p><ul><li>A</li></ul>')
     end

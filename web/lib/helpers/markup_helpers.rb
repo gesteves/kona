@@ -171,7 +171,8 @@ module MarkupHelpers
     # ⚠️ The title arrives from `smartypants`, thus it holds entities and no escape. Decode them,
     # then escape the text: a `<` or a `"` in a Contentful title must not become markup.
     plain = HTMLEntities.new.decode(title.to_s)
-    plain = "#{plain}." if plain.match?(/[a-zA-Z0-9]\z/)
+    # The period goes before a closing double quotation mark, as American style needs.
+    plain = plain.sub(/(\p{Alnum})(”*)\z/, '\1.\2')
     aria = hidden_from_at ? ' aria-hidden="true"' : ""
     formatted_title = "<b#{aria}>#{CGI.escapeHTML(plain)}</b>"
 
