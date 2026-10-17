@@ -33,8 +33,9 @@ RSpec.describe "Admin republish", type: :request do
       trigger = response.body.scan(/<wa-button\b[^>]*>/).find { |tag| tag.include?('data-dialog="open republish-site"') }
       expect(trigger).to be_present
       expect(trigger).not_to include("href=")
-      # The drawer of a mobile screen must close behind the dialog.
-      expect(trigger).to include('data-drawer="close"')
+      # ⚠️ The mobile drawer stops a click at data-drawer="close", thus the dialog would never open.
+      # The dialog controller closes the drawer.
+      expect(trigger).not_to include("data-drawer=")
     end
 
     it "renders the dialog and its form once, on every admin page" do

@@ -5,8 +5,10 @@
     document handler of <wa-drawer> and its handler in the drawer both look there: a click in a
     shadow root goes to the host before either handler sees it. %>
 <%# An item with :dialog is an action and not a destination: it opens a dialog of the layout. It
-    renders as the same <wa-button> with no href. `data-dialog` and `data-drawer` both have a
-    handler on the document, thus one tap closes the drawer and opens the dialog. %>
+    renders as the same <wa-button> with no href.
+    ⚠️ It has NO `data-drawer="close"`. On a mobile screen, the drawer stops the click at that
+    attribute, thus the click never reaches the `data-dialog` handler on the document. The `dialog`
+    controller closes the drawer when the dialog opens. %>
 <% current = item[:path].present? && admin_nav_current?(item[:path]) %>
 <li>
   <%# `appearance` gives the active state: filled for the current page, and plain for each other
@@ -19,7 +21,7 @@
                     appearance: current ? "filled" : "plain",
                     target: (item[:external] ? "_blank" : nil),
                     rel: (item[:external] ? "noopener" : nil),
-                    data: { drawer: "close",
+                    data: { drawer: (item[:dialog] ? nil : "close"),
                             dialog: (item[:dialog] ? "open #{item[:dialog]}" : nil) },
                     aria: { current: current ? "page" : nil } do %>
     <%= slotted_icon_svg(*item[:icon]) %>

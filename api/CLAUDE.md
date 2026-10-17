@@ -861,8 +861,8 @@ Awesome. The styles use that class, and not the media query.
 `dist/skills/webawesome-design/references/layouts-page.md`): write the nav **one time** in
 `slot="navigation"`. The component moves that one copy between the sidebar of the desktop and the
 drawer of the mobile, thus a second copy shows two times on the desktop. `--menu-width` must go back
-to `auto` for `view='mobile'`, or an empty band stays at the left. Each nav link needs
-`data-drawer="close"`. ⚠️ Set `disable-navigation-toggle` in the markup, because the server renders
+to `auto` for `view='mobile'`, or an empty band stays at the left. Each nav link to a page needs
+`data-drawer="close"`, and an item with `dialog:` must not have it (refer to the text below). ⚠️ Set `disable-navigation-toggle` in the markup, because the server renders
 the page: the component sets it when it sees our `[data-toggle-nav]`, but not before it upgrades.
 Until then its own hamburger button shows on a row with no style above the header.
 
@@ -889,9 +889,11 @@ selected. An item with `external: true`, which is Sidekiq only today because it 
 layout, opens in a new tab with `rel="noopener"` and a hidden "(opens in a new tab)".
 
 ⚠️ **An item with `dialog:` is an action and not a destination**, and it has no `:path`. It renders
-as the same button with no `href` and with `data-dialog="open <id>"`. It keeps `data-drawer="close"`,
-thus one tap on a phone closes the drawer and opens the dialog: both attributes have a handler on the
-document. **Republish site**, directly below Home, is the only one today. It opens
+as the same button with no `href` and with `data-dialog="open <id>"`. ⚠️ **It has no
+`data-drawer="close"`.** On a phone the nav is in the drawer, and the drawer stops the propagation of
+a click on that attribute. Thus the click never reaches the `data-dialog` handler on the document,
+and the tap only closes the drawer. The `dialog` Stimulus controller closes the drawer at the
+`wa-show` of its dialog. **Republish site**, directly below Home, is the only one today. It opens
 `layouts/_republish_dialog`, which the layout renders one time, and `POST /republish` then starts a
 build of the web site, after 0 to 60 minutes. The rules of that dialog:
 

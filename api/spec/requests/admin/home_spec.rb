@@ -171,7 +171,7 @@ RSpec.describe "Admin home", type: :request do
     end
 
     # <wa-page> moves one copy of the nav between the desktop sidebar and the mobile drawer. Thus a
-    # second copy in the markup would appear two times on the desktop. Each link needs
+    # second copy in the markup would appear two times on the desktop. Each link to a page needs
     # data-drawer="close", or the drawer stays open over the page that the link goes to.
     it "writes the navigation once, with drawer-closing links" do
       get "/"
