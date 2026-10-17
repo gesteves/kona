@@ -167,11 +167,14 @@
         <div class="social__topic" data-social-target="topicField"
              data-network="<%= network.key %>"
              <%= "hidden" unless @social.topic? %>>
-          <%# ⚠️ No `maxlength`: it measures UTF-16 code units, and the limit of Meta is characters.
-              The action checks the length, for the reason that the body field gives. %>
-          <wa-input name="topic" label="<%= t('.topic') %>" value="<%= @social.topic %>"
-                    size="small" autocomplete="off" spellcheck="false">
-          </wa-input>
+          <%# ⚠️ The selected option gives the value, and not a `value` attribute. Refer to
+              `SocialPresenter#topic_options`. The action checks the length and the characters. %>
+          <wa-combobox name="topic" label="<%= t('.topic') %>" size="small"
+                       allow-custom-value with-clear>
+            <% @social.topic_options.each do |option| %>
+              <wa-option value="<%= option %>" <%= "selected" if option == @social.topic %>><%= option %></wa-option>
+            <% end %>
+          </wa-combobox>
         </div>
       <% end %>
     <% end %>

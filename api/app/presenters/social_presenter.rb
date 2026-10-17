@@ -42,6 +42,14 @@ class SocialPresenter
   # equivalent at Bluesky or Mastodon, thus the field shows only while that row is ticked.
   TOPIC_NETWORK = "threads".freeze
 
+  # The options of the topic field: the interests of the owner in the Threads app. ⚠️ Meta gives no
+  # endpoint that lists the topics, thus the list is here. Each one is a value that goes to Meta,
+  # and not copy, thus it stays out of the locale file.
+  TOPICS = [
+    "IronmanTriathlon", "Triathlon", "Cycling Threads", "Running Threads", "Swimming Threads",
+    "Fitness Threads"
+  ].freeze
+
   # The most posts in one thread. ⚠️ It is a guard against a runaway form and not a rule of any
   # network: Bluesky and Mastodon set no limit, and the limit of Threads is a rate of 250 each day.
   MAX_POSTS = 25
@@ -228,6 +236,13 @@ class SocialPresenter
     network = networks.find { |row| row.key == TOPIC_NETWORK }
 
     network&.connected? && selected?(TOPIC_NETWORK) || false
+  end
+
+  # ⚠️ The combobox shows a value only through an option that matches it. Without the extra option,
+  # a topic that the owner typed goes with the form but the field looks empty after a refusal.
+  # @return [Array<String>] Each of TOPICS, then the topic of the draft when it is not one of them.
+  def topic_options
+    topic.blank? || TOPICS.include?(topic) ? TOPICS : TOPICS + [ topic ]
   end
 
   # @return [Integer]

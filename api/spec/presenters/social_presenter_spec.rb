@@ -102,4 +102,19 @@ RSpec.describe SocialPresenter do
       expect(presenter.mention_networks.map(&:key)).to eq([ "bluesky" ])
     end
   end
+
+  # ⚠️ The combobox shows a value only through an option that matches it.
+  describe "#topic_options" do
+    def options(topic) = described_class.new(networks: [ network ], topic: topic).topic_options
+
+    it "gives the list alone for no topic and for a topic of the list" do
+      expect(options(nil)).to eq(described_class::TOPICS)
+      expect(options(" ")).to eq(described_class::TOPICS)
+      expect(options("Triathlon")).to eq(described_class::TOPICS)
+    end
+
+    it "adds a topic that the owner typed, at the end" do
+      expect(options("Bikes")).to eq(described_class::TOPICS + [ "Bikes" ])
+    end
+  end
 end

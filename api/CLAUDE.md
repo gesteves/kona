@@ -1693,14 +1693,20 @@ runs after `applyBlueskyOnly`, which is what disables that row.
 - The preview shows the topic on the **Threads row of every post**, which is where each post
   carries it.
 
-⚠️ **There is NO way to look up a topic, and there is no list to pick one from.** The Threads
-keyword search (`/keyword_search`, with `search_mode=TAG`) searches **posts** that carry a topic,
-and it takes a `q` that you must already know. Meta publishes no endpoint that gives the topics
-themselves. Thus the field is a plain text input and the owner types the words.
-⚠️ Do not add a picker or a suggestion list without an endpoint that answers "which topics exist".
+**The field is a `<wa-combobox>` with `allow-custom-value` and `with-clear`.** It offers
+`SocialPresenter::TOPICS`, which are the interests of the owner in the Threads app, and the owner
+can also type a different topic.
+
+⚠️ **That list is in the code, because there is NO way to look up a topic.** The Threads keyword
+search (`/keyword_search`, with `search_mode=TAG`) searches **posts** that carry a topic, and it
+takes a `q` that you must already know. Meta publishes no endpoint that gives the topics themselves.
 `threads_trending_topics` is a permission that the Meta dashboard offers and that the owner did not
 enable, and it is **not** in `Threads::SCOPES`; what it returns was not confirmed, and a list of
-*trending* topics is not a search in any case.
+*trending* topics is not the list of the owner.
+
+⚠️ **The combobox shows a value only through an option that matches it.** A `value` with no option
+goes with the form, but the field looks empty. Thus `SocialPresenter#topic_options` adds the topic
+of the draft when it is not in the list, and the view marks the option `selected`.
 
 #### The preview
 

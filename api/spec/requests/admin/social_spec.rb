@@ -1091,7 +1091,17 @@ RSpec.describe "Admin social media", type: :request do
         it "keeps the topic in the form after a refusal" do
           submit(topic: "bikes & things")
 
-          expect(response.body).to include(%(value="bikes &amp; things"))
+          expect(response.body).to include(%(<wa-option value="bikes &amp; things" selected>))
+        end
+
+        # ⚠️ The combobox shows a value only through an option that matches it.
+        it "selects a topic of the list after a refusal, and adds no option for it" do
+          submit(topic: "Triathlon", posts: [ { text: "x" * 301, link: "" } ])
+
+          expect(response).to have_http_status(:unprocessable_content)
+
+          expect(response.body).to include(%(<wa-option value="Triathlon" selected>))
+          expect(response.body.scan(%(<wa-option value="Triathlon")).size).to eq(1)
         end
 
         # ⚠️ The field stays in the form while the Threads row is not ticked, thus a value that the
@@ -1128,7 +1138,10 @@ RSpec.describe "Admin social media", type: :request do
 
         get "/social"
 
-        expect(response.body).to include(%(<wa-input name="topic"))
+        expect(response.body).to include(%(<wa-combobox name="topic"))
+        SocialPresenter::TOPICS.each do |option|
+          expect(response.body).to include(%(<wa-option value="#{option}"))
+        end
         expect(response.body).not_to match(/class="social__topic"[^>]*hidden/)
       end
 
