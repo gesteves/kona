@@ -98,6 +98,15 @@ clock = ->(time) { zone.to_local(time).strftime('%-l:%M %p') }
 # @return [String] For example "5:36".
 elapsed = ->(secs) { format('%d:%02d', secs / 3600, (secs % 3600) / 60) }
 compass = ->(degrees) { COMPASS[((degrees + 11.25) / 22.5).floor % 16] }
+# @param mm [Float] A rate above zero, in mm/h.
+# @return [String] For example "up to 0.02 in/h", or "under 0.01 in/h".
+rate = lambda do |mm|
+  if options[:units] == :metric
+    mm < 0.1 ? 'under 0.1 mm/h' : "up to #{mm.round(1)} mm/h"
+  else
+    mm / Format::MM_PER_INCH < 0.01 ? 'under 0.01 in/h' : "up to #{(mm / Format::MM_PER_INCH).round(2)} in/h"
+  end
+end
 # @return [String] For example "59°F–63°F" or "7–10 mph", or one value when the two ends are the same.
 range_text = ->(low, high) { low == high ? low : "#{low.sub(/ \S+\z/, '')}–#{high}" }
 
@@ -149,7 +158,7 @@ weather_at = lambda do |hours, time|
     temperature: mix.('temperature'), feels: mix.('temperatureApparent'), humidity: mix.('humidity'),
     wind: mix.('windSpeed'), gust: mix.('windGust'), direction: (Math.atan2(x, y) * 180 / Math::PI) % 360,
     chance: mix.('precipitationChance'), intensity: mix.('precipitationIntensity'),
-    condition: (share < 0.5 ? a : b)['conditionCode']
+    condition: (share < 0.5 ? a : b)['conditionCode'], type: (share < 0.5 ? a : b)['precipitationType']
   }
 end
 
@@ -178,9 +187,12 @@ describe = lambda do |group|
   y = group.sum { |leg| Math.cos(leg[:weather][:direction] * Math::PI / 180) * leg[:weather][:wind].to_f * leg[:weight] }
   shares = Course.wind_shares(group)
   humidity = values.(:humidity)
+  types = values.(:type).reject { |type| type == 'clear' }.uniq
+  intensity = values.(:intensity).max.to_f
+  detail = [types.join(' or '), intensity.positive? ? rate.(intensity) : nil].compact.reject(&:empty?).join(' ')
   {
     conditions: conditions.join(', '),
-    rain: "#{(values.(:chance).max.to_f * 100).round}% chance at most, up to #{values.(:intensity).max.to_f.round(1)} mm/h",
+    rain: ["#{(values.(:chance).max.to_f * 100).round}% chance", detail].reject(&:empty?).join(', '),
     temperature: "#{range_text.(*temperature.minmax.map { |value| Format.degrees(value, options[:units]) })} " \
                  "(feels like #{range_text.(*feels.minmax.map { |value| Format.degrees(value, options[:units]) })})",
     humidity: range_text.(*humidity.minmax.map { |value| "#{(value * 100).round}%" }),
@@ -203,11 +215,11 @@ puts "- **Humidity:** #{summary[:humidity]}"
 puts "- **Wind:** #{summary[:wind]}"
 puts "- **Wind on the course:** #{summary[:shares]}"
 puts
-puts '| Time | Distance | Conditions | Temperature | Wind | Wind on the course |'
-puts '|---|---|---|---|---|---|'
+puts '| Time | Distance | Conditions | Temperature | Humidity | Precipitation | Wind | Wind on the course |'
+puts '|---|---|---|---|---|---|---|---|'
 legs.group_by { |leg| (leg[:offset] / (options[:every] * 60)).floor }.each_value do |group|
   facts = describe.(group)
   times = "#{clock.(start + group.first[:offset])}–#{clock.(start + group.last[:offset])}"
   miles = "#{distance.(group.first[:start][:meters]).sub(/ .*/, '')}–#{distance.(group.last[:finish][:meters])}"
-  puts "| #{times} | #{miles} | #{facts[:conditions]} | #{facts[:temperature]} | #{facts[:wind]} | #{facts[:shares]} |"
+  puts "| #{times} | #{miles} | #{facts[:conditions]} | #{facts[:temperature]} | #{facts[:humidity]} | #{facts[:rain]} | #{facts[:wind]} | #{facts[:shares]} |"
 end
