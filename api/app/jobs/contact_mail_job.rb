@@ -1,6 +1,4 @@
-require "erb"
 require "securerandom"
-require "time"
 
 # The contact-form intake: the spam check, the abuse check, and the email, outside the request path.
 # It gives the complete email to ContactDeliveryJob. That is a separate job, thus a Resend failure
@@ -14,8 +12,9 @@ class ContactMailJob < ContactJob
   # @param name [String] The name of the sender.
   # @param email [String] The email address of the sender, which becomes the Reply-To.
   # @param message [String] The body of the message.
-  # @param context [Hash] The sender data that the web proxy sends: some of "ip", "user_agent",
-  #   "city", "region", and "country". The spam quarantine adds "received_at".
+  # @param context [Hash] The sender data that the web proxy sends: some of "ip", "port",
+  #   "user_agent", "city", "region", "country", and "network". Api::ContactController adds
+  #   "received_at".
   # @param restored_from_spam [Boolean] True when the owner sends this message from the spam queue.
   #   The code then does no check, because the checks already ran and the owner decided against
   #   them. Admin::SpamController adds the Akismet ham report as a separate job.
@@ -50,7 +49,6 @@ class ContactMailJob < ContactJob
       "reply_to" => email,
       "subject" => subject,
       "text" => text_body(name, email, message, context),
-      "html" => html_body(name, email, message, context),
       "idempotency_key" => SecureRandom.uuid
     )
   end
@@ -78,29 +76,16 @@ class ContactMailJob < ContactJob
     BODY
   end
 
-  # @return [String] The HTML body of the email. The code escapes each value that it adds.
-  def html_body(name, email, message, context)
-    h = ->(value) { ERB::Util.html_escape(value) }
-    details = sender_details(context).map { |line| h.call(line) }.join("<br>")
-    <<~HTML
-      <p><strong>Name:</strong> #{h.call(name)}<br>
-      <strong>Email:</strong> #{h.call(email)}</p>
-      <p style="white-space: pre-wrap;">#{h.call(message)}</p>
-      <hr>
-      <p style="color: #888; font-size: 0.85em;">#{details}</p>
-    HTML
-  end
-
   # @return [Array<String>] The "Sender details" lines. It removes each blank line.
   def sender_details(context)
     location = [ context["city"], context["region"], context["country"] ].reject(&:blank?).join(", ")
     lines = []
     lines << "Location: #{location}" if location.present?
     lines << "IP: #{context["ip"]}" if context["ip"].present?
+    lines << "Source port: #{context["port"]}" if context["port"].present?
+    lines << "Network: #{context["network"]}" if context["network"].present?
     lines << "User agent: #{context["user_agent"]}" if context["user_agent"].present?
-    # A message from the quarantine has the time of its submission. The code makes a new message
-    # some seconds after it arrives, thus "now" is sufficiently accurate.
-    lines << "Submitted: #{context["received_at"].presence || Time.now.utc.iso8601}"
+    lines << "Submitted: #{SubmissionTime.format(context["received_at"])}"
     lines
   end
 end

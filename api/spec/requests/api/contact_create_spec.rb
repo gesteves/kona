@@ -1,6 +1,8 @@
 require "rails_helper"
 
 RSpec.describe "Contact", type: :request do
+  include ActiveSupport::Testing::TimeHelpers
+
   let(:token) { "test-token" }
   let(:site_url) { "https://example.test" }
   let(:valid_params) { { name: "Jane Rider", email: "jane@example.com", message: "Hello there!" } }
@@ -18,6 +20,9 @@ RSpec.describe "Contact", type: :request do
     # No spec makes a real DNS query. The "Email domain" group changes this.
     allow(EmailDomain).to receive(:accepts_mail?).and_return(true)
   end
+
+  # Api::ContactController records the arrival time when the Worker sends none.
+  around { |example| travel_to(Time.utc(2026, 8, 1, 12, 0, 0)) { example.run } }
 
   describe "authentication" do
     it "rejects requests without a bearer token" do
@@ -39,19 +44,30 @@ RSpec.describe "Contact", type: :request do
       expect(response).to have_http_status(:no_content)
       expect(ContactMailJob).to have_enqueued_sidekiq_job(
         "Jane Rider", "jane@example.com", "Hello there!",
-        { "ip" => "203.0.113.7", "user_agent" => "Mozilla/5.0" }
+        { "ip" => "203.0.113.7", "user_agent" => "Mozilla/5.0", "received_at" => "2026-08-01T12:00:00Z" }
       )
     end
 
-    it "forwards the visitor geo into the job context" do
+    it "forwards the visitor geo, network, port, and edge time into the job context" do
       post "/api/contact", params: valid_params, headers: json.merge(
-        "X-Kona-Client-IP" => "203.0.113.7", "X-Kona-Client-City" => "Boise",
-        "X-Kona-Client-Region" => "Idaho", "X-Kona-Client-Country" => "US"
+        "X-Kona-Client-IP" => "203.0.113.7", "X-Kona-Client-Port" => "54321",
+        "X-Kona-Client-City" => "Boise", "X-Kona-Client-Region" => "Idaho",
+        "X-Kona-Client-Country" => "US", "X-Kona-Client-Network" => "Comcast Cable",
+        "X-Kona-Client-Time" => "2026-08-01T11:59:48.123Z"
       )
 
       expect(ContactMailJob).to have_enqueued_sidekiq_job(
         "Jane Rider", "jane@example.com", "Hello there!",
-        { "ip" => "203.0.113.7", "city" => "Boise", "region" => "Idaho", "country" => "US" }
+        { "ip" => "203.0.113.7", "port" => "54321", "city" => "Boise", "region" => "Idaho",
+          "country" => "US", "network" => "Comcast Cable", "received_at" => "2026-08-01T11:59:48Z" }
+      )
+    end
+
+    it "uses its own clock when the edge time is not ISO 8601" do
+      post "/api/contact", params: valid_params, headers: json.merge("X-Kona-Client-Time" => "soon")
+
+      expect(ContactMailJob).to have_enqueued_sidekiq_job(
+        "Jane Rider", "jane@example.com", "Hello there!", { "received_at" => "2026-08-01T12:00:00Z" }
       )
     end
 
@@ -85,7 +101,9 @@ RSpec.describe "Contact", type: :request do
 
       expect(response).to redirect_to("#{site_url}/contact/success")
       expect(response).to have_http_status(:see_other)
-      expect(ContactMailJob).to have_enqueued_sidekiq_job("Jane Rider", "jane@example.com", "Hello there!", {})
+      expect(ContactMailJob).to have_enqueued_sidekiq_job(
+        "Jane Rider", "jane@example.com", "Hello there!", { "received_at" => "2026-08-01T12:00:00Z" }
+      )
     end
 
     it "silently redirects to the Thank-You page and drops honeypot submissions" do

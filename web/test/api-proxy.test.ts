@@ -51,6 +51,7 @@ describe('handleApi — widgets (GET)', () => {
     expect(sent.get('accept')).toBeNull();
     // A widget never sends the visitor data. That data goes on the contact path only.
     expect(sent.get('x-kona-client-ip')).toBeNull();
+    expect(sent.get('x-kona-client-time')).toBeNull();
     // The code makes each fragment response here, thus each one has its own security headers.
     expect(res.headers.get('x-content-type-options')).toBe('nosniff');
     expect(res.headers.get('x-frame-options')).toBe('DENY');
@@ -286,7 +287,7 @@ describe('handleApi — widgets (GET)', () => {
 });
 
 describe('handleApi — contact (POST)', () => {
-  it('forwards the visitor IP/UA/geo and the redirect Location, plus the bearer', async () => {
+  it('forwards the visitor IP/port/UA/geo/time and the redirect Location, plus the bearer', async () => {
     const upstream = interceptFetch(
       'POST',
       `${ORIGIN}/api/contact`,
@@ -303,13 +304,20 @@ describe('handleApi — contact (POST)', () => {
         headers: {
           'content-type': 'application/x-www-form-urlencoded',
           'cf-connecting-ip': '203.0.113.7',
+          // A zone rule sets this header from cf.edge.client_port.
+          'x-kona-client-port': '54321',
           'user-agent': 'TestBrowser/1.0',
           accept: 'text/html',
         },
         body: 'name=T&email=t@example.com&message=hi',
         // request.cf on a Worker request that comes in. The pool obeys the RequestInit
         // extension.
-        cf: { city: 'Portland', region: 'Oregon', country: 'US' },
+        cf: {
+          city: 'Portland',
+          region: 'Oregon',
+          country: 'US',
+          asOrganization: 'Comcast Cable',
+        },
       } as RequestInit),
       env
     );
@@ -324,10 +332,16 @@ describe('handleApi — contact (POST)', () => {
     // X-Kona-Client-* headers.
     const sent = upstream.request!.headers;
     expect(sent.get('x-kona-client-ip')).toBe('203.0.113.7');
+    expect(sent.get('x-kona-client-port')).toBe('54321');
     expect(sent.get('x-kona-client-ua')).toBe('TestBrowser/1.0');
+    // The time at the edge, which a report of a threat needs to the second.
+    expect(sent.get('x-kona-client-time')).toMatch(
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
+    );
     expect(sent.get('x-kona-client-city')).toBe('Portland');
     expect(sent.get('x-kona-client-region')).toBe('Oregon');
     expect(sent.get('x-kona-client-country')).toBe('US');
+    expect(sent.get('x-kona-client-network')).toBe('Comcast Cable');
     expect(sent.get('authorization')).toBe('Bearer SERVER_TOKEN');
     expect(sent.get('content-type')).toContain(
       'application/x-www-form-urlencoded'
@@ -337,6 +351,28 @@ describe('handleApi — contact (POST)', () => {
     expect(sent.get('accept')).toBe('text/html');
     // The body from the stream arrives with no change.
     expect(upstream.body).toBe('name=T&email=t@example.com&message=hi');
+  });
+
+  it('drops a port that is not a number', async () => {
+    const upstream = interceptFetch(
+      'POST',
+      `${ORIGIN}/api/contact`,
+      () => new Response(null, { status: 204 })
+    );
+
+    await handleApi(
+      new Request('https://www.example.com/api/contact', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/x-www-form-urlencoded',
+          'x-kona-client-port': '54321, 1',
+        },
+        body: 'name=T&email=t@example.com&message=hi',
+      }),
+      env
+    );
+
+    expect(upstream.request!.headers.get('x-kona-client-port')).toBeNull();
   });
 
   // The timeout was in the branch for the routes that are not the contact route, with

@@ -9,7 +9,8 @@ RSpec.describe SpamMessagePresenter do
       "name" => "Ivan",
       "email" => "ivan@example.com",
       "message" => "cheap pills",
-      "context" => { "ip" => "203.0.113.7", "user_agent" => "Mozilla/5.0", "city" => "Boise", "region" => "Idaho", "country" => "US" },
+      "context" => { "ip" => "203.0.113.7", "port" => "54321", "network" => "Comcast Cable", "user_agent" => "Mozilla/5.0",
+                     "city" => "Boise", "region" => "Idaho", "country" => "US" },
       "received_at" => "2026-08-01T12:00:00Z"
     }
   end
@@ -43,16 +44,27 @@ RSpec.describe SpamMessagePresenter do
     expect(presenter.location).to be_nil
   end
 
-  it "exposes the forwarded IP and user agent" do
+  it "exposes the forwarded IP, port, network, and user agent" do
     expect(presenter.ip).to eq("203.0.113.7")
+    expect(presenter.port).to eq("54321")
+    expect(presenter.network).to eq("Comcast Cable")
     expect(presenter.user_agent).to eq("Mozilla/5.0")
   end
 
-  it "reports nil for an IP and user agent the proxy didn't forward" do
+  it "reports nil for the sender data the proxy didn't forward" do
     payload["context"] = {}
 
     expect(presenter.ip).to be_nil
+    expect(presenter.port).to be_nil
+    expect(presenter.network).to be_nil
     expect(presenter.user_agent).to be_nil
+  end
+
+  it "gives the submission time to the second, in the local zone and in UTC" do
+    allow(ENV).to receive(:[]).and_call_original
+    allow(ENV).to receive(:[]).with("TIME_ZONE").and_return("America/Los_Angeles")
+
+    expect(presenter.submitted_at).to eq("Saturday, August 1, 2026, 5:00:00 AM PDT (2026-08-01T12:00:00Z)")
   end
 
   it "tolerates a missing context entirely" do

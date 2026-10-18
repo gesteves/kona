@@ -89,6 +89,8 @@ en:
           dropped after a month."
         ip: "IP"
         location: "Location"
+        network: "Network"
+        port: "Source port"
         release:
           abusive: "Not abusive"
           akismet: "Not spam"

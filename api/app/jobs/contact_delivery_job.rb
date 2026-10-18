@@ -7,15 +7,14 @@
 # a send that succeeds and loses its response after that window can give a second email at the next
 # attempt. A copy of an email costs less than a lost message.
 class ContactDeliveryJob < ContactJob
-  # @param payload [Hash] The email that ContactMailJob makes: "to", "reply_to", "subject", "text",
-  #   "html", and "idempotency_key".
+  # @param payload [Hash] The email that ContactMailJob makes: "to", "reply_to", "subject",
+  #   "text", and "idempotency_key".
   def perform(payload)
     Resend.new.send_email(
       to: payload["to"],
       reply_to: payload["reply_to"],
       subject: payload["subject"],
       text: payload["text"],
-      html: payload["html"],
       idempotency_key: payload["idempotency_key"]
     )
     Rails.logger.info("Contact form: emailed a submission to the owner")

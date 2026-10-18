@@ -10,7 +10,8 @@ RSpec.describe "Admin spam quarantine", type: :request do
       "name" => "Ivan Petrov",
       "email" => "ivan@example.ru",
       "message" => "Your website is not ranking on Google.",
-      "context" => { "ip" => "203.0.113.7", "user_agent" => "Mozilla/5.0", "city" => "Moscow", "country" => "RU" },
+      "context" => { "ip" => "203.0.113.7", "port" => "54321", "network" => "Rostelecom", "user_agent" => "Mozilla/5.0",
+                     "city" => "Moscow", "country" => "RU" },
       "received_at" => "2026-08-12T14:03:00Z"
     }
   end
@@ -43,8 +44,10 @@ RSpec.describe "Admin spam quarantine", type: :request do
         expect(response.body).to include("Your website is not ranking on Google.")
         expect(response.body).to include("Moscow, RU")
         expect(response.body).to include("203.0.113.7")
+        expect(response.body).to include(I18n.t("admin.spam.index.port"), "54321")
+        expect(response.body).to include(I18n.t("admin.spam.index.network"), "Rostelecom")
         expect(response.body).to include("Mozilla/5.0")
-        expect(response.body).to include("2026-08-12T14:03:00Z")
+        expect(response.body).to include(SubmissionTime.format("2026-08-12T14:03:00Z"))
       end
 
       it "offers both actions as Web Awesome buttons in real forms" do

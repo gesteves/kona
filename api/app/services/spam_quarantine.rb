@@ -35,8 +35,8 @@ class SpamQuarantine
   # @param name [String] The name of the sender.
   # @param email [String] The email address of the sender.
   # @param message [String] The body of the message.
-  # @param context [Hash] The sender data that the proxy sends (ip, user_agent, city, region, and
-  #   country), as ContactMailJob got it.
+  # @param context [Hash] The sender data, as ContactMailJob got it. Its "received_at" is the
+  #   arrival time of the request.
   # @param reason [String] AKISMET or ABUSIVE.
   # @return [String] The new message id.
   def store(name:, email:, message:, reason:, context: {})
@@ -49,7 +49,7 @@ class SpamQuarantine
       "message" => message,
       "context" => context || {},
       "reason" => reason,
-      "received_at" => Time.now.utc.iso8601
+      "received_at" => context&.dig("received_at").presence || Time.now.utc.iso8601
     })
 
     prune

@@ -40,10 +40,16 @@
               <% if message.ip %>
                 <dt><%= t(".ip") %></dt><dd><%= message.ip %></dd>
               <% end %>
+              <% if message.port %>
+                <dt><%= t(".port") %></dt><dd><%= message.port %></dd>
+              <% end %>
+              <% if message.network %>
+                <dt><%= t(".network") %></dt><dd><%= message.network %></dd>
+              <% end %>
               <% if message.user_agent %>
                 <dt><%= t(".user_agent") %></dt><dd><%= message.user_agent %></dd>
               <% end %>
-              <dt><%= t(".submitted") %></dt><dd><%= message.received_at %></dd>
+              <dt><%= t(".submitted") %></dt><dd><%= message.submitted_at %></dd>
             </dl>
 
             <div class="wa-cluster wa-gap-s">

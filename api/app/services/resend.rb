@@ -23,8 +23,7 @@ class Resend < ApplicationService
   # Sends an email.
   # @param to [String] The address of the receiver.
   # @param subject [String] The subject line.
-  # @param text [String] The plain-text body. The code always sends it, for better delivery.
-  # @param html [String, nil] An HTML body.
+  # @param text [String] The plain-text body.
   # @param reply_to [String, nil] The Reply-To address.
   # @param idempotency_key [String, nil] The same key at each attempt of one email. Resend keeps it
   #   for 24 hours and sends that email one time only. Thus a retry after a timeout, where Resend
@@ -32,11 +31,10 @@ class Resend < ApplicationService
   # @raise [RuntimeError] If there is no configuration.
   # @raise [ApplicationService::HttpError] If the response is not a 2xx, thus the caller does the
   #   send again.
-  def send_email(to:, subject:, text:, html: nil, reply_to: nil, idempotency_key: nil)
+  def send_email(to:, subject:, text:, reply_to: nil, idempotency_key: nil)
     raise "Resend is not configured" unless configured?
 
     body = { from: @from, to: to, subject: subject, text: text }
-    body[:html] = html if html.present?
     body[:reply_to] = reply_to if reply_to.present?
 
     headers = {

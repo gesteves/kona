@@ -263,6 +263,14 @@ Events counter of the rule is more than zero.
   when it is necessary, at `<page path>og.png` (refer to `web/src/og.ts`). This needs the **Workers
   Paid** plan: a render takes approximately 100 ms of CPU, and the Free plan permits 10 ms. Refer to
   [`web/CLAUDE.md`](web/CLAUDE.md).
+- **The source port** — a Request Header Transform Rule sets `X-Kona-Client-Port` to
+  `to_string(cf.edge.client_port)`, with the expression
+  `http.host eq "<site host>" and http.request.uri.path eq "/api/contact"`. `request.cf` has no
+  port, thus the Worker cannot get it in a different way. The contact email and the Spam page show
+  it. A report of a threat needs it: a carrier-grade NAT puts many subscribers behind one IPv4
+  address, and the IP, the port, and the time to the second select one. ⚠️ The "Set" of the rule
+  replaces a value from the client. Without the rule, a client can send a false port, and the email
+  shows it. After an edit, send a test message and check its "Source port" line.
 - **A managed transform** — "Add visitor location headers" must be on. Without it, `CF-IPCity` and
   `CF-Region` are absent and the log has the country only.
 - **`/cdn-cgi/*` never reaches an origin.** Cloudflare answers it at its own edge.
@@ -596,11 +604,12 @@ The rules of the proxy. Do not break one of these:
   Put each input of a widget in the **path**.
 - It gives an empty `502` with a short cache time when the upstream call raises. Thus a short
   problem at the origin removes the widget and does not keep an error in the cache.
-- **On the contact path only:** it sends the true visitor IP, UA, and geo data in the
-  `X-Kona-Client-*` headers, because the origin cannot see them: the zone changes each `CF-*` header
-  to describe the egress of the Worker. It also sends the `Location` header for the redirect of a
-  browser with no JavaScript. The API uses those values for Akismet, for the rate limit, and for the
-  notification email, and **never** for a ban.
+- **On the contact path only:** it sends the true visitor IP, source port, UA, geo data, network
+  name, and request time in the `X-Kona-Client-*` headers, because the origin cannot see them: the
+  zone changes each `CF-*` header to describe the egress of the Worker. It also sends the
+  `Location` header for the redirect of a browser with no JavaScript. The API uses those values for
+  Akismet, for the rate limit, for the notification email, and for the Spam page, and **never** for
+  a ban.
 
 ### Contact form (`POST /api/contact`)
 

@@ -11,7 +11,10 @@ import { requestLogLine } from './log';
  */
 const FORWARD_REQUEST_HEADERS = ['accept'];
 
-/** The contact-form endpoint: a POST that no cache holds. It sends the visitor IP, UA, and geo. */
+/**
+ * The contact-form endpoint: a POST that no cache holds. It sends the visitor IP, port, UA, geo,
+ * network, and the time of the request.
+ */
 const CONTACT_PATH = '/api/contact';
 
 /**
@@ -35,8 +38,16 @@ const CONTACT_UPSTREAM_TIMEOUT_MS = 25_000;
  */
 const MAX_CONTACT_BYTES = 32 * 1024;
 
-/** The approximate visitor location from `request.cf`. It goes on the contact path only. */
-type ClientGeo = { city?: string; region?: string; country?: string };
+/**
+ * The approximate visitor location and network from `request.cf`. It goes on the contact path
+ * only.
+ */
+type ClientGeo = {
+  city?: string;
+  region?: string;
+  country?: string;
+  asOrganization?: string;
+};
 
 /**
  * Makes the upstream request headers.
@@ -68,6 +79,12 @@ function upstreamHeaders(
   if (contactGeo) {
     const ip = incoming.get('cf-connecting-ip');
     if (ip) headers.set('x-kona-client-ip', ip);
+    // ⚠️ A zone rule sets this header from `cf.edge.client_port`, because `request.cf` has no
+    // port. The "Set" of that rule replaces a value from the client.
+    const port = incoming.get('x-kona-client-port');
+    if (port && /^\d{1,5}$/.test(port)) headers.set('x-kona-client-port', port);
+    // The time at the edge. A cold start of the origin can add some seconds to its own clock.
+    headers.set('x-kona-client-time', new Date().toISOString());
     const ua = incoming.get('user-agent');
     if (ua) headers.set('x-kona-client-ua', ua);
     if (contactGeo.city) headers.set('x-kona-client-city', contactGeo.city);
@@ -75,6 +92,8 @@ function upstreamHeaders(
       headers.set('x-kona-client-region', contactGeo.region);
     if (contactGeo.country)
       headers.set('x-kona-client-country', contactGeo.country);
+    if (contactGeo.asOrganization)
+      headers.set('x-kona-client-network', contactGeo.asOrganization);
   }
   if (apiToken) headers.set('authorization', `Bearer ${apiToken}`);
   return headers;
@@ -151,7 +170,12 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
 
   const cf = (request as { cf?: ClientGeo }).cf;
   const contactGeo: ClientGeo | undefined = isContact
-    ? { city: cf?.city, region: cf?.region, country: cf?.country }
+    ? {
+        city: cf?.city,
+        region: cf?.region,
+        country: cf?.country,
+        asOrganization: cf?.asOrganization,
+      }
     : undefined;
 
   let upstream: Response;

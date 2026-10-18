@@ -48,6 +48,14 @@ RSpec.describe SpamQuarantine do
       expect(payload["received_at"]).to be_present
     end
 
+    it "keeps the arrival time of the request, and not the time of the store" do
+      arrived = 2.hours.ago.utc.iso8601
+      id = described_class.new.store(name: "Ivan", email: "ivan@example.com", message: "hi",
+        context: { "received_at" => arrived }, reason: described_class::AKISMET)
+
+      expect(JSON.parse(store.fetch(id))["received_at"]).to eq(arrived)
+    end
+
     it "tolerates a nil context" do
       id = described_class.new.store(name: "Ivan", email: "ivan@example.com", message: "hi", context: nil, reason: described_class::AKISMET)
 

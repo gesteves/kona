@@ -68,17 +68,30 @@ module Api
     end
 
     # The true visitor data that the web proxy sends in its own headers, because the origin cannot
-    # see it. The app uses it only for Akismet and for the Sender details of the email, and never for
-    # a ban.
+    # see it. The app uses it only for Akismet and for the Sender details of the email and of the
+    # Spam page, and never for a ban.
     # @return [Hash] A hash with string keys that Sidekiq can serialize. It has no blank value.
     def sender_context
       {
         "ip" => forwarded("X-Kona-Client-IP"),
+        "port" => forwarded("X-Kona-Client-Port"),
         "user_agent" => forwarded("X-Kona-Client-UA"),
         "city" => forwarded("X-Kona-Client-City"),
         "region" => forwarded("X-Kona-Client-Region"),
-        "country" => forwarded("X-Kona-Client-Country")
+        "country" => forwarded("X-Kona-Client-Country"),
+        "network" => forwarded("X-Kona-Client-Network"),
+        "received_at" => arrival_time
       }.compact
+    end
+
+    # The Worker gives the time of the request at the edge. A cold start of the origin can add some
+    # seconds, thus this clock is the fallback only.
+    # @return [String] An ISO 8601 time in UTC, to the second.
+    def arrival_time
+      sent = forwarded("X-Kona-Client-Time")
+      (sent ? Time.iso8601(sent) : Time.now).utc.iso8601
+    rescue ArgumentError
+      Time.now.utc.iso8601
     end
 
     # @return [String, nil] A request header from the proxy, or nil if it is blank or absent.

@@ -3,7 +3,8 @@ require "rails_helper"
 RSpec.describe ContactMailJob do
   let(:akismet) { instance_double(Akismet) }
   let(:context) do
-    { "ip" => "203.0.113.7", "user_agent" => "Mozilla/5.0", "city" => "Boise", "region" => "Idaho", "country" => "US" }
+    { "ip" => "203.0.113.7", "port" => "54321", "user_agent" => "Mozilla/5.0", "city" => "Boise", "region" => "Idaho",
+      "country" => "US", "network" => "Comcast Cable", "received_at" => "2026-08-01T11:59:48Z" }
   end
 
   before do
@@ -15,6 +16,7 @@ RSpec.describe ContactMailJob do
     allow(ContactModeration).to receive(:abusive?).and_return(false)
     allow(ENV).to receive(:[]).and_call_original
     allow(ENV).to receive(:[]).with("CONTACT_TO_ADDRESS").and_return("owner@example.test")
+    allow(ENV).to receive(:[]).with("TIME_ZONE").and_return("America/Los_Angeles")
   end
 
   it "spam-checks a clean submission and enqueues a delivery job with the composed email" do
@@ -30,7 +32,10 @@ RSpec.describe ContactMailJob do
       hash_including(
         "to" => "owner@example.test",
         "reply_to" => "jane@example.com",
-        "text" => a_string_including("Boise, Idaho, US", "203.0.113.7", "Mozilla/5.0"),
+        "text" => a_string_including(
+          "Boise, Idaho, US", "IP: 203.0.113.7", "Source port: 54321", "Network: Comcast Cable", "Mozilla/5.0",
+          "Submitted: Saturday, August 1, 2026, 4:59:48 AM PDT (2026-08-01T11:59:48Z)"
+        ),
         "idempotency_key" => a_string_matching(/\A\h{8}-\h{4}-\h{4}-\h{4}-\h{12}\z/)
       )
     )
@@ -135,7 +140,16 @@ RSpec.describe ContactMailJob do
         context.merge("received_at" => "2026-08-01T12:00:00Z"), true)
 
       expect(ContactDeliveryJob).to have_enqueued_sidekiq_job(
-        hash_including("text" => a_string_including("Submitted: 2026-08-01T12:00:00Z"))
+        hash_including("text" => a_string_including("Submitted: Saturday, August 1, 2026, 5:00:00 AM PDT (2026-08-01T12:00:00Z)"))
+      )
+    end
+
+    it "delivers the message with the raw time when the stored time is not ISO 8601" do
+      described_class.new.perform("Jane Rider", "jane@example.com", "Hello!",
+        context.merge("received_at" => "yesterday"), true)
+
+      expect(ContactDeliveryJob).to have_enqueued_sidekiq_job(
+        hash_including("text" => a_string_including("Submitted: yesterday"))
       )
     end
   end

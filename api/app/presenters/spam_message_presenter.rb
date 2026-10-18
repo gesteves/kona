@@ -44,14 +44,31 @@ class SpamMessagePresenter
     @context["ip"].presence
   end
 
+  # @return [String, nil] The source port of the visitor, from a zone rule. Behind a carrier-grade
+  #   NAT, the IP alone does not name one subscriber.
+  def port
+    @context["port"].presence
+  end
+
+  # @return [String, nil] The name of the network of the visitor IP, for example an ISP or a host.
+  def network
+    @context["network"].presence
+  end
+
   # @return [String, nil] The visitor User-Agent that the web proxy sent.
   def user_agent
     @context["user_agent"].presence
   end
 
-  # @return [String] The submission time in ISO 8601, for <wa-relative-time> and the details line.
+  # @return [String] The submission time in ISO 8601, for <wa-relative-time>.
   def received_at
     @received_at
+  end
+
+  # @return [String] The submission time for the details line, to the second, in the local zone and
+  #   in UTC.
+  def submitted_at
+    SubmissionTime.format(@received_at)
   end
 
   # @return [Boolean] True if the body is long enough to need the control.
