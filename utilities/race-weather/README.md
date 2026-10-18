@@ -28,6 +28,35 @@ The date can be in almost any format: `August 15, 2027`, `2027-08-15`, `15 Aug 2
 The table goes to stdout, and the notes go to stderr: the place that Google found, its time zone,
 and the sensor of each AQI value. Thus `bin/race-weather … > table.md` gives the table only.
 
+## Weather along a course
+
+`bin/course-weather` gives the weather along a GPX course, at the time of each part of it at an
+even speed. WeatherKit gives a forecast for a future hour and the history for a past hour, thus it
+works before a race and after it.
+
+```bash
+bundle exec bin/course-weather bike.gpx "2026-10-18 08:00" --speed 20
+bundle exec bin/course-weather run.gpx "2026-10-18 13:36" --duration 3:30 --every 30
+```
+
+| Option | Default | Meaning |
+|---|---|---|
+| `--speed` | | The average speed, in mph, or in km/h with `--units metric` |
+| `--duration` | | The time for the full course, as `H:MM` or `H:MM:SS`. Give this or `--speed` |
+| `--units` | `imperial` | `imperial` or `metric` |
+| `--every` | `60` | The minutes in one row of the table |
+| `--zone` | | An IANA time zone. Without it, Google gives the zone of the start |
+
+The start is a local time at the course. The tool gets one WeatherKit call each 2 km of the
+course. A loop or an out-and-back gets fewer calls, because two points in the same cell of about
+1 km share one call.
+
+The wind of each leg of 50 m uses the rule of the headwind in the api activity description. The
+head component is the wind speed × the cosine of the angle between the wind and the direction of
+travel. A leg has a headwind at 8 km/h (5 mph) or more, and a tailwind at −8 km/h or less. Each
+other leg has a crosswind when its side component is 8 km/h or more, and a light wind when it is
+not. The shares are of the distance, thus they are also of the time at an even speed.
+
 ## The columns
 
 Each value is for the full local day, from midnight to midnight in the time zone of the place.

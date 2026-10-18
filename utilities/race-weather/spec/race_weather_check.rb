@@ -1,10 +1,11 @@
 # Checks the parts of the race weather tool that need no network: the date parsing, the choice of
-# the past dates, and the cells of the table.
+# the past dates, the cells of the table, and the course math.
 #
 # This is plain Ruby, on purpose: the tool has no test framework and does not need one. Run it with
 # `ruby spec/race_weather_check.rb`. CI runs it from .github/workflows/utilities.yml, with no
-# bundle, thus these two files must use the standard library only.
+# bundle, thus these files must use the standard library only.
 require 'date'
+require_relative '../lib/race_weather/course'
 require_relative '../lib/race_weather/dates'
 require_relative '../lib/race_weather/format'
 
@@ -85,6 +86,21 @@ row = Format.row(date: Date.new(2026, 8, 16), hours: hours, phrase: nil, aqi: ni
 check.('date cell', row.first, 'Aug 16, 2026')
 check.('missing cells', [row[1], row.last], ['No data', 'No data'])
 check.('header', Format.table([]).lines.first.chomp, '| Date | Weather | Temperature | Humidity | Wind | Rain | AQI |')
+
+# The course: the GPX points, the legs, and the wind of a leg.
+gpx = '<trkpt lat="38.0" lon="-121.0"></trkpt><trkpt lon="-121.0" lat="38.001"></trkpt><trkpt lat="38.001" lon="-121.001"/>'
+course = Course.points(gpx)
+check.('course points', course.size, 3)
+check.('course distance', course.last[:meters].round, 199)
+check.('course legs', Course.legs(course).map { |leg| leg[:bearing].round }, [0, 270])
+check.('headwind', Course.wind_kind(10.0, 0.0, 0.0), :headwind)
+check.('tailwind', Course.wind_kind(10.0, 180.0, 0.0), :tailwind)
+check.('crosswind', Course.wind_kind(10.0, 90.0, 0.0), :crosswind)
+check.('head component wins', Course.wind_kind(20.0, 45.0, 0.0), :headwind)
+check.('light wind', Course.wind_kind(7.0, 0.0, 0.0), :light)
+check.('wind shares', Course.wind_shares([{ kind: :headwind, weight: 3 }, { kind: :light, weight: 1 }]),
+       { headwind: 75, crosswind: 0, tailwind: 0, light: 25 })
+check.('duration', [Course.duration_seconds('3:30'), Course.duration_seconds('0:45:30')], [12_600, 2730])
 
 if failures.empty?
   puts "Race weather check: #{checks} checks OK"

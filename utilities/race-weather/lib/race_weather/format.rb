@@ -146,15 +146,19 @@ module RaceWeather
       end
     end
 
-    private
-
+    # @param celsius [Float]
+    # @return [String] For example "59°F" or "15°C".
     def degrees(celsius, units)
       units == :metric ? "#{celsius.round}°C" : "#{(celsius * 9 / 5.0 + 32).round}°F"
     end
 
+    # @param kph [Float]
+    # @return [String] For example "9 mph" or "15 km/h".
     def speed(kph, units)
       units == :metric ? "#{kph.round} km/h" : "#{(kph * MPH_PER_KPH).round} mph"
     end
+
+    private
 
     # @return [String] The number with no trailing zero, for example "0.3" and not "0.30".
     def trim(number)

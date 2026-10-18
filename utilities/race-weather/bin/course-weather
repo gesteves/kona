@@ -1,0 +1,213 @@
+#!/usr/bin/env ruby
+# Prints the WeatherKit weather along a GPX course, at the time of each part of it at an even
+# speed. It gives a summary and one row for each part of the course. The summary goes to stdout,
+# and the notes go to stderr. WeatherKit gives a forecast for a future hour and the history for a
+# past hour, thus this works on race day and after it.
+#
+#   bundle exec bin/course-weather COURSE.gpx "2026-10-18 08:00" --speed 20
+#   bundle exec bin/course-weather COURSE.gpx "2026-10-18 13:36" --duration 3:30 [--units metric]
+
+require 'date'
+require 'dotenv'
+require 'optparse'
+require 'time'
+require 'tzinfo'
+
+Dotenv.load(File.expand_path('../.env', __dir__))
+
+require_relative '../lib/race_weather/course'
+require_relative '../lib/race_weather/format'
+require_relative '../lib/race_weather/google'
+require_relative '../lib/race_weather/weather_kit'
+
+include RaceWeather
+
+# The distance between two WeatherKit query points along the course. The forecast grid is coarser
+# than this, thus a shorter distance adds calls and no detail.
+QUERY_METERS = 2000
+# The query points with the same rounded position share one call. This is about 1 km.
+CELL_DECIMALS = 2
+METERS_PER_MILE = 1609.344
+COMPASS = %w[N NNE NE ENE E ESE SE SSE S SSW SW WSW W WNW NW NNW].freeze
+
+options = { units: :imperial, every: 60 }
+parser = OptionParser.new do |opts|
+  opts.banner = 'Usage: bin/course-weather COURSE.gpx START (--speed N | --duration H:MM) [options]'
+  opts.on('--speed N', Float, 'The average speed, in mph or in km/h with --units metric') { |speed| options[:speed] = speed }
+  opts.on('--duration H:MM', 'The time for the full course') { |text| options[:duration] = text }
+  opts.on('--units UNITS', Format::UNITS, 'imperial (default) or metric') { |units| options[:units] = units }
+  opts.on('--every MINUTES', Integer, 'The length of one row of the table (default 60)') { |minutes| options[:every] = minutes }
+  opts.on('--zone ZONE', 'An IANA time zone. Without it, Google gives the zone of the start') { |zone| options[:zone] = zone }
+  opts.on('-h', '--help', 'Show this help') do
+    puts opts
+    exit
+  end
+end
+
+begin
+  parser.parse!
+rescue OptionParser::ParseError => e
+  abort "#{e.message}\n#{parser}"
+end
+
+path, start_text = ARGV
+abort parser.to_s if path.nil? || start_text.nil?
+abort "No file at #{path}" unless File.file?(path)
+abort 'Give --speed or --duration, not both' unless options.key?(:speed) ^ options.key?(:duration)
+abort '--every must be 1 or more' unless options[:every].positive?
+abort 'Set the WEATHERKIT_* keys in .env' unless WeatherKit.configured?
+
+points = Course.points(File.read(path))
+abort 'The file has no track points' if points.size < 2
+total_meters = points.last[:meters]
+
+seconds =
+  if options[:duration]
+    begin
+      Course.duration_seconds(options[:duration])
+    rescue ArgumentError => e
+      abort e.message
+    end
+  else
+    meters_per_hour = options[:speed] * (options[:units] == :metric ? 1000 : METERS_PER_MILE)
+    total_meters / meters_per_hour * 3600
+  end
+abort 'The duration must be more than zero' unless seconds.positive?
+meters_per_second = total_meters / seconds
+
+zone_id = options[:zone]
+unless zone_id
+  abort 'Set GOOGLE_API_KEY in .env, or give --zone' if ENV['GOOGLE_API_KEY'].to_s.empty?
+  zone_id = Google.time_zone(points.first[:latitude], points.first[:longitude]) or abort 'Google gave no time zone for the start'
+end
+zone = TZInfo::Timezone.get(zone_id)
+begin
+  local = DateTime.parse(start_text)
+rescue Date::Error
+  abort "#{start_text.inspect} is not a date and time"
+end
+start = zone.local_time(local.year, local.month, local.day, local.hour, local.minute)
+finish = start + seconds
+
+# @return [String] The distance as miles or kilometers, with one decimal.
+distance = lambda do |meters|
+  options[:units] == :metric ? "#{(meters / 1000).round(1)} km" : "#{(meters / METERS_PER_MILE).round(1)} mi"
+end
+# @return [String] For example "8:00 AM".
+clock = ->(time) { zone.to_local(time).strftime('%-l:%M %p') }
+# @return [String] For example "5:36".
+elapsed = ->(secs) { format('%d:%02d', secs / 3600, (secs % 3600) / 60) }
+compass = ->(degrees) { COMPASS[((degrees + 11.25) / 22.5).floor % 16] }
+# @return [String] For example "59°F–63°F" or "7–10 mph", or one value when the two ends are the same.
+range_text = ->(low, high) { low == high ? low : "#{low.sub(/ \S+\z/, '')}–#{high}" }
+
+name = File.read(path)[%r{<name>([^<]+)</name>}, 1] || File.basename(path)
+warn name
+warn "#{distance.(total_meters)}, #{clock.(start)}–#{clock.(finish)} #{zone_id} (#{elapsed.(seconds.round)})"
+
+# The query points, and the hours of each one, for the full window of the course.
+from = Time.at((start.to_i / 3600) * 3600).utc
+to = Time.at(((finish.to_i / 3600) + 2) * 3600).utc
+cache = {}
+queries = []
+next_meters = 0.0
+points.each do |point|
+  next if point[:meters] < next_meters && !point.equal?(points.last)
+
+  key = [point[:latitude].round(CELL_DECIMALS), point[:longitude].round(CELL_DECIMALS)]
+  cache[key] ||= begin
+    WeatherKit.hourly(key[0], key[1], from: from, to: to).map do |hour|
+      hour.merge('time' => Time.iso8601(hour['forecastStart']))
+    end
+  rescue StandardError => e
+    warn "WeatherKit failed at #{key.join(', ')}: #{e.message}"
+    []
+  end
+  queries << { meters: point[:meters], hours: cache[key] } unless cache[key].empty?
+  next_meters = point[:meters] + QUERY_METERS
+end
+abort 'WeatherKit gave no hours for the course' if queries.empty?
+warn "#{cache.size} WeatherKit calls"
+
+# The weather at a query point at a time. It interpolates each number between the two hours
+# around the time, and the wind direction as a vector. The condition is that of the nearer hour.
+weather_at = lambda do |hours, time|
+  after = hours.index { |hour| hour['time'] > time } || (hours.size - 1)
+  before = [after - 1, 0].max
+  a = hours[before]
+  b = hours[after]
+  span = b['time'] - a['time']
+  share = span.positive? ? ((time - a['time']) / span).clamp(0.0, 1.0) : 0.0
+  mix = ->(field) { a[field] && b[field] ? a[field] + ((b[field] - a[field]) * share) : a[field] || b[field] }
+  vector = [a, b].zip([1 - share, share]).map do |hour, weight|
+    radians = hour['windDirection'].to_f * Math::PI / 180
+    [Math.sin(radians) * hour['windSpeed'].to_f * weight, Math.cos(radians) * hour['windSpeed'].to_f * weight]
+  end
+  x = vector.sum(&:first)
+  y = vector.sum(&:last)
+  {
+    temperature: mix.('temperature'), feels: mix.('temperatureApparent'), humidity: mix.('humidity'),
+    wind: mix.('windSpeed'), gust: mix.('windGust'), direction: (Math.atan2(x, y) * 180 / Math::PI) % 360,
+    chance: mix.('precipitationChance'), intensity: mix.('precipitationIntensity'),
+    condition: (share < 0.5 ? a : b)['conditionCode']
+  }
+end
+
+legs = Course.legs(points).map do |leg|
+  middle = (leg[:start][:meters] + leg[:finish][:meters]) / 2
+  query = queries.min_by { |candidate| (candidate[:meters] - middle).abs }
+  offset = middle / meters_per_second
+  weather = weather_at.(query[:hours], start + offset)
+  kind = Course.wind_kind(weather[:wind].to_f, weather[:direction], leg[:bearing])
+  leg.merge(offset: offset, weight: leg[:meters], weather: weather, kind: kind)
+end
+
+# @return [Array<String>] The facts of a group of legs.
+describe = lambda do |group|
+  values = ->(field) { group.filter_map { |leg| leg[:weather][field] } }
+  weight = group.sum { |leg| leg[:weight] }
+  conditions = group.group_by { |leg| leg[:weather][:condition] }
+                    .map { |code, legs_of_code| [code, legs_of_code.sum { |leg| leg[:weight] } * 100.0 / weight] }
+                    .sort_by { |_, percent| -percent }
+                    .map { |code, percent| "#{Format.condition_words(code)} #{percent.round}%" }
+  temperature = values.(:temperature)
+  feels = values.(:feels)
+  wind = values.(:wind)
+  gust = values.(:gust)
+  x = group.sum { |leg| Math.sin(leg[:weather][:direction] * Math::PI / 180) * leg[:weather][:wind].to_f * leg[:weight] }
+  y = group.sum { |leg| Math.cos(leg[:weather][:direction] * Math::PI / 180) * leg[:weather][:wind].to_f * leg[:weight] }
+  shares = Course.wind_shares(group)
+  humidity = values.(:humidity)
+  {
+    conditions: conditions.join(', '),
+    rain: "#{(values.(:chance).max.to_f * 100).round}% chance at most, up to #{values.(:intensity).max.to_f.round(1)} mm/h",
+    temperature: "#{range_text.(*temperature.minmax.map { |value| Format.degrees(value, options[:units]) })} " \
+                 "(feels like #{range_text.(*feels.minmax.map { |value| Format.degrees(value, options[:units]) })})",
+    humidity: range_text.(*humidity.minmax.map { |value| "#{(value * 100).round}%" }),
+    wind: "#{range_text.(*wind.minmax.map { |value| Format.speed(value, options[:units]) })} " \
+          "from the #{compass.((Math.atan2(x, y) * 180 / Math::PI) % 360)}, gusts to #{Format.speed(gust.max, options[:units])}",
+    shares: "Headwind #{shares[:headwind]}%, crosswind #{shares[:crosswind]}%, tailwind #{shares[:tailwind]}%, " \
+            "light #{shares[:light]}%"
+  }
+end
+
+summary = describe.(legs)
+puts "## #{name}"
+puts
+puts "#{distance.(total_meters)}, #{clock.(start)}–#{clock.(finish)} (#{elapsed.(seconds.round)})"
+puts
+puts "- **Conditions:** #{summary[:conditions]}"
+puts "- **Precipitation:** #{summary[:rain]}"
+puts "- **Temperature:** #{summary[:temperature]}"
+puts "- **Humidity:** #{summary[:humidity]}"
+puts "- **Wind:** #{summary[:wind]}"
+puts "- **Wind on the course:** #{summary[:shares]}"
+puts
+puts '| Time | Distance | Conditions | Temperature | Wind | Wind on the course |'
+puts '|---|---|---|---|---|---|'
+legs.group_by { |leg| (leg[:offset] / (options[:every] * 60)).floor }.each_value do |group|
+  facts = describe.(group)
+  times = "#{clock.(start + group.first[:offset])}–#{clock.(start + group.last[:offset])}"
+  miles = "#{distance.(group.first[:start][:meters]).sub(/ .*/, '')}–#{distance.(group.last[:finish][:meters])}"
+  puts "| #{times} | #{miles} | #{facts[:conditions]} | #{facts[:temperature]} | #{facts[:wind]} | #{facts[:shares]} |"
+end
