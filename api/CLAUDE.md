@@ -64,7 +64,7 @@ edge serves a cached copy before it gets a new one.
 | GET | `/social/preview` | the card of a link, as JSON, for the preview on the page | `no-store` |
 | POST | `/social/preview/text` | the draft as each connected network will receive it, as JSON, for the Preview dialog. ⚠️ A POST, because a draft is much larger than a query string should carry | `no-store` |
 | GET | `/social/preview/image` | proxies the picture of that card. ⚠️ The parameter is the **page**, not the picture | `no-store` |
-| POST | `/social/photos` | stores ONE photo of a draft, as the JPEG that goes up as the blob; JSON `{id, path, width, height}`, or 422 `{error}` | `no-store` |
+| POST | `/social/photos` | stores ONE photo of a draft, as the JPEG that goes up as the blob; JSON `{id, path, alt_path, caption, width, height}`, or 422 `{error}` | `no-store` |
 | GET | `/social/photos/:id` | the stored JPEG, inline, for the tile of the composer and the preview | `no-store` |
 | POST | `/social/photos/:id/alt` | the alt text of that photo, from Claude; JSON `{alt}`, or 503 with no `ANTHROPIC_API_KEY`, or 502 with no answer | `no-store` |
 | POST | `/spam/:id/not-spam`; DELETE `/spam/:id`, `/connected-apps/whoop` | release or delete a quarantined message; disconnect Whoop | `no-store` |
@@ -1661,6 +1661,13 @@ alt text takes the width. The owner drags a tile or moves it with the arrow keys
   sentence, which the page shows in a toast, and the field keeps its text. Each tile carries
   `data-photo-alt-url`, from the server or from the answer of the upload, thus the JavaScript
   builds no path.
+- **The caption of the file comes before Claude.** `PhotoCaption` reads the XMP `dc:description`,
+  then the EXIF `ImageDescription`, and the upload answers it as `caption`. The tile writes it into
+  an EMPTY field before the automatic request, thus that request asks Claude for nothing. The
+  Generate control still replaces it. ⚠️ **Read the caption in the upload request, from the
+  original file.** `PhotoBlob` writes with `strip: true`, thus the stored JPEG has no caption.
+  ⚠️ `PhotoCaption::CAMERA_DEFAULTS` drops a text that a camera writes, for example
+  "OLYMPUS DIGITAL CAMERA". The media uploader uses the same rule.
 - ⚠️ `social-post#connect` drops each tile with no id. A Turbo snapshot can hold a tile whose
   upload never finished, and nothing can finish it. `disconnect` aborts each upload that is out.
 
@@ -2233,7 +2240,8 @@ and says so, and no other part of the app changes.
     wins, and the page itself is a small form of ids and words.
 - **The alt text** (`POST /contentful/uploads/files/:id/alt`). The page asks for it when the pick
   answers, with the rules of the Social media page. It is the same `AltText` service, with the
-  same prompt and the same model. ⚠️ It sends the **thumbnail**: a
+  same prompt and the same model. A file with a caption in its metadata gets that caption and no
+  request: the pick answers it as `caption`, from `PhotoCaption`. ⚠️ It sends the **thumbnail**: a
   38MB camera JPEG as base64 is far past what the call should carry, and the description of a
   picture does not change with the resolution.
 - **The submit** (`POST /contentful/uploads`). It records each tile and adds one
