@@ -23,7 +23,9 @@ module Admin
 
     # POST /contentful/uploads/files
     #
-    # Answers `{ id, path, alt_path, title, width, height }`, or a 4xx with `{ error }`.
+    # Answers `{ id, path, alt_path, title, caption, width, height }`, or a 4xx with `{ error }`.
+    # `caption` is the caption in the metadata of the file, or nil. The page writes it into the
+    # alt text field, and Claude then writes no alt text.
     def create
       return refuse(t("admin.contentful_uploads.files.unconfigured"), status: :service_unavailable) unless ContentfulManagement.configured?
 
@@ -40,6 +42,7 @@ module Admin
       # byte to Contentful. A content type from the browser is not such a check.
       # ⚠️ It gives the PATH and not `file.read`. Refer to the ⚠️ on MAX_BYTES above.
       thumbnail = PhotoBlob.thumbnail(file.tempfile.path)
+      caption = PhotoCaption.read(file.tempfile.path)
 
       upload_id = ContentfulManagement.new.create_upload(file.tempfile.path)
       return refuse(t("admin.contentful_uploads.files.upload_refused"), status: :bad_gateway) if upload_id.blank?
@@ -52,7 +55,7 @@ module Admin
 
       render json: { id: id, path: contentful_upload_file_path(id),
                      alt_path: contentful_upload_file_alt_path(id),
-                     title: File.basename(file_name, ".*"),
+                     title: File.basename(file_name, ".*"), caption: caption,
                      width: thumbnail[:width], height: thumbnail[:height] }
     rescue PhotoBlob::NotAnImageError
       refuse(t("admin.contentful_uploads.files.not_an_image"))

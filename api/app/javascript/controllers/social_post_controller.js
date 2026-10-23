@@ -305,7 +305,7 @@ export default class extends Controller {
    * ⚠️ The picture changes to the path of our own store only after that copy has loaded, thus the
    * tile never shows an empty box between the two. The object URL goes at that moment.
    * @param {HTMLElement} tile
-   * @param {object} answer `{ id, path }`
+   * @param {object} answer `{ id, path, alt_path, caption }`
    */
   fillTile(tile, answer) {
     tile.querySelector("[data-photo-id]").value = answer.id ?? "";
@@ -316,6 +316,14 @@ export default class extends Controller {
     tile.dataset.photoAltUrl = answer.alt_path ?? "";
     const generate = tile.querySelector("[data-photo-generate]");
     if (generate) generate.disabled = !answer.alt_path;
+
+    // ⚠️ The caption of the file goes into an EMPTY field only, before the automatic request.
+    // That request then sees a value and asks Claude for nothing.
+    const alt = tile.querySelector("[data-photo-alt]");
+    if (answer.caption && alt && !alt.value?.trim()) {
+      alt.value = answer.caption;
+      alt.dispatchEvent(new Event("input", { bubbles: true }));
+    }
 
     const image = tile.querySelector("[data-photo-image]");
     const stored = new Image();
@@ -505,9 +513,11 @@ export default class extends Controller {
    *
    * ⚠️ A click REPLACES the field, because the owner asked for new words. The automatic request
    * writes into an EMPTY field only: the owner can type while the upload or the request is out,
-   * and those words win. A value that code writes fires no event, thus this dispatches `input` on
-   * the field: `countAlt` runs for the tile and `social#validate` runs for the form, exactly as a
-   * keystroke would. A refusal leaves the field as it was and says why in a toast.
+   * and those words win. The caption of the file also fills the field first, thus a file with a
+   * caption gets no automatic request. A value that code writes fires no event, thus this
+   * dispatches `input` on the field: `countAlt` runs for the tile and `social#validate` runs for
+   * the form, exactly as a keystroke would. A refusal leaves the field as it was and says why in
+   * a toast.
    *
    * ⚠️ It runs only when the tile has the Generate control. The server renders that control only
    * with a Claude key, thus with no key the upload asks for nothing.

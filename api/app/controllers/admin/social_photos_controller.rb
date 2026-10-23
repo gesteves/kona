@@ -19,7 +19,9 @@ module Admin
 
     # POST /social/photos
     #
-    # Answers `{ id, path, width, height }`, or a 422 with `{ error }`.
+    # Answers `{ id, path, alt_path, caption, width, height }`, or a 422 with `{ error }`.
+    # `caption` is the caption in the metadata of the file, or nil. The page writes it into the
+    # alt text field, and Claude then writes no alt text.
     def create
       file = params[:photo]
       return refuse(t("admin.social.photos.no_file")) unless file.is_a?(ActionDispatch::Http::UploadedFile)
@@ -32,10 +34,12 @@ module Admin
 
       # ⚠️ It gives the PATH and not `file.read`. Refer to the ⚠️ on MAX_BYTES above.
       photo = PhotoBlob.prepare(file.tempfile.path)
+      # ⚠️ It reads the ORIGINAL file: the stored JPEG has no metadata.
+      caption = PhotoCaption.read(file.tempfile.path)
       id = SocialPhotos.new.store(image: photo[:bytes], width: photo[:width], height: photo[:height])
 
       render json: { id: id, path: social_photo_path(id), alt_path: social_photo_alt_path(id),
-                     width: photo[:width], height: photo[:height] }
+                     caption: caption, width: photo[:width], height: photo[:height] }
     rescue PhotoBlob::NotAnImageError
       refuse(t("admin.social.photos.not_an_image"))
     rescue PhotoBlob::WontFitError

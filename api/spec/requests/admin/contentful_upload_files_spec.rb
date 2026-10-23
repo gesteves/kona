@@ -26,6 +26,17 @@ RSpec.describe "Admin Contentful upload files", type: :request do
     Rack::Test::UploadedFile.new(file.path, "image/png", original_filename: name)
   end
 
+  # A JPEG with an XMP caption, on the disk, as an upload.
+  def captioned_upload(caption)
+    xmp = %(<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">) +
+          %(<rdf:Description rdf:about="" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:description><rdf:Alt>) +
+          %(<rdf:li xml:lang="x-default">#{caption}</rdf:li></rdf:Alt></dc:description></rdf:Description></rdf:RDF></x:xmpmeta>)
+    image = (Vips::Image.black(30, 10, bands: 3).copy(interpretation: :srgb) + [ 10, 120, 200 ]).cast(:uchar)
+    file = Tempfile.new([ "captioned", ".jpg" ])
+    image.mutate { |m| m.set_type!(Vips::BLOB_TYPE, "xmp-data", xmp) }.jpegsave(file.path)
+    Rack::Test::UploadedFile.new(file.path, "image/jpeg", original_filename: "captioned.jpg")
+  end
+
   def remember(id)
     (@stored ||= []) << id
     id
@@ -59,6 +70,23 @@ RSpec.describe "Admin Contentful upload files", type: :request do
         # ⚠️ The title is the name with NO extension.
         expect(answer["title"]).to eq("IMG_4821")
         expect($redis.ttl("#{StagedUpload::KEY_PREFIX}#{id}")).to be_within(5).of(StagedUpload::TTL.to_i)
+      end
+
+      it "answers the caption of the file" do
+        post "/contentful/uploads/files", params: { file: captioned_upload("The finish arch at dusk") },
+                                          headers: { "Accept" => "application/json" }
+
+        answer = JSON.parse(response.body)
+        remember(answer["id"])
+        expect(answer["caption"]).to eq("The finish arch at dusk")
+      end
+
+      it "answers a nil caption for a file with none" do
+        post "/contentful/uploads/files", params: { file: upload }, headers: { "Accept" => "application/json" }
+
+        answer = JSON.parse(response.body)
+        remember(answer["id"])
+        expect(answer).to include("caption" => nil)
       end
 
       # ⚠️ Contentful gets the ORIGINAL file, and the thumbnail is only for the tile and for

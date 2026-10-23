@@ -21,6 +21,17 @@ RSpec.describe "Admin social photos", type: :request do
     Rack::Test::UploadedFile.new(file.path, "image/png", original_filename: name)
   end
 
+  # A JPEG with an XMP caption, on the disk, as an upload.
+  def captioned_upload(caption)
+    xmp = %(<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">) +
+          %(<rdf:Description rdf:about="" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:description><rdf:Alt>) +
+          %(<rdf:li xml:lang="x-default">#{caption}</rdf:li></rdf:Alt></dc:description></rdf:Description></rdf:RDF></x:xmpmeta>)
+    image = (Vips::Image.black(30, 10, bands: 3).copy(interpretation: :srgb) + [ 10, 120, 200 ]).cast(:uchar)
+    file = Tempfile.new([ "captioned", ".jpg" ])
+    image.mutate { |m| m.set_type!(Vips::BLOB_TYPE, "xmp-data", xmp) }.jpegsave(file.path)
+    Rack::Test::UploadedFile.new(file.path, "image/jpeg", original_filename: "captioned.jpg")
+  end
+
   def remember(id)
     (@stored ||= []) << id
     id
@@ -48,6 +59,26 @@ RSpec.describe "Admin social photos", type: :request do
         expect(answer["width"]).to eq(30)
         expect(answer["height"]).to eq(10)
         expect($redis.ttl("#{SocialPhotos::KEY_PREFIX}#{id}")).to be_within(5).of(SocialPhotos::DRAFT_TTL.to_i)
+      end
+
+      # ⚠️ The caption comes from the ORIGINAL file: the stored JPEG has no metadata.
+      it "answers the caption of the original file, and stores a JPEG with none" do
+        post "/social/photos", params: { photo: captioned_upload("A swimmer in the lake") },
+                               headers: { "Accept" => "application/json" }
+
+        answer = JSON.parse(response.body)
+        id = remember(answer["id"])
+        expect(answer["caption"]).to eq("A swimmer in the lake")
+        stored = Vips::Image.new_from_buffer(SocialPhotos.new.fetch(id)[:image], "")
+        expect(stored.get_typeof("xmp-data")).to eq(0)
+      end
+
+      it "answers a nil caption for a file with none" do
+        post "/social/photos", params: { photo: upload }, headers: { "Accept" => "application/json" }
+
+        answer = JSON.parse(response.body)
+        remember(answer["id"])
+        expect(answer).to include("caption" => nil)
       end
 
       it "refuses a request with no file" do
