@@ -200,6 +200,10 @@ jobs:
       # `wrangler` and `@cloudflare/vitest-plugin` **together**. The plugin pins the exact
       # versions of wrangler and miniflare. Thus npm moves an `npm update wrangler` alone back to
       # the pinned version, and nothing changes.
+      #
+      # ⚠️ The newest miniflare can also pin a vulnerable undici. Then the `overrides` entry in
+      # `package.json` sets a fixed undici below miniflare. Remove that entry when miniflare pins a
+      # fixed version.
       - name: npm audit (JS dependency CVEs)
         run: npm audit --omit=dev --audit-level=high
 
