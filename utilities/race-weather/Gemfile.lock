@@ -1,7 +1,7 @@
 GEM
   remote: https://rubygems.org/
   specs:
-    anthropic (1.82.0)
+    anthropic (2.3.0)
       base64 (~> 0.1)
       connection_pool (>= 2, < 4)
       opentelemetry-api (>= 1.2.4, < 2)
@@ -40,7 +40,7 @@ DEPENDENCIES
   tzinfo
 
 CHECKSUMS
-  anthropic (1.82.0) sha256=4226ee819e35373e18eeffd49d65fbd3cd5f1daceef0e8670254627ca3146fb0
+  anthropic (2.3.0) sha256=6b863da7bf40ca5f5416beb45ac0ecf779fd979ce66b3a37d3b6b9ef17479900
   base64 (0.3.0) sha256=27337aeabad6ffae05c265c450490628ef3ebd4b67be58257393227588f5a97b
   bigdecimal (4.1.3) sha256=61ebe1e5e559bdc3cc6f2c0ee7f427321fc838f59611c294356eb04d6e21cf66
   concurrent-ruby (1.3.8) sha256=b2f1be836e968ccc78ccfce277ea79c72a88633f22306782c16ff23fb415d1e1
