@@ -23,10 +23,10 @@
     "esbuild": "^0.28.2",
     "pagefind": "^1.5.2",
     "satori": "^0.32.0",
-    "wrangler": "^4.151.3"
+    "wrangler": "^4.154.0"
   },
   "devDependencies": {
-    "@cloudflare/vitest-plugin": "^1.4.6",
+    "@cloudflare/vitest-plugin": "^1.4.9",
     "@cloudflare/workers-types": "^5.20261014.1",
     "@eslint/js": "^10.0.1",
     "axe-core": "4.14.0",
@@ -36,7 +36,7 @@
     "prettier": "^3.9.10",
     "stylelint": "^17.16.0",
     "stylelint-config-standard-scss": "^17.0.0",
-    "stylelint-scss": "^7.3.0",
+    "stylelint-scss": "^7.4.0",
     "typescript": "^7.0.2",
     "vitest": "^5.0.5"
   },
