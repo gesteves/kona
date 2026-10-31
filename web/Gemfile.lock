@@ -211,8 +211,8 @@ GEM
     ruby-vips (2.3.0)
       ffi (~> 1.12)
       logger
-    sanitize (7.0.0)
-      crass (~> 1.0.2)
+    sanitize (7.0.1)
+      crass (~> 1.0.8)
       nokogiri (>= 1.16.8)
     sassc (2.4.0)
       ffi (~> 1.9)
