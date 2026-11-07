@@ -211,9 +211,9 @@ GEM
     ruby-vips (2.3.0)
       ffi (~> 1.12)
       logger
-    sanitize (7.0.1)
+    sanitize (7.0.2)
       crass (~> 1.0.8)
-      nokogiri (>= 1.16.8)
+      nokogiri (>= 1.19.7)
     sassc (2.4.0)
       ffi (~> 1.9)
     securerandom (0.4.1)
