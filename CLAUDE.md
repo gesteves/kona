@@ -59,6 +59,9 @@ values of `utilities/aqi-map/`, and it deploys nothing.
   PurpleAir, Google Maps, and Claude with its own `.env`, and not the api classes.
   ⚠️ It loads the EPA math from `utilities/aqi-map/lib/epa_aqi.rb`, thus that file stays the one
   copy in `utilities/`. A change to that file also changes this tool.
+- **`utilities/cloud-environment/`** — the setup script and the guide for a Claude Code cloud
+  environment. ⚠️ A change to `.ruby-version` or `.nvmrc` needs the same change in `setup.sh`, and
+  then in the environment settings.
 
 ## Local development
 
