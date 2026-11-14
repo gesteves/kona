@@ -1,7 +1,7 @@
 namespace :redis do
   # The durable records of this app: the Redis of `kona-redis` is their only copy. Each other key
-  # in that keyspace is a cache with a TTL, a lock, or a Sidekiq queue, and each one of those comes
-  # back by itself.
+  # in that keyspace is a cache with a TTL, a lock, a Sidekiq queue, or the `contentful:uploads`
+  # history, and each one of those comes back by itself or is not needed.
   #
   # ⚠️ These tasks name each key from a constant, and they use no SCAN. Refer to
   # `standard_site:migrate_fingerprints` for the one place that a SCAN is permitted, and why.

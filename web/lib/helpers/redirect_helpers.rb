@@ -1,5 +1,5 @@
 # The rules of the Cloudflare `_redirects` file, in the order that source/redirects.erb must
-# write them. Refer to web/CLAUDE.md.
+# write them.
 module RedirectHelpers
   # Makes a redirect from each synonym of a concept to its canonical archive page. It ignores a
   # synonym with a blank slug, a synonym that is the same as a real tag page, and a synonym that
@@ -39,7 +39,7 @@ module RedirectHelpers
   # counts as dynamic, exact matches included. Write the static rules first, or the deploy fails
   # with only `code: 100324` when the file becomes longer than approximately 100 lines. The static
   # rules first is also the correct match order. This code is outside the template, thus you can
-  # test it. Refer to the root and web CLAUDE.md.
+  # test it.
   # @return [Array(Array<Hash>, Array<Hash>)] The static rules, then the dynamic rules.
   def partitioned_redirects
     rules =

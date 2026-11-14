@@ -6,7 +6,7 @@
     partials/article/_body.html.erb adds this partial to the contact page.
 
     Keep the field names — name, email, message, and the honeypot `comment` — the same as in the
-    Api::ContactController of the api. Refer to the contact contract in the root CLAUDE.md. This form
+    Api::ContactController of the api. This form
     also works with no JavaScript: the method and the action do a native POST, then a 303 to
     /contact/success. With JavaScript, the `contact` Stimulus controller takes the submit, does a
     fetch, and shows a toast. %>

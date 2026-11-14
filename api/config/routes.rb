@@ -78,9 +78,9 @@ Rails.application.routes.draw do
   # there, thus the public host serves only `/up` and the three machine namespaces above. With no
   # value (dev, CI, and the .fly.dev origin), Rails draws them on each host.
   #
-  # ⚠️ The bot-protection skip rule of the zone applies to "each host but the admin one". This
+  # ⚠️ The SBFM skip rule of the zone covers the public host and not the admin host. This
   # constraint is what makes that rule safe: a route outside this block is available on the public
-  # host, with the managed rules and Super Bot Fight Mode off.
+  # host, with Super Bot Fight Mode off.
   # spec/requests/host_constraints_spec.rb enforces this.
   admin_only = lambda do |request|
     api_host = ENV["API_HOST"].presence

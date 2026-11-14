@@ -17,7 +17,7 @@ primary_region = 'iad'
 # is competing for the same volume — the one persistence path here that CAN stall the event loop.
 #
 # ⚠️ This instance holds DURABLE records that no code can make again, and nothing else holds a
-# copy: `contact:spam`, `maps:tracks`, the four `*:credentials` hashes, the Whoop refresh token,
+# copy: `contact:spam`, `maps:tracks`, each `*:credentials` hash, the Whoop refresh token,
 # `location:current`, `standard_site:did`, and `standard_site:fingerprints`. **None of them has a
 # TTL.** Each cache key and each lock key does. Refer to api/CLAUDE.md.
 #

@@ -1,7 +1,7 @@
 # Kona — monorepo guide
 
-This file gives the **shape of the monorepo and the contract between the two apps**. For the
-commands and the rules of one app, read the nearest `CLAUDE.md`:
+This file gives the **contract between the two apps** and the reasons for the Cloudflare
+configuration. For the rules of one app, read the nearest `CLAUDE.md`:
 
 - [`web/CLAUDE.md`](web/CLAUDE.md) — Middleman static site (the blog).
 - [`api/CLAUDE.md`](api/CLAUDE.md) — Rails API serving dynamic widgets.
@@ -10,29 +10,12 @@ commands and the rules of one app, read the nearest `CLAUDE.md`:
 Work on one app from its own directory. Each app has its own `Gemfile`, its own `.env.example`, and
 its own test suite.
 
-## Repo layout
+`redis/` holds the `fly.toml` of `kona-redis`. That Redis is the cache and the Sidekiq queues of the
+api, and it is also the only copy of some records. Refer to [`api/CLAUDE.md`](api/CLAUDE.md).
 
-| Path | What | Deploy |
-|---|---|---|
-| `web/` | The Middleman 4 static site (Ruby 4.0.9). It builds the blog, whose content comes from Contentful. | Cloudflare Workers (`kona-web`) |
-| `api/` | The Rails 8.1 API (Ruby 4.0.9). It serves the HTML "widget" fragments that go into the static pages at run time. It also has a Sidekiq `worker` process and an admin UI for the owner, at the root of the admin host. | fly.io (`kona-api`: `app` and `worker`), behind Cloudflare |
-| `redis/` | The `fly.toml` of `kona-redis`: the cache of the API, its Sidekiq queues, and the durable records whose only copy is there. Refer to [`api/CLAUDE.md`](api/CLAUDE.md). | fly.io |
-| `utilities/` | The local-only tools. They never go to production. Refer to the text below. | — |
-
-Each app has its own Redis, through its own `REDIS_URL`: `api/` uses `kona-redis`, and `web/` uses a
-different Upstash instance. The two keyspaces are separate, and they share no data.
-
-⚠️ **Those two are PRODUCTION values, and a `.env` on your own machine must never hold one.** Use
-the local Redis that `overmind start` runs. The Upstash instance is a **metered** free tier of
-500,000 commands each month, and `overmind start` runs Sidekiq. An idle Sidekiq is not quiet: its
-fetch loop is a `BRPOP` with a 2-second timeout for each of its 5 threads, thus it makes
-approximately 2.5 commands each second, or 9,000 each hour, with no job at all. A development
-machine that points there uses the full month in approximately two days, and the graph shows
-`BRPOP` above each other command. Nothing gives you a message before the quota does.
-
-There is also a **Cloudflare R2 bucket** that holds a copy of each Contentful image asset. Its own
-custom domain in the zone serves it. There is no configuration for it in the repo: it is in the
-dashboard, and the api fills it. Refer to **The image mirror**.
+⚠️ **A `.env` on your own machine must never hold a production value**, and this includes each
+`REDIS_URL`. Both `.env.example` files give the reason. Use the local Redis that `overmind start`
+runs.
 
 ### `utilities/` — local-only tools
 
@@ -40,95 +23,37 @@ dashboard, and the api fills it. Refer to **The image mirror**.
 `api.yml` have a path filter on `web/**` and on `api/**`. Thus a change below `utilities/` builds
 nothing, deploys nothing, and never starts the `Cache-Tag: site` edge purge of the Web deploy. **Do
 not make `web/` or `api/` depend on a file here**, at build time or at request time.
-`.github/workflows/utilities.yml` runs the checks that exist, which today are the known-correct AQI
-values of `utilities/aqi-map/`, and it deploys nothing.
 
-- **`utilities/contentful/`** — the content migrations and the SKOS taxonomy toolkit.
-- **`utilities/aqi-map/`** — a Sinatra app of its own. It serves one local page: a Mapbox map of the
-  PurpleAir readings of a time in the past, for a screenshot that becomes the cover image of a post.
-  It is a first version, and **it must not go to production**: it binds `127.0.0.1` and it proxies a
+- ⚠️ **`utilities/aqi-map/` must not go to production**: it binds `127.0.0.1` and it proxies a
   PurpleAir key with no authentication of its own.
-  ⚠️ It has a **copy** of the EPA correction and of the AQI conversion from
-  `api/app/services/purple_air.rb`, because `utilities/` must not depend on `api/`. Thus a
-  correction there does not reach this copy. The copy is in `utilities/aqi-map/lib/epa_aqi.rb`
-  alone, thus you can compare the two files directly. `spec/epa_aqi_check.rb` tests it against
-  known-correct values, which come from the **published equation** and not from either copy of the
-  code. Thus one error in both copies cannot pass. `utilities.yml` runs that check.
-- **`utilities/race-weather/`** — a CLI. It prints a Markdown table of the weather and the AQI on
-  the past dates closest to a race date, with the weekday of the race. It uses WeatherKit,
-  PurpleAir, Google Maps, and Claude with its own `.env`, and not the api classes.
-  ⚠️ It loads the EPA math from `utilities/aqi-map/lib/epa_aqi.rb`, thus that file stays the one
-  copy in `utilities/`. A change to that file also changes this tool.
+- ⚠️ `utilities/aqi-map/lib/epa_aqi.rb` is a **copy** of the EPA math in
+  `api/app/services/purple_air.rb`, and `utilities/race-weather/` loads that copy. A correction in
+  one file does not reach the other. `spec/epa_aqi_check.rb` tests the copy against the published
+  equation.
 
 ## Local development
 
-There are two commands, and **the command that you run selects the API**. There is no flag for
-that, on purpose:
+`overmind start` runs the full stack against the local api. `cd web && bundle exec middleman` runs
+the site alone, against the deployed api. `Procfile.dev` and `.overmind.env` give the details.
 
-```bash
-overmind start                    # redis :6379 + web :4567 + api :3000 + the api's esbuild watch, site → the local api
-cd web && bundle exec middleman   # web only, site → the deployed api
-```
+The api writes its log to `api/log/development.log`, and **not** to its overmind pane.
 
-You need `overmind` (`brew install overmind`, which also installs tmux). It reads `Procfile.dev`
-and `.overmind.env`, and each child process gets the `KONA_API_URL` and the `SITE_URL` of that
-second file. dotenv never replaces a variable that has a value, and that is the full mechanism. It
-is also why the plain `middleman` command still reaches production, from `web/.env`.
-`overmind restart web` restarts one process. `overmind connect api` gives a true TTY, thus
-`binding.break` works.
-
-⚠️ **Sidekiq starts with the other processes**: `overmind start` runs `redis`, `web`, `api`, `js`,
-and `worker`. The worker was optional, because no widget endpoint adds a job to a queue. But the
-Course maps page of the admin changed that: a GPX file that a user uploads stays at "Processing"
-until `MapTilesetJob` publishes it. That page says so when it finds no Sidekiq process, but you must
-not need that message on your own machine.
-
-⚠️ **`redis` is a process of overmind, and not a service of brew and not a container.** It is first
-in `Procfile.dev`, because the api and the worker connect at their boot. It writes its AOF to
-`tmp/redis/`, which git ignores, thus the data of kona is its own. **Stop a Redis that already holds
-6379 before you start**, or that process cannot take the port and overmind stops. That failure is
-loud on purpose, thus `redis` is absent from `OVERMIND_CAN_DIE`.
-
-The `js` process is esbuild, which watches the admin bundle of the api. It applies to the admin
-pages of the api and to `/signin` only. The widgets and the site do not use it. ⚠️ Those pages raise
-`Propshaft::MissingAssetError` when nothing made the bundle. Thus run `npm run build` in `api/` one
-time after a new clone. `bin/setup` does that.
-
-The ports: 4567 for Middleman, 3000 for Rails, 8787 for `wrangler dev`, and 6379 for the Redis of
-overmind. The api
-writes its log to `api/log/development.log`, and **not** to its overmind pane.
-
-Two conditions look like a problem and are not:
-
-- `overmind kill` can leave `.overmind.sock`, and the next `overmind start` then stops with "it
-  looks like Overmind is already running". Delete that socket. Ctrl-C and `overmind quit` both end
-  the session correctly.
-- A group of `ActionController::RoutingError` messages at the **first** page load of the api. They
-  go away at the next load. `routes.rb` ends with a `*unmatched` catch-all, thus nothing can raise
-  that error after Rails loads the routes. Those messages mean that the route set was empty for a
-  short time. Rails in development has `enable_reloading = true` and `eager_load = false`, thus the
-  first request draws the routes again while the two other Puma threads already answer the five
-  widget requests of the page. It is a race in the reload of the development mode, and it is not the
-  proxy.
-
-⚠️ `Procfile.dev` sets `PORT=3000` for the api. Overmind gives each process a `PORT` in the Heroku
-style: 5000, then 5100, and so on. `api/config/puma.rb` reads it. Thus without that line, the api
-starts on 5100 and each widget gets a 502 against a `KONA_API_URL` that looks correct.
-
-⚠️ `/widgets/*` and `POST /api/contact` reach `middleman server` through
-`web/lib/utils/dev_api_proxy.rb`, a Rack middleware for development only. The static site has no
-page at those paths, thus without that middleware each widget goes away on your own machine. It is
-**not** a copy of `web/src/api-proxy.ts` and it must not become one: the rules in that file make one
-shared edge cache entry safe for many viewers, and there is no edge here. `/pa/*` and the OG cards
-have no proxy, on purpose: they need `wrangler dev` (refer to [`web/CLAUDE.md`](web/CLAUDE.md)).
+A group of `ActionController::RoutingError` messages at the **first** page load of the api is not a
+problem. They go away at the next load. `routes.rb` ends with a `*unmatched` catch-all, thus nothing
+can raise that error after Rails loads the routes. Those messages mean that the route set was empty
+for a short time. Rails in development has `enable_reloading = true` and `eager_load = false`, thus
+the first request draws the routes again while the two other Puma threads already answer the five
+widget requests of the page. It is a race in the reload of the development mode, and it is not the
+proxy.
 
 ## Duplicated across the two apps
 
-The aqi-map copy above is not the only one: the logic in this table is in both `api/` and `web/`,
-because it renders markup that goes onto the **same page**. The static build renders an article and
-the upcoming races, and the api renders the same summary text again into the trending fragment, and
-the same races into the upcoming-races fragment. A difference between the two changes the
-typography, or the behavior of a link, in the middle of a page:
+The logic in this table is in both `api/` and `web/`, because it renders markup that goes onto the
+**same page**. The static build renders an article and the upcoming races, and the api renders the
+same summary text again into the trending fragment, and the same races into the upcoming-races
+fragment. A difference between the two changes the typography, or the behavior of a link, in the
+middle of a page. Most of these files do not name their copy, thus read this table before you
+change one:
 
 | Logic | api | web |
 |---|---|---|
@@ -148,38 +73,6 @@ typography, or the behavior of a link, in the middle of a page:
 card of the trending widget, and the build renders each other card, and the two go on the same page.
 The `sizes` list, the widths, and the attributes must be the same. The
 `widget_markup_contract_spec` compares the outer element of the **collection** only.
-⚠️ **The shape is in one place: the `ratio` of a card variant of `srcsets.yml`**.
-Both apps read it for the `h` of each candidate, and both write it into the markup as the
-`--card-ratio` custom property. `.entry__cover-image` in `_entry.scss` and `.entry-skeleton-cover` in
-`_skeleton.scss` read that property, thus neither stylesheet holds a number. A change to the shape
-is one edit and one `cp`, and `srcsets_contract_spec` fails when a person forgets the copy.
-There are two card variants. `card` is the half-width card of a collection, and `card_large` is the
-cover image of an entry in the blog list and in a tag archive. `card_large` merges the `entry`
-variant with a YAML merge key, because that element is the same centered text column, and it adds a
-`ratio` of its own. ⚠️ **A merge key needs `aliases: true` at each `YAML.load_file` of that file.**
-Psych 5 refuses an alias by default. The Middleman build already passes it, and the api and each
-spec pass it in the code.
-
-⚠️ **`api/config/srcsets.yml` is a copy of `web/data/srcsets.yml`, word for word**, and it is the
-one duplication in this table that a check covers: `api/spec/contracts/srcsets_contract_spec.rb`
-compares the two files. The api uses the `card` variant alone, and the other variants stay only to
-make the copy one command: `cp web/data/srcsets.yml api/config/srcsets.yml`. The api cannot read
-the file of web, because its Docker image holds `api/` only. ⚠️ That spec reads a `web/` file, thus
-`web/data/srcsets.yml` is in the `paths:` of `api.yml`, for the same reason as the placeholder
-paths.
-
-⚠️ The two blurhash copies use different Redis keys, on purpose: the build writes
-`blurhash:jpeg:*` in the Redis of web, and the api writes `blurhash:svg:*` in `kona-redis`. The two
-keyspaces are separate, thus neither app can read the value of the other one.
-
-⚠️ `Api::MarkupHelper#render_summary_body` is a smaller `render_body`, on purpose, but two of its
-steps are necessary: it **must** continue to call `fix_degrees` and `mark_affiliate_links`. Without
-the second one, an affiliate link loses its `rel="sponsored nofollow noopener"` disclosure, and that
-link has the disclosure at each other place on the same page. The removal gives no message.
-
-⚠️ `open_external_links_in_new_tabs` is truly **different** in the two apps: web omits a link to the
-same host, and the api opens each absolute link. The api assumes that a card body links only to
-another site. No test checks that assumption.
 
 The site **wordmark** and the **favicon** are also in two places.
 `web/source/partials/_logo_symbol.svg.erb` holds the paths of the mark, which each `<use>` in
@@ -205,11 +98,14 @@ tab icon. Copy the files again when the mark changes.
   record of a measurement, and no note about a method that a person tried and then removed. Those
   belong in git.
 - **Give a reason only when that reason is necessary**: a rule that the code does not show, and that
-  a probable "improvement" would break. Use one sentence or two, with a ⚠️. Put a longer text in a
-  `CLAUDE.md`.
-- The same applies to each `CLAUDE.md` file: it holds what an agent cannot find in the code, that
-  is, a contract between the two apps, a configuration in a dashboard, and a rule that the code does
-  not show. Keep each one short.
+  a probable "improvement" would break. Use one sentence or two, with a ⚠️.
+- ⚠️ **Each warning has one home: a comment at the code that it guards.** Never copy a code comment
+  into a `CLAUDE.md`.
+- The same applies to each `CLAUDE.md` file. It holds what an agent cannot find in the code and
+  cannot read with `cf`: a contract between the two apps, the reason for a dashboard configuration,
+  and a rule that the code does not show. It does not copy a configuration. Keep each one short.
+- **An edit to a `CLAUDE.md` is not a routine step of a change.** Add a line only for a rule that has
+  no place in the code.
 - Never write a production host name in the code. Refer to the text below.
 - ⚠️ **In `api/`, each user-facing word of the admin UI goes in `config/locales/en.yml`**, and
   never in an ERB file, a Ruby method, or a JS file. The rule, and what stays out of it, is in
@@ -239,41 +135,29 @@ request, a test, or a workflow *uses*.
 
 ## Cloudflare sits in front of everything
 
-⚠️ **No file in this repo configures the zone.** Each setting is in the dashboard, `grep` cannot
-find it, and more than one code path needs it. Each production request goes through Cloudflare
-before it reaches the Worker or fly. Thus read the zone before you decide that a problem is in the
-code.
+⚠️ **No file in this repo configures the zone, and this file does not copy it.** Read the live
+configuration with the `cf` CLI: `cf rulesets list --zone <zone>`, then
+`cf rulesets entrypoint get <phase> --zone <zone>` for the rules of one phase. `cf bot-management
+get`, `cf dns records list`, `cf managed-transforms list`, and `cf zones settings get <setting>` give
+the rest. Read the zone before you decide that a problem is in the code. This section keeps only the
+reason for each rule, and each link between a rule and the repo.
 
-⚠️ Each rule below names a host name that **a person typed and that nothing checked**. A host name
+⚠️ Each rule names a host name that **a person typed and that nothing checked**. A host name
 with an error saves correctly, shows as Active, and matches nothing, and it gives no message. That
 already occurred one time. Copy each host name from the DNS records of the zone, then check that the
 Events counter of the rule is more than zero.
 
-- **The client IP** — `CF-Connecting-IP` is the only true visitor IP. The `Fly-Client-IP` of fly is
-  a Cloudflare PoP. `api/config/initializers/rack_attack.rb` and `web/src/log.ts` read it. Anything
-  that reaches an origin directly can write a false value in it. Thus it can be the key of a
-  throttle and of a log line, but it must **never** control a ban.
 - **The images** — Cloudflare Images serves each transformation from `<IMAGES_URL>/cdn-cgi/image/…`,
   and it gets the source from the R2 mirror. This needs **Transformations** on, with the mirror host
   in the list of the permitted sources.
   ⚠️ **Never add `*.ctfassets.net` to that list.** Its absence is necessary: it makes a bad or
   absent `IMAGE_HOST` fail with a message. With ctfassets in the list, the site looks correct and it
   comes directly from Contentful, and it uses the metered bandwidth that the mirror protects.
-- **The OG cards** — a page with no cover image gets an `og:image` that the `kona-web` Worker renders
-  when it is necessary, at `<page path>og.png` (refer to `web/src/og.ts`). This needs the **Workers
-  Paid** plan: a render takes approximately 100 ms of CPU, and the Free plan permits 10 ms. Refer to
-  [`web/CLAUDE.md`](web/CLAUDE.md).
-- **The source port** — a Request Header Transform Rule sets `X-Kona-Client-Port` to
-  `to_string(cf.edge.client_port)`, with the expression
-  `http.host eq "<site host>" and http.request.uri.path eq "/api/contact"`. `request.cf` has no
-  port, thus the Worker cannot get it in a different way. The contact email and the Spam page show
-  it. A report of a threat needs it: a carrier-grade NAT puts many subscribers behind one IPv4
-  address, and the IP, the port, and the time to the second select one. ⚠️ The "Set" of the rule
-  replaces a value from the client. Without the rule, a client can send a false port, and the email
-  shows it. After an edit, send a test message and check its "Source port" line.
-- **A managed transform** — "Add visitor location headers" must be on. Without it, `CF-IPCity` and
-  `CF-Region` are absent and the log has the country only.
-- **`/cdn-cgi/*` never reaches an origin.** Cloudflare answers it at its own edge.
+- **The source port** — a Request Header Transform Rule sets `X-Kona-Client-Port` on
+  `POST /api/contact` of the site host, because `request.cf` has no port. The contact email and the
+  Spam page show it. A report of a threat needs it: a carrier-grade NAT puts many subscribers behind
+  one IPv4 address, and the IP, the port, and the time to the second select one. After an edit, send
+  a test message and check its "Source port" line.
 
 ### The origin certificate
 
@@ -308,28 +192,10 @@ A deploy does **not** invalidate the edge by itself. Thus the invalidation is a 
 rule gives each response the tag `Cache-Tag: site`, and `.github/workflows/web.yml` purges that tag
 at each deploy.
 
-⚠️ **That workflow purges the tag TWO times, and both are necessary.** `wrangler deploy` returns at
-the activation, but the new version needs some seconds to reach each PoP. The first purge has no
-wait, and it gives the new pages at once at each PoP that is already current. Then the workflow
-reads `/build-id.txt` until the edge answers with the id of that run, and it purges again. That
-second purge removes the old content that a slow PoP put in the cache again. One purge after a wait
-leaves the current PoPs on the previous copy for the full wait, and it gives nothing more. Refer to
-`web/CLAUDE.md` for `/build-id.txt`.
-
-```
-(http.host eq "<site host>" and not starts_with(http.request.uri.path, "/cdn-cgi/"))
-or
-(http.host eq "<api host>" and (
-  starts_with(http.request.uri.path, "/widgets/articles/")
-  or starts_with(http.request.uri.path, "/widgets/events/")
-))
-```
-
-The first part covers the full static build. The second part covers the widget fragments that
-render **Contentful** content, and it matches them by their namespace. Articles and events are
-Contentful content types, thus each path below those prefixes comes from Contentful, and this rule
-covers a new widget there without a change. A Contentful publish starts a deploy, which does the
-purge. Thus those widgets cannot serve content from before an edit for their full edge TTL.
+The rule tags the full static build on the site host. On the api host, it tags the widget fragments
+below `/widgets/articles/` and `/widgets/events/`: articles and events are Contentful content types,
+and a Contentful publish starts a deploy. ⚠️ The cache holds a proxied widget under the **api** host
+name, thus the rule must name that host.
 
 ⚠️ **Never change this into a match on the path only or on the host only, and never widen the second
 part to `/widgets/`.** A purge removes the `stale-while-revalidate` and `stale-if-error` copies of a
@@ -338,13 +204,6 @@ With the tag on each widget, a Contentful publish during a failure would remove 
 full site. The live-data widgets — `weather/current`, `activity-stats`, `whoop`, and
 `plausible/pageviews/:id` — render nothing from Contentful and are in their own namespaces, and that
 is what keeps them out of this rule.
-
-⚠️ **The content addresses each OG card URL, thus a card needs no purge.** The Worker stores a card
-with `caches.default.put` and writes no `Cache-Tag`, and the Cloudflare docs give that header as
-the method to tag a Cache API entry. Thus do not trust the deploy purge to reach a card. An article
-card has its `published_version` in its URL. A **listing page** — the blog index, a tag archive,
-and the home page — is not a Contentful entry, thus its URL has a digest of its `og:title` (refer to
-[`web/CLAUDE.md`](web/CLAUDE.md)).
 
 ⚠️ **The host of the image mirror is absent from both parts, on purpose.** Each of its objects is
 immutable and the content gives its address, thus a purge can correct nothing. And with the tag,
@@ -361,11 +220,10 @@ two rules does not change the tags.
 `widgets` rule would remove `site` from each Contentful widget. The deploy purge would then miss
 those widgets, and it would give no message.
 
-⚠️ **Never put `widgets` in the deploy purge.** That workflow purges `{"tags":["site"]}`, and it must
-purge that tag only, for the reason above. Use the manual purge when the cached copy of a widget is
-incorrect and time cannot correct it: after a change to a `cache_widget` TTL, because a cached
-fragment keeps the `CDN-Cache-Control` that it had when it went into the cache, and after a markup
-change that must arrive with the change to the web placeholder.
+Purge the `widgets` tag by hand only, and never in the deploy. Use it when the cached copy of a
+widget is incorrect and time cannot correct it: after a change to a `cache_widget` TTL, because a
+cached fragment keeps the `CDN-Cache-Control` that it had when it went into the cache, and after a
+markup change that must arrive with the change to the web placeholder.
 
 ⚠️ A **Contentful widget below a NEW top-level namespace needs a change to this rule in the
 dashboard**, and no file in the repo gives you that message. Without that change, the widget serves
@@ -375,40 +233,20 @@ old content for all time, and it gives no message.
 gets a response from an origin. To check a tag, purge it, then read `CF-Cache-Status` on the next
 request.
 
-(A `Cache-Tag` response header from an origin also works, and purge by tag is on each plan. Thus
-these rules are a decision and not a necessity. Two reasons keep them. First, the site host has no
-origin that writes a header: each page is a static file from the asset layer of the Worker. Thus
-that half needs a rule in each condition. Second, a header for the widget half would then give one
-tag two sources, in two apps and two deploy pipelines. One rule covers the two hosts instead. The
-cost is discoverability, and the warning above about a new namespace is that cost. These rules run
-in the `http_response_cache_settings` phase, after the response of the origin. That phase includes
-each subrequest of a Worker, and that puts the widget fragments in reach.)
+(A `Cache-Tag` header from an origin also works. But the site host has no origin that writes a
+header, and a header for the widgets would give one tag two sources in two apps. Thus one rule
+covers the two hosts, and the warning above about a new namespace is the cost.)
 
 ### Cache Rules (edge TTL)
 
-There is one rule, and its scope is much smaller than it appears to need:
-
-```
-http.host eq "<site host>"
-and not http.request.uri.path contains "."
-and not starts_with(http.request.uri.path, "/cdn-cgi/")
-and not starts_with(http.request.uri.path, "/widgets/")
-and not starts_with(http.request.uri.path, "/api/")
-and not starts_with(http.request.uri.path, "/pa/")
-```
-
-The response can go in the cache. **Edge TTL: ignore cache-control, 1 year.** **Browser TTL: respect
-origin.**
-
+One rule gives the HTML of the site host an edge TTL of one year, and it ignores `Cache-Control`.
 The purpose is to **keep the archive in the cache**. Most URLs here are old posts, and each PoP gets
 few requests for them. Thus a short edge TTL removes them between two visits. The TTL is a maximum
 and not a promise: each PoP removes an entry under LRU in each condition, thus this TTL only stops
 being the limit. The reason for each exclusion:
 
 - **`contains "."`** selects the HTML, because a page URL has no extension. Thus each asset with a
-  fingerprint keeps the `immutable` policy that it already declares correctly. It is also what keeps
-  the **OG cards** out of this rule with no clause of their own, and that is why that route has an
-  extension.
+  fingerprint keeps the `immutable` policy that it already declares correctly.
 - **`/widgets/`, `/api/`, and `/pa/`** — three of the four `run_worker_first` route families are on
   the site host and have no extension. A TTL of one year would keep each widget in the cache for all
   time, and a cached `/pa/*` would give incorrect analytics. **A new `run_worker_first` entry needs
@@ -426,34 +264,17 @@ page.
 
 The zone is on Cloudflare **Pro**, thus the WAF **Managed Rules** and **Super Bot Fight Mode** apply
 to the full zone, and this **includes the api host**. Almost all the traffic there is between two
-machines, and it looks exactly like the traffic that those two features stop.
+machines, and it looks exactly like the traffic that SBFM stops.
 
-⚠️ **The skip rule must exist *before* you set those features on.** Without it, each widget gives a
-403 on the full site at the moment that SBFM starts.
+⚠️ **The SBFM skip rule must exist *before* you set SBFM on.** Without it, each widget gives a 403
+on the full site at the moment that SBFM starts.
 
-The custom rules, in order from the top. Each BLOCK rule stays above the skip rule, and the skip
-rule does not have "All remaining custom rules" on:
+Each Block rule stays above the skip rule, and the skip rule does not have "All remaining custom
+rules" on.
 
-| # | Rule | Expression | Action |
-|---|---|---|---|
-| 1 | A bad Linux crawler with a false Google referrer | A desktop Linux Chrome UA and a `google.com` referer | Block |
-| 2 | Block the scanner noise | The path families that no host in the zone serves. Refer to the text below. | Block |
-| 3 | Block a request for an original image | `http.host eq "<image host>" and not any(http.request.headers["via"][*] contains "image-resizing")` | Block |
-| 4 | Skip the bot protection off the admin host | `http.host ne "<admin host>"` | Skip → each managed rule **and** each SBFM rule |
-
-**Rule 1** matches too much, and we know that: those conditions also match a true person on a desktop
-Linux machine who clicks a Google result, and a block of that person is an accepted cost. The bot
-goes past a managed challenge, a challenge with no interaction, **and** an interactive challenge.
-Thus the UA and the referer are the only things left that stop it. Do not change it into a
-challenge: that method already failed.
-
-**Rule 2** is one long `or` over `lower(http.request.uri.path)`, and it matches by *family*: the
-extensions that a scanner uses (`.php`, `.env`, `.sql`, `.yml`, `.pem`, `.key`, and more); the
-prefixes of a tool or a framework (`/wp-`, `/cgi-bin/`, `/actuator/`, `/phpmyadmin/`, `/k8s/`,
-`/terraform/`, `/secrets/`, `/config/`, `/deploy/`, `/flask/`, `/pki/`, `/home/`, `/analytics/`);
-the file names of secret material (`credential`, `cognito`, `/id_`); a **dot segment at each
-position** (`contains "/."`, but not `/.well-known/`); and each method that is not `GET`, `HEAD`, or
-`POST`.
+**The scanner rule** is one long `or` over `lower(http.request.uri.path)`, and it matches by
+*family*: the extensions, the tool prefixes, and the file names of secret material that a scanner
+asks for.
 
 ⚠️ A scanner writes each **dot as a percent escape** (`/terraform/%2eenv%2estaging`), to go past a
 match on the extension. Thus the rule also blocks a plain `contains "%2e"`. The **Normalize incoming
@@ -465,17 +286,15 @@ the raw path in both conditions. Thus you cannot know which form the rule saw. E
 :directory_indexes` puts each page at `/<slug>/`. Thus this rule would block a top-level page with
 the slug `config`, `home`, `analytics`, or `deploy`, through its own prefix clause. Read
 `data/pages.json` before you add a prefix, and read this note again if a new page ever gives a 403.
-Each clause must also be false for the api host (`/widgets/`, `/api/`, `/webhooks/`, `/whoop/`,
-`/auth/`, `/signin`, `/signout`, `/sidekiq`, and `/up`) and for the shape of an R2 key
-(`{space}/{asset id}/{token}/{filename}`).
+Each clause must also be false for each path that the api host serves, and for the shape of an R2
+key (`{space}/{asset id}/{token}/{filename}`).
 
-⚠️ **The admin UI is at the root of the admin host**, thus its pages use top-level paths: today
-`/spam`, `/location`, `/republish`, `/connected-apps`, `/course-maps`, and `/contentful`. They have
+⚠️ **The admin UI is at the root of the admin host**, thus its pages use top-level paths. They have
 the same problem from the other side: a new admin page with the name of one of those prefix
 families would give a 403 in the full zone. Read this rule before you give a name to a new page.
 
-**Rule 3** knows "Cloudflare Images gets a source" from "a person types the URL", through the
-`image-resizing` text that Cloudflare puts in `Via`.
+**The original-image rule** knows "Cloudflare Images gets a source" from "a person types the URL",
+through the `image-resizing` text that Cloudflare puts in `Via`.
 
 ⚠️ **Never change it into a block of the full host.** The fetch of the transformation also goes
 through the rules, thus a block of the host gives a 403 for **each image on the site**. After an
@@ -489,226 +308,107 @@ transformation endpoint on the site host takes each width. Thus
 original** would limit the resolution that a person can get: the mirror would hold `?w=2560` and not
 the original file.
 
-**Rule 4** is one condition and not a list of the permitted paths of each host, because **the api app
-does that itself**: `API_HOST` in `api/config/routes.rb` draws each route for the owner off the admin
-host only. Those routes are `/signin`, `/signout`, `/auth/*`, `/whoop/auth`, `/whoop/callback`,
-`/sidekiq`, and the admin UI at `/`. Thus the public api host answers only `/up` and the three
-machine namespaces.
+**The skip rule** skips SBFM only, on the site host, on the public api host, and on the path `/up`
+of each host. The managed rules run on each host. The rule names the api host and not a list of its
+paths, because **the api app does that itself**: `API_HOST` in `api/config/routes.rb` draws each
+route for the owner off the admin host only. Thus the public api host answers only `/up` and the
+three machine namespaces.
 
 ⚠️ **That route constraint is the reason that this rule is safe.** A route for the owner outside that
-constraint goes on a host with no managed rules and no SBFM, and nothing in the zone would find it.
+constraint goes on a host with no SBFM, and nothing in the zone would find it.
 `api/spec/requests/host_constraints_spec.rb` tests both directions.
 
-⚠️ **This rule is a denylist, thus each new host name in the zone has no protection by default**: a
-staging subdomain, a second origin, and a new service. The list of permitted hosts, which this rule
-had before, failed in the opposite direction and gave a much clearer message. Add each new host here,
-with care.
+⚠️ **The rule is a list of hosts, thus SBFM applies to each new host name by default.** A new host
+that machines call, for example a second origin, needs an entry here, or SBFM blocks its callers
+with no message.
 
 The reason for the skip rule, for each host:
 
-- **The site host** — SBFM blocked **each feed reader and each Open Graph scraper**. "Verified bots:
-  Allow" covers Googlebot and Bingbot, but not the unfurler of Slack, Mastodon, or Discord, and not
-  an RSS client. Those are exactly the traffic that a blog needs. Those unfurlers are also the only
-  readers of the OG cards. ⚠️ This host is not static only: `run_worker_first` takes `/widgets/*`,
-  `/api/contact`, `/pa/*`, and the card paths, and `POST /api/contact` takes true text from a user.
-  The managed rules never protected that endpoint: the honeypot, Turnstile, Akismet, the length
-  limits, and the `contact/ip` throttle protect it. Do not use this skip rule as a reason to remove
-  one of those.
-- **The image host** — the source fetch has no browser fingerprint, which is the clearest "this is a
-  machine" result. Thus SBFM would remove each image at the same time.
+- **The site host** — SBFM blocks **each feed reader and each Open Graph scraper**, and its
+  verified-bots setting can block Googlebot and Bingbot too. Those are exactly the traffic that a
+  blog needs, and the unfurlers are the only readers of the OG cards. ⚠️ This host is not static
+  only: `run_worker_first` takes `/widgets/*`, `/api/contact`, `/pa/*`, and the card paths, and
+  `POST /api/contact` takes true text from a user. The honeypot, Turnstile, Akismet, the length
+  limits, and the `contact/ip` throttle protect that endpoint. Do not use this skip rule as a reason
+  to remove one of those.
 - **The public api host** — `web/src/api-proxy.ts` sends an `authorization` header only, on purpose,
-  because the cache entry must have the same bytes for each viewer. That gives the same "this is a
-  machine" fingerprint. `/api/` also covers the callers at build time. `/webhooks/` takes POSTs with
-  Contentful rich text, with no person present, and that text will start a managed injection rule at
-  some time. An HMAC checks both, thus a managed rule adds nothing. Strava also POSTs its events
-  there, with no signature and no browser: the app accepts only its own subscription and athlete.
-  ⚠️ A block there gives **no message**: nothing shows an error, and the PDS sync simply stops. ⚠️ **Meta also GETs each photo
-  of a Threads post** from `/api/social-photos/*` on this host. A challenge there stops each Threads
-  post with photos, and the only sign is an `ERROR` container in the job report.
-- **The admin host** — the one host with the protection on, and the only one whose traffic is a true
-  browser that one person controls: the Google sign-in, the admin UI at the root of the host, the
-  Sidekiq UI, and the Whoop OAuth round trip. A managed challenge there is acceptable, and it is not
-  acceptable at any other host. The `/assets/*` files of the admin UI, which have a fingerprint, are
-  also on this host, and the **static resource protection of SBFM is off**, which is what keeps them
-  free of a challenge. ⚠️ Point each external uptime check at `/up` on the **public** host. The
-  checks of fly reach the app on its internal host and never go through the zone.
+  because the cache entry must have the same bytes for each viewer. That gives a "this is a machine"
+  fingerprint. `/api/` also covers the callers at build time. Strava POSTs its events to
+  `/webhooks/` with no signature and no browser. ⚠️ **Meta also GETs each photo of a Threads post**
+  from `/api/social-photos/*` on this host. A challenge there stops each Threads post with photos,
+  and the only sign is an `ERROR` container in the job report.
+- **The admin host** — SBFM stays on, because its traffic is a true browser that one person
+  controls. The `/assets/*` files of the admin UI are also on this host, and the **static resource
+  protection of SBFM is off**, which is what keeps them free of a challenge. ⚠️ Point each external
+  uptime check at `/up`. The checks of fly reach the app on its internal host and never go through
+  the zone.
+
+⚠️ **The managed rules also run on `/webhooks/*`.** Contentful rich text can match a managed
+injection rule. A block there gives **no message**: the PDS sync and the site builds simply stop.
+When a webhook stops, read Security Events before you read the code.
 
 ⚠️ **The rate limiting rules are NOT in the skip list, on purpose.** Do not add them.
 
-**The managed rules** — start the Cloudflare Managed Ruleset with the action set to **Log**, read
-Security Events for a week, then use the default actions. The **OWASP Core Ruleset** is **not** on,
-on purpose: it gives many false results, and the main thing that it would catch here is the text of
-the contact form. If you ever set it on, use PL1, the High threshold (60), and the Log action, and
-never a stricter value.
+**The managed rules** — the **OWASP Core Ruleset** is **not** on, on purpose: it gives many false
+results, and the main thing that it would catch here is the text of the contact form. If you ever set
+it on, use PL1, the High threshold (60), and the Log action, and never a stricter value.
 
-**Super Bot Fight Mode** — definitely automated: Block. Likely automated: Managed Challenge. Verified
-bots: Allow. JS detections: on. **Static resource protection: off**, because it would give a
-challenge to the CSS, JavaScript, and font requests of the site. ⚠️ It does not replace custom rule
-1: that scraper goes past an interactive challenge.
+**Super Bot Fight Mode** — **static resource protection stays off**, because it would give a
+challenge to the CSS, JavaScript, and font requests of the site.
 
 **The rate limiting rules.** The Pro plan permits two:
 
 - `/api/contact` — it stays on **Block**. ⚠️ Never use a challenge action: the native POST path with
   no JavaScript cannot answer a challenge, and that would break the path for a browser with no
   JavaScript.
-- A limit on a crawler on the site host — a GET or a HEAD outside `/cdn-cgi/`, for each IP,
-  approximately 200 requests each minute, then a Managed Challenge. ⚠️ Do not use a much lower
-  number: Pagefind gets a group of index files for each search, and Turbo gets a page early when the
-  pointer goes to a link. Thus one true reader is much above a simple rate.
+- A limit on a crawler on the site host, then a Managed Challenge. ⚠️ Do not use a much lower number
+  than approximately 200 requests each minute: Pagefind gets a group of index files for each search,
+  and Turbo gets a page early when the pointer goes to a link. Thus one true reader is much above a
+  simple rate.
 
-**The other zone settings.** They are deliberate but not necessary: Smart Tiered Cache on, Page
-Shield script monitoring on, and Early Hints, HTTP/3, 0-RTT, and Crawler Hints on. **Polish and
-Mirage stay off**, because each image already goes through `/cdn-cgi/image/*`, which selects the
-format and the quality.
+**Polish and Mirage stay off**, because each image already goes through `/cdn-cgi/image/*`, which
+selects the format and the quality.
 
-**A zone rule blocks the bots, and no code does.** A person deleted the `block-bots` edge function
-(`3c4e0044`). Do not add it again. If the referral traffic looks incorrect, read rule 1 before you
-read the code.
+**A zone rule blocks the bots, and no code does.** Do not add an edge function for it. If the
+referral traffic or the analytics look incorrect, read the custom rules before you read the code.
 
 ## How the two apps connect
 
-The routes of the API are in three namespaces. `/widgets/*` gives HTML fragments, through the
-proxy. `/api/*` takes or gives structured data, and a caller reaches it directly at `KONA_API_URL`,
-but `POST /api/contact` is different. `/webhooks/*` takes the inbound webhooks. The web build reads
-three paths at build time: `GET /api/standard-site`, `GET /api/related`, and `POST /api/icons`.
+The api has three route namespaces. `/widgets/*` gives HTML fragments, `/api/*` takes or gives
+structured data at `KONA_API_URL`, and `/webhooks/*` takes the inbound webhooks.
+`web/src/api-proxy.ts` proxies `/widgets/*` and `POST /api/contact` from the site host, and its
+comments give the rules of that proxy.
 
-1. A browser asks for `/widgets/*`, or does a `POST /api/contact`, on the main site.
-2. `run_worker_first` in `web/wrangler.jsonc` takes those paths, thus they go to the Worker code and
-   not to the static asset layer.
-3. `web/src/api-proxy.ts` sends the request to `KONA_API_URL`.
-4. The code makes the upstream fetch cacheable with `cf: { cacheEverything: true }`, because a widget
-   URL has no extension and the Cloudflare default, which uses the extension, would cache nothing.
-   The `CDN-Cache-Control` of the origin gives the full TTL (RFC 9213). One copy in the cache serves
-   each viewer. ⚠️ The cache holds that entry under the **api** host name, and that is why the
-   `site` tag rule applies to that host.
-
-⚠️ The proxy takes `/api/contact` **only, and not `/api/*`**. Do not widen it. With `/api/*`, a
-browser could reach `POST /api/location`, `POST /api/icons`, and `POST /api/build`, which starts a
-production deploy, and the proxy would add the bearer token.
-
-The rules of the proxy. Do not break one of these:
-
-- It sends `accept` only, and on the contact path only, and it **adds** a constant
-  `Authorization: Bearer <API_TOKEN>`. It removes the `authorization` header of the client. The
-  token is the same for each viewer, thus each upstream request is the same and there is one shared
-  cache entry. ⚠️ `API_TOKEN` must be in the secrets of the Worker in the dashboard, and it must
-  **be the same as the token of the API**. If it is not, each widget gets a 401 on the full site.
-- It sends the `Cache-Control` of the origin, the `ETag` and `Last-Modified` validators, and the
-  **`Age`** of the copy in the edge cache. ⚠️ **`Age` is necessary.** The browser policy is
-  `max-age=0, stale-while-revalidate=N`, and RFC 9111 makes the browser measure that window from
-  the age of the response. Without Age, each viewer gets a full window in addition to the time that
-  the edge already held the copy. On a counter that only goes up, that looks like a number that goes
-  *down*.
-- It does **not** send `CDN-Cache-Control` to the browser.
+- ⚠️ `API_TOKEN` must be in the secrets of the Worker in the dashboard, and it must **be the same as
+  the token of the API**. If it is not, each widget gets a 401 on the full site.
 - The **path alone** is the key of the edge cache: no query parameter, and no value for each user.
   Put each input of a widget in the **path**.
-- It gives an empty `502` with a short cache time when the upstream call raises. Thus a short
-  problem at the origin removes the widget and does not keep an error in the cache.
-- **On the contact path only:** it sends the true visitor IP, source port, UA, geo data, network
-  name, and request time in the `X-Kona-Client-*` headers, because the origin cannot see them: the
-  zone changes each `CF-*` header to describe the egress of the Worker. It also sends the
-  `Location` header for the redirect of a browser with no JavaScript. The API uses those values for
-  Akismet, for the rate limit, for the notification email, and for the Spam page, and **never** for
-  a ban.
 
 ### Contact form (`POST /api/contact`)
 
-The form is a **web partial** (`source/partials/_contact_form.html.erb`), and it is **not** raw HTML
-in the Contentful body. SmartyPants would make the quotation marks in its attributes curly, and that
-would break the field names and the Stimulus attributes. The intro text stays in Contentful.
-
-`Api::ContactController` removes each submission with a value in the honeypot, which is the hidden
-`comment` field. It refuses an address whose domain has no MX record, and it then adds a
-`ContactMailJob` to the queue. That job does the spam check with **Akismet** and the abuse check with
-**Claude**, and it sends the email with **Resend**, which is an HTTPS API, because fly blocks
-outbound SMTP. It sets `Reply-To` to the sender. The form also works with no JavaScript: with
-JavaScript, the `contact` Stimulus controller posts with `fetch` and `Accept: application/json`, and
-it gets a 204 or a 422, shows a toast, and does not navigate. With no JavaScript, the native POST
-sends `Accept: text/html` and gets a 303 to `/contact/success`. Both use the same endpoint and the
-same checks.
-
-The layers of protection: the honeypot, the MX lookup, Akismet, and the abuse check on both paths,
-the length limits on the server, a rack-attack throttle for each visitor on the `X-Kona-Client-IP`
-from the proxy, and **Cloudflare Turnstile**. ⚠️ Turnstile needs JavaScript, thus the app checks it
-**on the JSON path only**. Turnstile, Akismet, and the abuse check permit the message when there is
-*no configuration*.
-
 ⚠️ **A contact message must never go away. The Claude subject line is the only step that can fail
-and be skipped.** Each other step fails **closed**. A timeout of the MX lookup gives a 503, and the
-visitor sends again. A failure of Akismet or of the abuse check makes the intake job run again, and
-the contact jobs use the default retries of Sidekiq and not the 24-hour window of the other jobs.
-
-A message that Akismet or the abuse check marks goes to the **quarantine, and the app does not
-remove it**: Redis holds it for a month and the Spam page of the admin lists it. On that page, the
-owner sends the email, and for an Akismet mark the app tells Akismet that the mark was incorrect.
-Refer to [`api/CLAUDE.md`](api/CLAUDE.md).
+and be skipped.** Each other step fails **closed**. Refer to [`api/CLAUDE.md`](api/CLAUDE.md) for
+the checks and the quarantine.
 
 ## The image mirror
 
-Each image is a Cloudflare Images transformation, and Cloudflare gets the **source**, with no
-transformation, from the host that the URL names. A source outside the zone cannot use Tiered Cache
-and cannot use Cache Reserve. Thus each PoP got the full-size original from Contentful by itself, and
-it got that file again after an eviction. For that reason the app copies each asset into an **R2
-bucket**, which its own custom domain in the zone serves, and that host name is the source of each
-transformation.
-
-The two apps meet **only in the shape of a URL**: there is no request between them, there is no
-import, and neither one checks the other:
-
-| | Who | What |
-|---|---|---|
-| Writes | `api` — `AssetMirror` and `AssetSyncJob`, from the asset-publish webhook, and `rake assets:backfill` | An R2 object whose key is the Contentful path, **with no change**: `{space}/{asset id}/{token}/{filename}` |
-| Reads | `web` — `Contentful#rewrite_image_urls` at build time, and only when `IMAGE_HOST` has a value | It changes **the host only**, thus the path that it writes is that same key |
-| Reads | `api` — `ImagesHelper#cdn_image_url`, at the render of the trending card | The same change, at request time, from `IMAGE_HOST` |
-
-⚠️ **The two sides match each `*.ctfassets.net` host, and they must continue to match the same
-set.** Contentful serves many ordinary image assets from `downloads.ctfassets.net`, and that host
-has no Images API. If you change one side to `images.ctfassets.net` only, those assets go to
-Contentful for all time, and they give no message.
+The api copies each Contentful image asset into an **R2 bucket**, which its own custom domain in the
+zone serves, and that host name is the source of each transformation. `AssetMirror` and
+`Contentful#rewrite_image_urls` give the contract: the key of each object is the Contentful path,
+with no change.
 
 ⚠️ **A difference between the two sides makes each image on the site 404, and nothing reports it.**
 Such a difference is the wrong bucket, the wrong custom domain, a key shape that a person "improved",
 or an `IMAGE_HOST` with a value before the backfill was complete. The order of the steps: the
-bucket, the custom domain, the SBFM skip rule, and the mirror host in the Transformations list; then
+bucket, the custom domain, and the mirror host in the Transformations list; then
 a deploy of the api with the `R2_*` secrets; then `rake assets:backfill` to its end; and *only then*
 a value for `IMAGE_HOST` in the build environment of web. The images are broken between the last two
 steps, thus keep that time short. And never correct it with ctfassets in the list.
-
-Three results:
-
-- **The mirror copies a publish only. It ignores an unpublish and a delete, on purpose.** `web` reads
-  Contentful with a **preview** token, thus a page from the build still points at an unpublished
-  asset. Each object is immutable, thus nothing needs an invalidation.
-- **A blurhash also goes through the mirror**: `encode_blurhash` resizes with `cdn_image_url`, as
-  each other image does. ⚠️ It must ask for an `fm:` value. With no format, Cloudflare returns the
-  source format, and a libvips with no loader for that format fails the decode into a `rescue`. There
-  is then no placeholder, and no message.
-- **Each environment needs `IMAGE_HOST`, and this includes your own machine. It is not a way to go
-  back.** The rewrite does nothing when the value is blank, but the Transformations list has the
-  mirror host only. Thus an `IMAGE_HOST` with no value leaves each image at ctfassets, and each one
-  gets a **403**. To go back to Contentful, change that list in the dashboard first.
-- **Custom rule 3 blocks a direct request for a mirrored original.** That rule is a difficulty and
-  not a boundary. Refer to the text above. The mirror holds the true originals today: 1.39GB, and
-  that includes twelve camera JPEG files of 20MB to 38MB. Thus a person who wants those files can
-  still get them.
 
 ## The cross-app HTML contract (most important)
 
 The API gives HTML fragments that **replace** a placeholder element in the static site. Thus the
 markup of the two must have the same structure in the two apps.
-
-`web/source/javascripts/stimulus/controllers/live_update_controller.js` reads
-`data-live-update-url-value`, gets the fragment, and, for a response that is **not empty**, replaces
-the full placeholder element. It gets the fragment on connect when the element is a **placeholder**
-(`data-live-update-placeholder-value="true"`), and when the content of that URL is more than one
-minute old. It gets the fragment again at a tab `visibilitychange`, with the same minimum age. That
-clock is at the module level, and its **key is the URL**. Thus it stays after the swap of the
-placeholder for the fragment, and it stays through a Turbo back or forward **restoration visit**,
-which renders a cached snapshot that contains the *fragment* and which never gets new content.
-Without that clock, a widget from a restoration visit would show the content from the last time that
-the user left the page. On a view counter, that is a number that goes down.
-
-The results:
 
 - The **outermost element of the API fragment must have** `data-controller="live-update"` and
   `data-live-update-url-value`. Without them, it gets no new content after the first swap. ⚠️ It
@@ -720,10 +420,6 @@ The results:
   into markup. This applies in each condition. A non-2xx status and a network error are different:
   they remove **a placeholder only**.
 
-A placeholder makes the shared attributes with `live_update_attrs`
-(`web/lib/helpers/site_helpers.rb`), and an API view makes the matching outer element with
-`live_update_url`.
-
 ⚠️ **Not each element on the web side is a skeleton.** `live_update_attrs(url, placeholder: false)`
 marks an element that the build renders with **real content**, and the fragment then adds to that
 content and does not fill an empty element. Today that is the upcoming-races section only: the build
@@ -733,50 +429,24 @@ the api fragment: a short fetch failure would delete content that is already cor
 the fragment on connect, because the controller counts a URL with no fetch as old. An **empty**
 response still removes it, and that is the api saying that there is no upcoming race.
 
-`web/test/browser/controllers/live_update.test.js` tests the **web half**.
-`api/spec/contracts/widget_markup_contract_spec.rb` compares the two sides: it reads both files
-across the monorepo and checks that the placeholder and the fragment have the same tag, the same
-classes, and the same `data-nosnippet`. It checks the outer element only, and a person keeps each
-element in it the same in the two apps.
+`api/spec/contracts/widget_markup_contract_spec.rb` compares the outer element of each pair. A
+person keeps each element in it the same in the two apps.
 
-⚠️ That spec is in the api but it reads `web/`, and `api.yml` has a path filter. Thus the `paths:` of
-that workflow has each placeholder path that the spec reads, **on purpose**. Without those paths, no
-check would run on the edits that break the contract most often. The spec fails when the two lists
-become different.
+⚠️ **Each api spec that reads a `web/` file needs that path in the `paths:` of `api.yml`.** That
+workflow has a path filter, thus without the path no check runs on the edits that break the contract
+most often.
 
-| Widget | web placeholder | api view | endpoint |
-|---|---|---|---|
-| Activity stats | `source/partials/placeholders/_stats.html.erb` | `views/widgets/activity_stats/show.html.erb` | `/widgets/activity-stats` |
-| Whoop | `source/partials/placeholders/_whoop.html.erb` | `views/widgets/whoop/show.html.erb` | `/widgets/whoop` |
-| Current weather | `source/partials/placeholders/_weather.html.erb` | `views/widgets/weather/current.html.erb` | `/widgets/weather/current` |
-| Pageviews | `source/partials/article/_full.html.erb` (inline `span`) | `views/widgets/plausible/pageviews.html.erb` | `/widgets/plausible/pageviews/:id` |
-| Upcoming races † | `source/partials/_upcoming_races.html.erb` | `views/widgets/events/upcoming.html.erb` | `/widgets/events/upcoming` |
-| Trending articles ‡ | `source/partials/placeholders/_trending.html.erb` | `views/widgets/articles/trending.html.erb` | `/widgets/articles/trending` |
-
-† This is not a placeholder: the build renders it with real content and the fragment adds to that
-content. Refer to the `placeholder: false` note above.
-
-‡ The home page and a Page render this one. An **entry page does not**, on purpose: it already has
-"More Reports From This Race", "You May Also Like", and the Previous and Next cards. A Page cannot
-show "You May Also Like", which comes from the text, the links, and the concepts of an entry, thus
-the trending list is the recirculation of a Page. ⚠️ The endpoint had a `/:id` form that removed the current article, for an
-entry page. That page no longer shows the section, thus the route, `ArticlesController#trending_excluding`,
-and `TrendingArticles#excluding` are all gone. Do not add them again for an entry page.
+The trending widget is on the home page and on a Page. ⚠️ An **entry page does not** show it, on
+purpose: it already has "More Reports From This Race", "You May Also Like", and the Previous and Next
+cards. Do not add it to an entry page.
 
 The shared CSS is in `web/source/stylesheets/components/`. The fragments of the api use the classes
 of `_collection.scss`, `_entry.scss`, `_event.scss`, `_stats.scss`, and `_weather.scss`:
 approximately 38 classes, and also `sr-only`. The two apps own those five files together. A list of
 the classes here would become incorrect at the first change to a widget.
 
-The two sides make the group of live-update attributes with a helper: `live_update_attrs` in
-`web/lib/helpers/site_helpers.rb`, and the helper in `api/app/helpers/live_update_helper.rb`. Neither
-side writes those attributes in each view. The helper of the api omits
-`data-live-update-placeholder-value`, on purpose, and `api/spec/support/live_update_contract.rb` is a
-shared example that each widget request spec includes. That example fails when a fragment ever gets
-that attribute.
-
 ⚠️ **When you change the markup, the class names, or the DOM shape of a widget, edit the web
-placeholder and the api view together.** Then read the rules of the proxy above again.
+placeholder and the api view together.**
 
 ## The analytics of a card click
 
@@ -786,12 +456,6 @@ answers "where does a reader enter an article from, inside the site". The tracki
 a `url` property with the destination, and the `event:page` dimension of Plausible is the page that
 the reader clicked on. Thus neither one needs a property.
 
-`article_click_classes(section)` makes the class names, in both apps. The build renders each card of
-the page, and the api renders the card of the trending fragment into that same page.
-`api/spec/contracts/article_click_contract_spec.rb` compares the name of the event across the two
-apps: one goal in the dashboard matches one name only, thus a difference makes the trending section
-stop converting and gives no message.
-
 **The heading of the section IS the value of `section`, word for word**, and the partial reads it
 from the same `title` local that it renders. Thus the dashboard reads as the page reads.
 
@@ -800,48 +464,18 @@ the new one starts on the day of the deploy, thus you can compare the two and se
 did. Nothing joins them again, thus a heading that you change and then change back gives three
 lines. Change a heading when you want that measurement.
 
+Three values are overrides, because their heading cannot be the value:
+
 | `section` | Module |
 |---|---|
-| `Recent Articles` | The home page |
-| `Trending Articles` | **The api fragment**, on the home page and on a Page |
-| `More Reports From This Race` | An entry page |
-| `You May Also Like` | An entry page and a Short |
-| `Previous` / `Next` | The two halves of the read-next navigation |
-| `Blog List` | The blog index and each tag archive. **An override.** ⚠️ Those pages have **no** section heading: the `<h1>` is the name of the page, and for a tag archive that is the name of the tag. Thus the heading would make one value for each tag, and `event:page` already gives you that. |
-| `Recent Articles (404)` | The 404 page. **An override.** ⚠️ Its heading is the same as the one on the home page. The plain heading would merge the two, and `event:page` cannot separate them: a 404 is served at whatever URL the reader asked for. |
-| `Article Body` | A link to an article in the intro or the body of an article page or of the page of a Short. **An override**, because the text has no heading. Pages and the cards of a list do not get it. |
-
-The first five come from the heading and no call site names them. `Blog List` and
-`Recent Articles (404)` are the only `tracking_section` locals in the repo, and each one is there
-because its heading cannot be the value. `Article Body` is the `link_section` of `render_body`, and
-`track_article_links` tags a link only when its path has the permalink shape of an article.
-
-⚠️ **The goal must exist in the Plausible dashboard, with that exact text.** Plausible accepts an
-event that no goal matches, shows nothing, and does not fill in the data from before. A custom event
-also counts toward the billable pageviews.
+| `Blog List` | The blog index and each tag archive. ⚠️ Those pages have **no** section heading: the `<h1>` is the name of the page, and for a tag archive that is the name of the tag. Thus the heading would make one value for each tag, and `event:page` already gives you that. |
+| `Recent Articles (404)` | The 404 page. ⚠️ Its heading is the same as the one on the home page. The plain heading would merge the two, and `event:page` cannot separate them: a 404 is served at whatever URL the reader asked for. |
+| `Article Body` | A link to an article in the intro or the body of an article page or of the page of a Short, because the text has no heading. Pages and the cards of a list do not get it. |
 
 ⚠️ **The classes go on each `<a>`, and never on the card.** The tracking script walks **four nodes
 up** from the click at the most, and it looks for the anchor and the tagged element together. From
 the "Continue reading" link and from the date permalink, the `<article>` is outside that range. Such
 a link then sends nothing, and it gives no message.
-
-⚠️ **The helper encodes each space as a `+`, and the script reads it back as a space.** Do not write
-a raw heading into a class attribute: `class="… plausible-event-section=You May Also Like"` is four
-class names, and the script then records a section of "You". A heading can still have no `=` and no
-`--`, because the script parses the class name with `/plausible-event-(.+)(=|--)(.+)/`.
-
-⚠️ **Read an optional local into ANOTHER name when its default is not nil.**
-`partials/_collection.html.erb` writes `section_label = defined?(tracking_section) ? tracking_section
-: title`. With `tracking_section` on the left, the assignment makes the parser declare that local,
-thus `defined?` is always true and the value is always nil. The default would never apply, each card
-would lose its classes, and no check would show it. The `id_scope` line above it is safe only because
-its default IS nil.
-
-⚠️ **The value is the heading and NOT the DOM id.** `partials/_collection.html.erb` makes that id
-from the same heading with `title.parameterize`, and that is a slug. Do not use one for the other.
-
-⚠️ **The page of the article must not pass `tracking_section` to `partials/article/_meta`.** The
-permalink there points at the page that the reader is already on.
 
 ⚠️ The trending fragment is at the edge for an hour. Thus a change to these classes needs the manual
 `widgets` tag purge, or the cards keep the old markup until that TTL ends.
