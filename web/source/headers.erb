@@ -68,8 +68,10 @@
 # HTML with no extension needs no rule here. It is not in the default-cache extension list of
 # Cloudflare, and max-age=0 with must-revalidate is already its default. The tag purge also covers
 # it.
+# SocialSpec readers on another site get the main feed at this fixed path, thus it needs CORS.
 /feed.xml
   Cache-Control: public, max-age=0, must-revalidate
+  Access-Control-Allow-Origin: *
 
 /sitemap.xml
   Cache-Control: public, max-age=0, must-revalidate
