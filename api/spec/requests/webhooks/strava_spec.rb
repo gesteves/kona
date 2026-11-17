@@ -78,6 +78,20 @@ RSpec.describe "Strava webhook", type: :request do
       expect(StravaActivityJob.jobs).to be_empty
     end
 
+    # Strava uses 64-bit ids for activities and athletes. These values are above 2^53, thus a
+    # conversion to a Float would change them.
+    it "keeps each digit of a 64-bit activity id and athlete id" do
+      StravaCredentials.store_athlete(
+        athlete_id: 9_007_199_254_740_995, athlete_name: "Athlete",
+        access_token: "an-access-token", refresh_token: "a-refresh-token", expires_at: 6.hours.from_now.to_i
+      )
+
+      post_event(event(object_id: 9_007_199_254_740_993, owner_id: 9_007_199_254_740_995))
+
+      expect(response).to have_http_status(:ok)
+      expect(StravaActivityJob).to have_enqueued_sidekiq_job("9007199254740993", 1_760_000_000)
+    end
+
     it "refuses each event before `rake strava:subscribe` stores the subscription" do
       $redis.del(Strava::SUBSCRIPTION_KEY)
 
