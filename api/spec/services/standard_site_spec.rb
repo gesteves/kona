@@ -130,6 +130,12 @@ describe StandardSite do
       expect(record["updatedAt"]).to eq("2026-02-24T22:07:58.616Z")
     end
 
+    it "removes the HTML tags of the title and decodes its entities" do
+      post["title"] = %(<abbr title="Professional Triathletes Organisation">PTO</abbr> &amp; St. George T100)
+
+      expect(client.build_document_record(post, publication_uri)["title"]).to eq("PTO & St. George T100")
+    end
+
     it "derives a plain-text description from the intro when no summary is set" do
       expect(record["description"]).to eq("Some bold intro with a link.")
     end

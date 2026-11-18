@@ -303,7 +303,7 @@ class StandardSite < ApplicationService
     record = {
       "$type" => PUBLICATION_COLLECTION,
       "url" => publication_url,
-      "name" => truncate_graphemes(site["title"].to_s, MAX_NAME_GRAPHEMES),
+      "name" => truncate_graphemes(plain_title(site["title"]), MAX_NAME_GRAPHEMES),
       "basicTheme" => BASIC_THEME,
       "preferences" => { "showInDiscover" => true }
     }
@@ -324,7 +324,7 @@ class StandardSite < ApplicationService
     record = {
       "$type" => DOCUMENT_COLLECTION,
       "site" => publication_uri,
-      "title" => truncate_graphemes(post["title"].to_s, MAX_NAME_GRAPHEMES),
+      "title" => truncate_graphemes(plain_title(post["title"]), MAX_NAME_GRAPHEMES),
       "publishedAt" => iso8601(post["published_at"])
     }
     path = document_path(post["path"])
@@ -669,6 +669,15 @@ class StandardSite < ApplicationService
     html = markdown.render(text.to_s)
     decoded = HTMLEntities.new.decode(Sanitize.fragment(html))
     decoded.gsub(/\s+/, " ").strip.presence
+  end
+
+  # Removes the HTML tags of a title and decodes its entities. A title is not Markdown, thus this
+  # does not render it. ⚠️ A title can hold markup, for example an `<abbr>`, and a client shows
+  # each record field as text.
+  # @param title [String, nil] The title.
+  # @return [String] The plain text, or an empty string.
+  def plain_title(title)
+    HTMLEntities.new.decode(Sanitize.fragment(title.to_s)).gsub(/\s+/, " ").strip
   end
 
   # @return [Redcarpet::Markdown] The shared renderer.
