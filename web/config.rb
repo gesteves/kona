@@ -72,6 +72,9 @@ end
 # The standard.site verification endpoint. It has no layout and no directory index.
 page "/.well-known/site.standard.publication", layout: false, directory_index: false
 
+# `_headers` gives the Content-Type in production. This gives it to `middleman server`.
+page "/llms.txt", layout: false, directory_index: false, content_type: "text/plain; charset=utf-8"
+
 # The about page as AboutSpec Markdown. ⚠️ This is a proxy to a `.txt.erb` template, and not a
 # source file named `about.md.erb`. Middleman reads `.md` as a template extension and would render
 # that file into HTML.
