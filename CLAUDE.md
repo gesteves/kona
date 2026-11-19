@@ -158,6 +158,15 @@ Events counter of the rule is more than zero.
   Spam page show it. A report of a threat needs it: a carrier-grade NAT puts many subscribers behind
   one IPv4 address, and the IP, the port, and the time to the second select one. After an edit, send
   a test message and check its "Source port" line.
+- **The Markdown of a post** — a URL Rewrite Transform Rule on the site host sends each request with
+  `Accept: text/markdown` on a `/20…/` path to `<path>index.md`. The build writes that file for
+  each post. The rewritten URL is the cache key, thus the HTML and the Markdown never share a cache
+  entry, and no Worker runs. The Pro plan has no regex, thus the rule matches the prefix `/20` and a
+  path that ends in `/`.
+  ⚠️ **Keep "Markdown for Agents" off.** It sends `Content-Signal: ai-train=yes`, and robots.txt
+  says `ai-train=no`.
+  ⚠️ The rule matches the shape of a permalink. A change to that shape needs a change to the rule,
+  and nothing in the repo gives you that message.
 
 ### The origin certificate
 

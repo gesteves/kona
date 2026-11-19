@@ -76,12 +76,12 @@ purges again.
 - ⚠️ **Keep the name `build-id.txt`.** The scanner rule of the zone blocks the prefix `/deploy/` and
   the file names of secret material, across the full zone. `build-id` clears each of those families.
 
-## `/.well-known/about.md`
+## The Markdown documents: `/.well-known/about.md` and the `index.md` of each post
 
 - ⚠️ A new kind of markup in a body goes out as its text only. Add a step for it to
   `normalize_for_markdown`.
-- ⚠️ **The front matter must be the first line of the file.** Thus the template is one ERB tag with
-  no comment and no newline.
+- ⚠️ **The front matter must be the first line of the file.** Thus each template is one ERB tag
+  with no comment and no newline.
 
 ## Permissions
 

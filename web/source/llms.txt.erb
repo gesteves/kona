@@ -3,17 +3,21 @@
 > <%= data.site.meta_description %>
 
 This is the personal blog of <%= data.site.author.name %>. Articles are published at
-permalinks of the form `/YYYY/MM/DD/{slug}/` and listed newest first below. The full
-archive lives at <%= full_url('/blog/') %>.
+permalinks of the form `/YYYY/MM/DD/{slug}/` and listed newest first below. Each post has a
+Markdown version at `/YYYY/MM/DD/{slug}/index.md`, and a request to the permalink with
+`Accept: text/markdown` also gets it. The links below go to the Markdown versions. The content
+signals are in <%= full_url('/robots.txt') %>. The full archive lives at <%= full_url('/blog/') %>.
 
 ## Key pages
 
-- [About](<%= full_url('/about/') %>): About <%= data.site.author.name %> and this site.
-- [Blog](<%= full_url('/blog/') %>): The complete archive of articles, newest first.
+- [About](<%= full_url(AboutHelpers.about_page(data.pages) ? '/.well-known/about.md' : '/about/') %>): About <%= data.site.author.name %> and this site.
 - [Atom feed](<%= full_url('/feed.xml') %>): Machine-readable feed of recent articles.
 
 ## Articles
 <% llms_articles.each do |article| %>
-- [<%= sanitize(article.title) %>](<%= full_url(article.path) %>)<% if article.summary.present? %>: <%= sanitize(article.summary)&.truncate(200, omission: "…", separator: " ")&.tr("\n", " ") %><% end %>
+- [<%= sanitize(article.title) %>](<%= full_url(entry_markdown_path(article)) %>)<% if article.summary.present? %>: <%= sanitize(article.summary)&.truncate(200, omission: "…", separator: " ")&.tr("\n", " ") %><% end %>
 <% end %>
-- [Browse the full archive](<%= full_url('/blog/') %>) for older articles not listed here.
+
+## Optional
+
+- [Blog](<%= full_url('/blog/') %>): The complete archive of articles, newest first, as HTML, with the older articles that are not listed above.

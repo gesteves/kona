@@ -40,6 +40,7 @@ ignore "/page.html"
 ignore "/short.html"
 ignore "/tag_feed.xml"
 ignore "/about_md.txt"
+ignore "/entry_md.txt"
 
 # Each page that the build makes — an article, a page, the blog index, and a tag page — proxies its
 # template with itself as the `content` local.
@@ -52,6 +53,14 @@ ignore "/about_md.txt"
   collection.each do |content|
     proxy content.path, content.template, locals: { content: content }, ignore: true
   end
+end
+
+# Each published post also gets a Markdown copy at "<permalink>index.md". A zone rewrite rule sends
+# each request with `Accept: text/markdown` to it. It uses a `.txt.erb` template for the same reason
+# as about.md below.
+@app.data.articles.reject(&:draft).each do |content|
+  proxy EntryMarkdownHelpers.markdown_path(content.path), "/entry_md.txt", locals: { content: content },
+    layout: false, directory_index: false, content_type: "text/markdown; charset=utf-8", ignore: true
 end
 
 # Each tag also gets an Atom feed at "<tag path>feed.xml". It lists the entries of that tag, which
