@@ -96,7 +96,10 @@
 /robots.txt
   Cache-Control: public, max-age=0, must-revalidate
 
+# ⚠️ The asset layer sends `text/plain` with no charset. A browser then shows each curly quote
+# in a summary as Latin-1 mojibake.
 /llms.txt
+  Content-Type: text/plain; charset=utf-8
   Cache-Control: public, max-age=0, must-revalidate
 
 # The IndexNow key file. An engine reads it to check that we own the host that the submission
