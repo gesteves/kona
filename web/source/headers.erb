@@ -48,6 +48,20 @@
   Access-Control-Allow-Origin: *
   Cache-Control: public, max-age=0, must-revalidate
 
+# The Markdown copy of each post. A zone URL Rewrite rule also sends each request with
+# `Accept: text/markdown` on a permalink here, thus the HTML and the Markdown have separate cache keys.
+# ⚠️ Content-Signal must agree with robots.txt: ai-train=no. Cloudflare "Markdown for Agents" sends
+# ai-train=yes, thus that setting stays off.
+# ⚠️ This URL always gives Markdown, whatever the Accept header. noindex is the only control for a
+# search engine. Do not add rel=canonical, and do not disallow the path in robots.txt.
+/*/index.md
+  Content-Type: text/markdown; charset=utf-8
+  Content-Signal: search=yes, ai-input=yes, ai-train=no
+  Link: </llms.txt>; rel="describedby"
+  X-Robots-Tag: noindex
+  Vary: Accept
+  Cache-Control: public, max-age=0, must-revalidate
+
 # asset_hash (config.rb) puts a fingerprint in each of these names. New content gives a new URL,
 # thus a cached copy is never old and the cache can keep it for all time.
 /javascripts/*

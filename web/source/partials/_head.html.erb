@@ -20,6 +20,12 @@
   <% alternate_feed_links.each do |feed| %>
     <link rel="alternate" type="application/atom+xml" title="<%= h feed[:title] %>" href="<%= feed[:href] %>" />
   <% end %>
+  <%# The Markdown copy of a post, and the llms.txt that covers each page. These are the link
+      relations of the llms.txt proposal. %>
+  <% if page && published_post?(page) %>
+    <link rel="alternate" type="text/markdown" href="<%= full_url(entry_markdown_path(page)) %>">
+  <% end %>
+  <link rel="describedby" href="<%= full_url('/llms.txt') %>">
   <link rel="icon" href="/favicon.ico" sizes="32x32">
   <% if data.site.logo.present? %>
     <link rel="apple-touch-icon" href="<%= site_icon_url(w: 180) %>">
