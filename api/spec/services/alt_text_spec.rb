@@ -33,8 +33,15 @@ RSpec.describe AltText do
           { type: :image, source: { type: :base64, media_type: :"image/jpeg", data: Base64.strict_encode64(jpeg) } },
           { type: :text, text: described_class::USER_TEXT }
         ] } ],
-        request_options: { timeout: 15 }
+        request_options: { timeout: 15, max_retries: 0 }
       )
+    end
+
+    # ⚠️ The SDK gives each retry the full timeout again. One retry of a 15-second call is past the
+    # 20-second rack-timeout, and that gives a 500 where the page expects a toast.
+    it "makes one attempt only, because the call runs in a request" do
+      expect(described_class.max_retries).to eq(0)
+      expect(described_class::TIMEOUT_SECONDS * (described_class.max_retries + 1)).to be < 20
     end
 
     it "reads the prompt from the file, and not from the code" do

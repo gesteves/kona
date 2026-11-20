@@ -52,6 +52,8 @@ RSpec.describe ActivityDescription::Generator do
 
   describe "the dedup lock" do
     it "takes and releases a per-activity Redis lock" do
+      allow($redis).to receive(:get).with("activity:description_lock:i1").and_return("1")
+
       generator.generate!("i1")
 
       expect($redis).to have_received(:set).with("activity:description_lock:i1", "1", nx: true, ex: 600)
@@ -83,10 +85,30 @@ RSpec.describe ActivityDescription::Generator do
     end
 
     it "releases the lock even when the run raises" do
+      allow($redis).to receive(:get).with("activity:description_lock:i1").and_return("1")
       allow(intervals).to receive(:activity!).and_raise("boom")
 
       expect { generator.generate!("i1") }.to raise_error("boom")
       expect($redis).to have_received(:del).with("activity:description_lock:i1")
+    end
+
+    # ⚠️ A run that is longer than LOCK_TTL has no lock at its end. The key then belongs to the run
+    # that took it after the expiry, and a delete would let a third run in.
+    it "leaves a lock that a different run took after its own lock expired" do
+      allow($redis).to receive(:get).with("activity:description_lock:i1").and_return("job-2")
+
+      generator.generate!("i1", lock_token: "job-1")
+
+      expect(intervals).to have_received(:activity!)
+      expect($redis).not_to have_received(:del)
+    end
+
+    it "does not delete a lock that expired and that no run took" do
+      allow($redis).to receive(:get).with("activity:description_lock:i1").and_return(nil)
+
+      generator.generate!("i1", lock_token: "job-1")
+
+      expect($redis).not_to have_received(:del)
     end
   end
 

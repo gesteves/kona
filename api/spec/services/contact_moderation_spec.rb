@@ -31,7 +31,7 @@ RSpec.describe ContactModeration do
           system_: described_class::SYSTEM_PROMPT,
           messages: [ { role: "user", content: "From: Jane\n\nMessage:\nLoved the Alcatraz report!" } ],
           output_config: { format: { type: :json_schema, schema: described_class::SCHEMA } },
-          request_options: { timeout: 15 }
+          request_options: { timeout: 15, max_retries: 2 }
         )
       )
     end

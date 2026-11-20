@@ -47,6 +47,10 @@ class Bluesky < ApplicationService
   # the owner linked to, and the worker is a 512MB VM at concurrency 5. A picture past this limit
   # loses the thumbnail and never the post.
   MAX_CARD_IMAGE_BYTES = 10 * 1024 * 1024
+  # The types of an og:image that go up with no change. ⚠️ Each other type goes through the shrink
+  # and comes out as a JPEG. An SVG is a document that can hold a script, and
+  # `Admin::SocialController#preview_image` sends these bytes from the admin host.
+  CARD_IMAGE_TYPES = %w[image/jpeg image/png image/webp image/gif].freeze
 
   # The limits of the text fields of a card.
   CARD_TITLE_MAX = 300
@@ -288,13 +292,13 @@ class Bluesky < ApplicationService
     return if picture.nil?
 
     bytes = picture[:body]
-    mime = picture[:content_type].to_s.split(";").first.to_s.strip
+    mime = picture[:content_type].to_s.split(";").first.to_s.strip.downcase
 
     # ⚠️ A host with no content type, or a 200 that is an HTML error page, must not go up as a
     # picture. The shrink decodes the bytes with libvips, thus it is also the check that they are
     # an image. It runs for an oversized picture for the same reason as before: a blob past the
     # limit fails at putRecord.
-    bytes, mime = shrink(bytes) if !mime.start_with?("image/") || bytes.bytesize > MAX_BLOB_BYTES
+    bytes, mime = shrink(bytes) if !CARD_IMAGE_TYPES.include?(mime) || bytes.bytesize > MAX_BLOB_BYTES
     return if bytes.blank? || bytes.bytesize > MAX_BLOB_BYTES
 
     { body: bytes, content_type: mime }

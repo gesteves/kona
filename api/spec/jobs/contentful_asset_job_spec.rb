@@ -97,6 +97,19 @@ RSpec.describe ContentfulAssetJob do
     expect(contentful).not_to have_received(:create_asset)
   end
 
+  # ⚠️ The staged file lives for less time than the retry window. An asset that exists needs only
+  # the process and the publish, and neither one reads the staged file.
+  it "still publishes an asset that exists when the staged file expired" do
+    library.update(id, "asset_id" => "asset-1")
+    $redis.del("#{StagedUpload::KEY_PREFIX}#{id}")
+
+    described_class.new.perform(id)
+
+    expect(contentful).not_to have_received(:create_asset)
+    expect(contentful).to have_received(:publish_asset).with("asset-1", 2)
+    expect(library.find(id)["status"]).to eq("published")
+  end
+
   it "raises on an upstream failure, thus Sidekiq does the job again" do
     allow(contentful).to receive(:publish_asset).and_raise(ApplicationService::HttpError.new(409, "stale", "url"))
 

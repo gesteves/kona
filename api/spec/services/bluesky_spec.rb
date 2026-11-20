@@ -461,6 +461,37 @@ RSpec.describe Bluesky do
         expect(@sent["record"]["embed"]["external"]["thumb"]).to eq({ "$type" => "blob" })
       end
 
+      # ⚠️ An SVG is a document that can hold a script, and the preview of the Social media page
+      # sends these bytes from the admin host. The decode makes it a JPEG.
+      it "decodes an SVG and never sends it as it came" do
+        stub_streamed_get("https://cdn.test/og.png", body: "<svg><script>alert(1)</script></svg>",
+                          headers: { "content-type" => "image/svg+xml; charset=utf-8" })
+        allow(Vips::Image).to receive(:thumbnail_buffer).and_return(Vips::Image.black(100, 50))
+
+        picture = service.card_image("https://cdn.test/og.png")
+
+        expect(picture[:content_type]).to eq("image/jpeg")
+        expect(picture[:body]).not_to include("<script>")
+      end
+
+      it "gives no picture for an SVG that libvips cannot decode" do
+        stub_streamed_get("https://cdn.test/og.png", body: "<svg><script>alert(1)</script></svg>",
+                          headers: { "content-type" => "image/svg+xml" })
+        allow(Vips::Image).to receive(:thumbnail_buffer).and_raise(Vips::Error, "not an image")
+
+        expect(service.card_image("https://cdn.test/og.png")).to be_nil
+      end
+
+      it "keeps the type of a small picture in a format that a browser draws" do
+        stub_streamed_get("https://cdn.test/og.png", body: "bytes", headers: { "content-type" => "IMAGE/PNG" })
+        allow(Vips::Image).to receive(:thumbnail_buffer)
+
+        picture = service.card_image("https://cdn.test/og.png")
+
+        expect(picture).to eq({ body: "bytes", content_type: "image/png" })
+        expect(Vips::Image).not_to have_received(:thumbnail_buffer)
+      end
+
       # ⚠️ A blob past the limit fails at putRecord and takes the whole post with it. A picture
       # that stays too large after the shrink must go away, and the post must not.
       it "drops a picture that is still past the blob limit after the shrink" do

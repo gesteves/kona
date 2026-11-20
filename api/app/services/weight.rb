@@ -24,13 +24,18 @@ class Weight
   end
 
   # Parses the day of the weight.
+  #
+  # ⚠️ A day in the future is incorrect. .save sends each day from today on to Strava, which keeps
+  # one current weight, thus a typing error in the year would replace that weight. Tomorrow is
+  # permitted: the caller can be in a time zone that is ahead of the stored location.
   # @param value [String, nil] An ISO 8601 date. When it is blank, the day is today in the time zone
   #   of the current location.
-  # @return [Date, nil] The day, or nil if the value is incorrect.
+  # @return [Date, nil] The day, or nil if the value is incorrect or after tomorrow.
   def self.parse_date(value)
     return today if value.blank?
 
-    Date.iso8601(value.to_s)
+    date = Date.iso8601(value.to_s)
+    date unless date > today + 1
   rescue Date::Error
     nil
   end

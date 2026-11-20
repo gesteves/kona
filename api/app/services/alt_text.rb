@@ -13,7 +13,7 @@ module AltText
   DEFAULT_MODEL = "claude-sonnet-5-5".freeze
   MAX_TOKENS = 512
   # ⚠️ This call runs in a REQUEST, inside the 20-second rack-timeout, and not in a job. A longer
-  # timeout would give a 500 in place of a toast.
+  # timeout would give a 500 in place of a toast, and a retry would also: refer to #max_retries.
   TIMEOUT_SECONDS = 15
 
   # The one instruction of the user message. The system prompt says what to write.
@@ -23,6 +23,12 @@ module AltText
 
   # @return [String] The env var that replaces the model for this caller.
   def anthropic_model_env = "ANTHROPIC_ALT_TEXT_MODEL"
+
+  # ⚠️ One attempt only. Each retry of the SDK gets the full `TIMEOUT_SECONDS` again, thus one
+  # retry puts the call past the rack-timeout. That timeout is not a StandardError, and the rescue
+  # in .generate does not catch it.
+  # @return [Integer]
+  def max_retries = 0
 
   # @param image [String] The bytes of the picture.
   # @param media_type [String] Its content type. The photos of a draft are always JPEG.

@@ -26,15 +26,18 @@ class ContentfulAssetJob < ApplicationJob
     return Rails.logger.info("Media: upload #{id} is gone; nothing to publish") if record.nil?
     return if record["status"] == "published"
 
-    staged = StagedUpload.new.fetch(id)
-    # ⚠️ PermanentError and not a plain raise: the Upload of Contentful is gone with this record,
-    # thus no later attempt can find the bytes. A retry for 24 hours would only repeat the failure.
-    raise PermanentError, "The picked file expired before it could be published." if staged.nil?
-
     contentful = ContentfulManagement.new
     asset_id = record["asset_id"]
 
+    # ⚠️ Only this step needs the staged file. A retry that finds an asset id has only the process
+    # and the publish to do, and the staged file can be gone by then: its TTL is shorter than the
+    # retry window of this job.
     if asset_id.blank?
+      staged = StagedUpload.new.fetch(id)
+      # ⚠️ PermanentError and not a plain raise: the Upload of Contentful is gone with this record,
+      # thus no later attempt can find the bytes. A retry for 24 hours would only repeat the failure.
+      raise PermanentError, "The picked file expired before it could be published." if staged.nil?
+
       created = contentful.create_asset(
         title: record["title"],
         description: record["alt"],

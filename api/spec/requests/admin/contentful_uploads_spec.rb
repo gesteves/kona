@@ -169,6 +169,54 @@ RSpec.describe "Admin Contentful uploads", type: :request do
         expect(flash[:notice]).to be_present
       end
 
+      # ⚠️ `<<` binds before `||`. Without the parentheses, a blank title put nil in the list and
+      # the message named nothing.
+      it "names an expired tile by its id when it has no title" do
+        post "/contentful/uploads", params: { files: { ids: [ "0" * 32 ], titles: [ " " ], alts: [ "" ] } }
+
+        expect(flash[:alert]).to eq(I18n.t("admin.contentful_uploads.flash.expired", files: "0" * 32))
+      end
+
+      # ⚠️ A browser can send the form a second time: a double click, or a form that the back
+      # button restored. A second job would find no asset id and make a second asset.
+      it "adds no second job for a tile that is already processing" do
+        id = stage
+        params = { files: { ids: [ id ], titles: [ "First" ], alts: [ "A dog." ] } }
+        post "/contentful/uploads", params: params
+        UploadLibrary.new.update(id, "asset_id" => "asset-1")
+
+        post "/contentful/uploads", params: params
+
+        expect(response).to redirect_to("/contentful/uploads")
+        expect(ContentfulAssetJob.jobs.size).to eq(1)
+        expect(UploadLibrary.new.find(id)["asset_id"]).to eq("asset-1")
+        expect(flash[:alert]).to be_nil
+      end
+
+      it "adds no second job for a tile that is already published" do
+        id = stage
+        UploadLibrary.new.stage(id: id, title: "First", alt: "", file_name: "IMG_4821.jpg")
+        UploadLibrary.new.update(id, "status" => "published", "asset_id" => "asset-1")
+
+        post "/contentful/uploads", params: { files: { ids: [ id ], titles: [ "First" ], alts: [ "" ] } }
+
+        expect(ContentfulAssetJob.jobs).to be_empty
+        expect(UploadLibrary.new.find(id)).to include("status" => "published", "asset_id" => "asset-1")
+      end
+
+      # A failed record can go again. It keeps the asset that an earlier job made.
+      it "takes a failed tile again and keeps its asset id" do
+        id = stage
+        UploadLibrary.new.stage(id: id, title: "First", alt: "", file_name: "IMG_4821.jpg")
+        UploadLibrary.new.update(id, "status" => "failed", "asset_id" => "asset-1", "error" => "boom")
+
+        post "/contentful/uploads", params: { files: { ids: [ id ], titles: [ "First" ], alts: [ "" ] } }
+
+        expect(ContentfulAssetJob).to have_enqueued_sidekiq_job(id)
+        expect(UploadLibrary.new.find(id)).to include("status" => "processing", "asset_id" => "asset-1",
+                                                      "error" => nil)
+      end
+
       it "uses the file name when the owner emptied the title" do
         id = stage(file_name: "IMG_4821.jpg")
 

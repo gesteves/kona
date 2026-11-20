@@ -48,7 +48,7 @@ RSpec.describe AnthropicStructuredOutput do
       hash_including(model: "claude-default", max_tokens: 200, thinking: { type: :disabled },
                      system_: "Be brief.", messages: [ { role: "user", content: "Summarize." } ],
                      output_config: { format: { type: :json_schema, schema: schema } },
-                     request_options: { timeout: 7 })
+                     request_options: { timeout: 7, max_retries: 2 })
     )
   end
 
@@ -62,7 +62,7 @@ RSpec.describe AnthropicStructuredOutput do
     expect(messages).to have_received(:create).with(
       model: "claude-default", max_tokens: 200, thinking: { type: :disabled },
       system_: "Describe.", messages: [ { role: "user", content: content } ],
-      request_options: { timeout: 7 }
+      request_options: { timeout: 7, max_retries: 2 }
     )
   end
 

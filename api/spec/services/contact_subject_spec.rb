@@ -29,7 +29,7 @@ RSpec.describe ContactSubject do
           thinking: { type: :between_tools },
           system_: described_class::SYSTEM_PROMPT,
           output_config: hash_including(format: hash_including(type: :json_schema)),
-          request_options: { timeout: 15 }
+          request_options: { timeout: 15, max_retries: 2 }
         )
       )
     end

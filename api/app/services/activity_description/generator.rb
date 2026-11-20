@@ -380,6 +380,8 @@ module ActivityDescription
     # ⚠️ The token lets a RETRY of the same job enter its own lock. A process that dies leaves
     # the lock for LOCK_TTL, and the retry comes some seconds later: without the token it would
     # read the lock as another run.
+    # ⚠️ The release deletes the lock only when it still holds this token. A run that is longer
+    # than LOCK_TTL has no lock any more, and the key can then belong to a different run.
     # @return [Object, Symbol] The value of the block, or :busy.
     def with_dedup_lock(activity_id, token)
       key = "activity:description_lock:#{activity_id}"
@@ -392,7 +394,7 @@ module ActivityDescription
       begin
         yield
       ensure
-        $redis.del(key)
+        $redis.del(key) if $redis.get(key) == token
       end
     end
 

@@ -28,7 +28,7 @@ RSpec.describe ActivityDescription::Llm do
           thinking: { type: :between_tools },
           system_: described_class::PLANNED_SUMMARY_PROMPT,
           output_config: hash_including(format: hash_including(type: :json_schema)),
-          request_options: { timeout: 30 }
+          request_options: { timeout: 30, max_retries: 2 }
         )
       )
     end
@@ -39,6 +39,26 @@ RSpec.describe ActivityDescription::Llm do
       )
 
       expect(described_class.planned_summary("sparse")).to be_nil
+    end
+
+    # ⚠️ The composer keeps each line with no stat emoji as the words of the owner. A summary on
+    # two lines would leave its second line in the description at each later run.
+    it "puts a summary with a newline on one line" do
+      allow(client).to receive(:messages).and_return(
+        instance_double(Anthropic::Resources::Messages,
+                        create: message_with(planned_summary: " 6×5-min intervals\nat 102% FTP \n"))
+      )
+
+      expect(described_class.planned_summary("6x5")).to eq("6×5-min intervals at 102% FTP")
+    end
+
+    it "returns nil for a summary that is much longer than the prompt permits" do
+      long = "a" * (described_class::MAX_PLANNED_SUMMARY_LENGTH + 1)
+      allow(client).to receive(:messages).and_return(
+        instance_double(Anthropic::Resources::Messages, create: message_with(planned_summary: long))
+      )
+
+      expect(described_class.planned_summary("6x5")).to be_nil
     end
 
     it "returns nil for blank input or when unconfigured" do

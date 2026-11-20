@@ -58,7 +58,8 @@ RSpec.describe "Weight", type: :request do
     "a non-numeric weight" => { weight: "abc" },
     "an out-of-range weight" => { weight: 5 },
     "an unknown unit" => { weight: 72.4, unit: "stone" },
-    "an incorrect date" => { weight: 72.4, date: "2026-13-45" }
+    "an incorrect date" => { weight: 72.4, date: "2026-13-45" },
+    "a date in the future" => { weight: 72.4, date: "2099-01-01" }
   }.each do |description, params|
     it "rejects #{description} and enqueues nothing" do
       post "/api/weight", params: params, headers: headers

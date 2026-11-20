@@ -24,6 +24,9 @@ class UploadLibrary
   MAX_AGE = 7.days
 
   # Records one file at the submit, before the job runs.
+  #
+  # ⚠️ A record that already has an asset id keeps it. `ContentfulAssetJob` makes an asset only
+  # when the id is absent, thus a submit that removed the id would leave a duplicate in the space.
   # @param id [String] The id of the staged file. It is also the id of this record.
   # @param title [String] `fields.title` of the asset.
   # @param alt [String] `fields.description` of the asset.
@@ -36,7 +39,7 @@ class UploadLibrary
       "alt" => alt.to_s,
       "file_name" => file_name.to_s,
       "status" => "processing",
-      "asset_id" => nil,
+      "asset_id" => find(id)&.dig("asset_id"),
       "error" => nil,
       "uploaded_at" => Time.now.utc.iso8601
     })

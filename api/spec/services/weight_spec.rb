@@ -34,5 +34,17 @@ RSpec.describe Weight do
       expect(described_class.parse_date("2026-10-01")).to eq(Date.new(2026, 10, 1))
       expect(described_class.parse_date("yesterday")).to be_nil
     end
+
+    # ⚠️ Strava keeps one current weight, and .save sends each day from today on to it. A typing
+    # error in the year must not replace that weight.
+    it "gives nil for a day after tomorrow, and permits tomorrow for a caller in a zone ahead" do
+      allow_any_instance_of(Location).to receive(:time_zone).and_return("America/Denver")
+
+      travel_to Time.utc(2026, 10, 6, 18, 0) do
+        expect(described_class.parse_date("2026-10-07")).to eq(Date.new(2026, 10, 7))
+        expect(described_class.parse_date("2026-10-08")).to be_nil
+        expect(described_class.parse_date("2099-01-01")).to be_nil
+      end
+    end
   end
 end

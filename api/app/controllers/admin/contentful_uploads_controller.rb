@@ -17,6 +17,10 @@ module Admin
     # Contentful.
     MAX_FILES = 25
 
+    # The statuses of a record whose job runs now or ran to its end. #ingest adds no second job
+    # for such a record.
+    IN_HAND = %w[processing published].freeze
+
     # GET /contentful/uploads
     def index
       @uploads = library.all.map { |record| ContentfulUploadPresenter.new(record) }
@@ -104,6 +108,9 @@ module Admin
 
     # Records each tile and adds its job to the queue. A tile whose staged file expired gives a
     # message and stops nothing: one stale tile in a batch must not refuse the other ones.
+    #
+    # ⚠️ A tile that a job already has is skipped, with no message. A browser can send the same
+    # form a second time, and a second job for one file would make a second asset.
     # @return [Array(Array<String>, Array<String>)] The accepted names and the expired names.
     def ingest(files)
       staged_upload = StagedUpload.new
@@ -111,9 +118,11 @@ module Admin
       expired = []
 
       files.each do |file|
+        next if IN_HAND.include?(library.find(file[:id])&.dig("status"))
+
         staged = staged_upload.fetch(file[:id])
         if staged.nil?
-          expired << file[:title].presence || file[:id]
+          expired << (file[:title].presence || file[:id])
           next
         end
 

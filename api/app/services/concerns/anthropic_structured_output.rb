@@ -11,7 +11,8 @@ require "anthropic"
 # module that they include.
 #
 # The module that uses this supplies `DEFAULT_MODEL`, `MAX_TOKENS`, and `TIMEOUT_SECONDS`, and also
-# `anthropic_model_env`, which names the env var that replaces the model.
+# `anthropic_model_env`, which names the env var that replaces the model. A module whose call runs
+# in a request also replaces `max_retries`.
 module AnthropicStructuredOutput
   # The model declined the request (`stop_reason: refusal`), thus the answer has no JSON to parse.
   class Refusal < StandardError; end
@@ -27,6 +28,14 @@ module AnthropicStructuredOutput
   # @return [String] The model to call.
   def model
     ENV[anthropic_model_env].presence || self::DEFAULT_MODEL
+  end
+
+  # ⚠️ `TIMEOUT_SECONDS` is the limit of ONE attempt, and the SDK starts the time again for each
+  # retry. Thus the longest call is `TIMEOUT_SECONDS` × (`max_retries` + 1), and more for the waits
+  # between. A caller inside a request gives 0 here, because of the 20-second rack-timeout.
+  # @return [Integer] The number of times that the SDK tries a failed call again.
+  def max_retries
+    Anthropic::Client::DEFAULT_MAX_RETRIES
   end
 
   # Makes an Anthropic call with a structured output. Such an output is always correct JSON that
@@ -74,7 +83,7 @@ module AnthropicStructuredOutput
       thinking: { type: thinking_off_type },
       system_: system,
       messages: [ { role: "user", content: content } ],
-      request_options: { timeout: self::TIMEOUT_SECONDS }
+      request_options: { timeout: self::TIMEOUT_SECONDS, max_retries: max_retries }
     }
     params[:output_config] = output_config if output_config
 

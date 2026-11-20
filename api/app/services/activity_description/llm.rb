@@ -10,6 +10,9 @@ module ActivityDescription
     PLANNED_SUMMARY_PROMPT = Rails.root.join("app/prompts/planned-summary.md").read.freeze
     WEATHER_CONDITIONS_PROMPT = Rails.root.join("app/prompts/weather-conditions.md").read.freeze
 
+    # The longest planned summary that the code accepts. The prompt asks for 50 characters, thus an
+    # answer past this ignored the prompt.
+    MAX_PLANNED_SUMMARY_LENGTH = 120
     # The longest weather phrase that the code accepts. The prompt asks for about six words.
     MAX_WEATHER_CONDITIONS_LENGTH = 60
     WEATHER_CONDITIONS_SCHEMA = {
@@ -30,8 +33,9 @@ module ActivityDescription
 
     # Makes a one-sentence summary of a planned-workout description, with no period at the end. The
     # composer renders it as the 🗓️ line.
-    # @return [String, nil] Nil when there is no configuration, when the input is blank, and when
-    #   the model refuses because the description has too little content.
+    # @return [String, nil] Nil when there is no configuration, when the input is blank, when the
+    #   model refuses because the description has too little content, and when the summary fails
+    #   the checks of #valid_planned_summary.
     # @raise [StandardError] On a transport failure. The generator catches the error for each call,
     #   thus only this line goes away.
     def planned_summary(planned_description)
@@ -47,7 +51,15 @@ module ActivityDescription
           additionalProperties: false
         }
       )
-      parsed[:planned_summary].presence
+      valid_planned_summary(parsed[:planned_summary])
+    end
+
+    # ⚠️ The summary must stay on ONE line. `Composer.headline` keeps each line with no stat emoji
+    # as the words of the owner, thus a second line would stay in the description for all time.
+    # @return [String, nil] The summary on one line, or nil when it is blank or too long.
+    def valid_planned_summary(text)
+      text = text.to_s.squish
+      text if text.present? && text.length <= MAX_PLANNED_SUMMARY_LENGTH
     end
 
     # Joins the condition facts of an activity into one phrase, the answer to "How was the
