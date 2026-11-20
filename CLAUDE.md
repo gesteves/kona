@@ -343,9 +343,11 @@ The reason for the skip rule, for each host:
   uptime check at `/up`. The checks of fly reach the app on its internal host and never go through
   the zone.
 
-⚠️ **The managed rules also run on `/webhooks/*`.** Contentful rich text can match a managed
-injection rule. A block there gives **no message**: the PDS sync and the site builds simply stop.
-When a webhook stops, read Security Events before you read the code.
+⚠️ **A skip rule takes the signed `POST /webhooks/contentful` on the api host out of the managed
+rules.** Contentful rich text can match a managed injection rule, and the HMAC check of the api
+authenticates that request. Without the skip, a block stops the PDS sync and the site builds, and it
+gives **no message**. Each other path below `/webhooks/` still goes through the managed rules. When a
+webhook stops, read Security Events before you read the code.
 
 ⚠️ **The rate limiting rules are NOT in the skip list, on purpose.** Do not add them.
 

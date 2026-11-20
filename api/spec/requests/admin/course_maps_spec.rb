@@ -299,6 +299,15 @@ RSpec.describe "Admin course maps", type: :request do
       expect(response).to have_http_status(:no_content)
     end
 
+    it "saves the settings from a POST with _method=patch, which the preview controller sends" do
+      allow(library).to receive(:update_settings).and_return(ready_track)
+
+      post "/course-maps/morning_run_abc", params: { _method: "patch", settings: { padding_top: "80" } }
+
+      expect(library).to have_received(:update_settings).with("morning_run_abc", hash_including("padding_top" => "80"))
+      expect(response).to have_http_status(:no_content)
+    end
+
     it "404s a track that's gone" do
       allow(library).to receive(:update_settings).and_return(nil)
 

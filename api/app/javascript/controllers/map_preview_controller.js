@@ -81,13 +81,15 @@ export default class extends Controller {
 
     this.aborter?.abort();
     this.aborter = new AbortController();
+    // ⚠️ Send a POST with `_method=patch`, and never a true PATCH. The scanner rule of the zone
+    // blocks each method that is not GET, HEAD, or POST, thus a PATCH gets a 403.
     fetch(this.saveUrlValue, {
-      method: "PATCH",
+      method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
         "X-CSRF-Token": document.querySelector("meta[name=csrf-token]")?.content ?? ""
       },
-      body: query,
+      body: `${query}&_method=patch`,
       signal: this.aborter.signal
     }).catch(() => {
       // A settings save that fails, or that a later save stopped, is not important enough to stop

@@ -8,8 +8,7 @@
     </h1>
   </header>
   <%# The site search indexes a page, as it indexes an entry. ⚠️ This tests index_in_search_engines
-      and also draft, and the entry templates are different. /contact/success and /oauth/callback are
-      published pages that set that flag to false, and without this test they would appear in the
-      search modal. %>
+      and also draft, and the entry templates are different. /contact/success is a published page
+      that sets that flag to false, and without this test it would appear in the search modal. %>
   <%= partial 'partials/article/body', locals: { article: article, pagefind: !article.draft && article.index_in_search_engines } %>
 </article>
