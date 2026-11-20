@@ -1,5 +1,4 @@
 require "rails_helper"
-require "open3"
 
 # The Markdown link grammar is in Ruby and in JavaScript, and the composer depends on both.
 #
@@ -86,7 +85,11 @@ RSpec.describe "MarkdownLinks Ruby ↔ JavaScript contract" do
     node = which_node
     skip "node is not on the PATH; `npm run build` needs it as well." if node.nil?
 
-    from_js = run_javascript(node, js_path)
+    from_js = run_javascript(
+      node, libs: %w[markdown_links], drafts: MARKDOWN_DRAFTS,
+            imports: 'import { parse } from "./markdown_links.mjs";',
+            answer: "drafts.map((d) => { const r = parse(d); return { text: r.text, urls: r.links.map((l) => l.url) }; })"
+    )
     from_ruby = MARKDOWN_DRAFTS.map do |draft|
       result = MarkdownLinks.parse(draft)
       { "text" => result.text, "urls" => result.links.map(&:url) }
@@ -96,43 +99,6 @@ RSpec.describe "MarkdownLinks Ruby ↔ JavaScript contract" do
       expect(from_js[index]).to eq(from_ruby[index]),
         "The two files read #{draft.inspect} differently. " \
         "Ruby gives #{from_ruby[index].inspect} and the browser gives #{from_js[index].inspect}."
-    end
-  end
-
-  # @return [String, nil] The path of node, or nil where it is absent.
-  def which_node
-    path = `command -v node 2>/dev/null`.strip
-    path.presence
-  end
-
-  # Runs the browser file over MARKDOWN_DRAFTS.
-  #
-  # ⚠️ It copies the file to a **.mjs**, because `package.json` has no `"type": "module"`. Node
-  # reads a plain `.js` as CommonJS, and the `export` of that file is then a syntax error.
-  # @param node [String]
-  # @param js_path [Pathname]
-  # @return [Array<Hash>]
-  def run_javascript(node, js_path)
-    Dir.mktmpdir do |dir|
-      module_path = File.join(dir, "markdown_links.mjs")
-      FileUtils.cp(js_path, module_path)
-      File.write(File.join(dir, "drafts.json"), JSON.generate(MARKDOWN_DRAFTS))
-      File.write(File.join(dir, "run.mjs"), <<~JS)
-        import { readFileSync } from "node:fs";
-        import { parse } from "./markdown_links.mjs";
-
-        const drafts = JSON.parse(readFileSync(new URL("./drafts.json", import.meta.url), "utf8"));
-        const answers = drafts.map((draft) => {
-          const result = parse(draft);
-          return { text: result.text, urls: result.links.map((link) => link.url) };
-        });
-        process.stdout.write(JSON.stringify(answers));
-      JS
-
-      out, err, status = Open3.capture3(node, File.join(dir, "run.mjs"))
-      raise "node could not run #{js_path.basename}: #{err}" unless status.success?
-
-      JSON.parse(out)
     end
   end
 end

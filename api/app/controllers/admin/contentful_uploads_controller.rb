@@ -1,7 +1,3 @@
-# Sidekiq::ProcessSet, for the "does a process do the queued jobs?" check below. The
-# `require "sidekiq/web"` in the initializer also loads it, but no code here must depend on that.
-require "sidekiq/api"
-
 module Admin
   # The media uploader: it puts one or more images into Contentful as published assets.
   #
@@ -13,6 +9,8 @@ module Admin
   # ⚠️ The tiles have NO order: an asset stands by itself. Thus this page has no grip and no drag,
   # and it is different from the photo composer of the Social media page in that one way.
   class ContentfulUploadsController < BaseController
+    include WorkerCheck
+
     # The most tiles of one submit. It is a guard against a runaway form, and not a limit of
     # Contentful.
     MAX_FILES = 25
@@ -144,15 +142,6 @@ module Admin
       notice = t("admin.contentful_uploads.flash.publishing", count: accepted.length,
                  files: accepted.to_sentence)
       alert ? { notice: notice, alert: alert } : { notice: notice }
-    end
-
-    # ⚠️ This page needs the Sidekiq worker, as the Course maps page does: a file stays at
-    # "Processing" until the job publishes it.
-    def worker_running?
-      Sidekiq::ProcessSet.new.size.positive?
-    rescue StandardError => e
-      Rails.logger.warn("Media: could not read Sidekiq's process set (#{e.class}: #{e.message})")
-      true # Don't cry wolf if the check itself is what's broken.
     end
   end
 end

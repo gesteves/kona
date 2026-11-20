@@ -11,13 +11,13 @@ class RequestBodyLimit
   # ⚠️ Plain integers: this file loads before ActiveSupport adds `megabytes` to Integer.
   MEGABYTE = 1024 * 1024
   # ⚠️ `/social/photos` is ABOVE `/social`: the first match wins, and a photo upload is one file of
-  # as much as `Admin::SocialPhotosController::MAX_BYTES` where the draft itself is a small form.
+  # as much as `PictureUpload::MAX_BYTES` where the draft itself is a small form.
   # That limit is 50MB, and this number is above it for the envelope of the multipart body.
   LIMITS = [
     [ "/course-maps", 32 * MEGABYTE ],
     [ "/social/photos", 64 * MEGABYTE ],
     # ⚠️ `/contentful/uploads/files` is ABOVE `/contentful` for the same reason: one picked file is
-    # as much as `Admin::ContentfulUploadFilesController::MAX_BYTES`, and the page itself is a
+    # as much as `PictureUpload::MAX_BYTES`, and the page itself is a
     # small form of ids and text.
     [ "/contentful/uploads/files", 64 * MEGABYTE ],
     [ "/contentful", MEGABYTE / 4 ],

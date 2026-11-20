@@ -1,7 +1,7 @@
 require "json"
 
 # One Redis hash of JSON records: the field is the id of a record, and the value is its JSON.
-# SpamQuarantine and TrackLibrary both keep their records this way.
+# SpamQuarantine keeps its records this way, and so does each JsonRecordLibrary.
 #
 # ⚠️ There is one hash, and not one key for each record, on purpose. No other code in this app
 # reads the full keyspace, and this Redis also holds the Sidekiq queues, thus a SCAN would be the

@@ -7,10 +7,6 @@ RSpec.describe Mastodon do
 
   after { $redis.del(MastodonCredentials::REDIS_KEY) }
 
-  def http_response(body, success: true, code: 200)
-    instance_double(HTTParty::Response, success?: success, code: code, body: body.to_json, request: nil)
-  end
-
   def register_client!
     MastodonCredentials.store_client(
       instance: "mastodon.social", client_id: "client-id", client_secret: "client-secret",

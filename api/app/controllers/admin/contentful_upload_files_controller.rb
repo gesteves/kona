@@ -10,16 +10,9 @@ module Admin
   # request, and the other way — Redis — would hold as much as 500MB of camera JPEG. The transfer
   # happens while the owner writes the alt text, thus it costs no waiting.
   class ContentfulUploadFilesController < BaseController
-    # The most bytes of one upload. A camera JPEG is 20MB to 38MB, thus a smaller limit refuses the
-    # true photos of the owner.
-    #
-    # ⚠️ **Cloudflare Pro refuses a request body above 100MB**, at the edge, with a 413 that this
-    # app never sees and cannot write a message for. Thus this limit must stay well below that
-    # number.
-    # ⚠️ The file stays on the DISK: `PhotoBlob` and `ContentfulManagement#create_upload` both read
-    # the temporary file of Puma, thus the size of the picture does not decide how much memory the
-    # request uses. `RequestBodyLimit` refuses a larger body before this code runs.
-    MAX_BYTES = 50.megabytes
+    include PictureUpload
+
+    I18N_SCOPE = "admin.contentful_uploads.files".freeze
 
     # POST /contentful/uploads/files
     #
@@ -32,15 +25,12 @@ module Admin
       file = params[:file]
       return refuse(t("admin.contentful_uploads.files.no_file")) unless file.is_a?(ActionDispatch::Http::UploadedFile)
 
-      if file.size > MAX_BYTES
-        return refuse(t("admin.contentful_uploads.files.too_large",
-                        size: ActiveSupport::NumberHelper.number_to_human_size(file.size),
-                        limit: ActiveSupport::NumberHelper.number_to_human_size(MAX_BYTES)))
-      end
+      too_large = too_large_message(file, scope: I18N_SCOPE)
+      return refuse(too_large) if too_large
 
       # ⚠️ The decode is the check that the file IS a picture, and it runs BEFORE the app sends one
       # byte to Contentful. A content type from the browser is not such a check.
-      # ⚠️ It gives the PATH and not `file.read`. Refer to the ⚠️ on MAX_BYTES above.
+      # ⚠️ It gives the PATH and not `file.read`. Refer to the ⚠️ on PictureUpload::MAX_BYTES.
       thumbnail = PhotoBlob.thumbnail(file.tempfile.path)
       caption = PhotoCaption.read(file.tempfile.path)
 
@@ -86,20 +76,8 @@ module Admin
     def alt
       staged = StagedUpload.new.fetch(params[:id].to_s)
       return head :not_found if staged.nil?
-      return refuse(t("admin.contentful_uploads.files.alt_not_configured"), status: :service_unavailable) unless AltText.configured?
 
-      text = AltText.generate(image: staged[:thumbnail])
-      return refuse(t("admin.contentful_uploads.files.alt_failed"), status: :bad_gateway) if text.blank?
-
-      render json: { alt: text }
-    end
-
-    private
-
-    # @param message [String]
-    # @param status [Symbol]
-    def refuse(message, status: :unprocessable_content)
-      render json: { error: message }, status: status
+      render_alt_text(staged[:thumbnail], scope: I18N_SCOPE)
     end
   end
 end

@@ -1,5 +1,4 @@
 require "rails_helper"
-require "open3"
 
 # The typography runs on the server, and the character count runs in the browser.
 #
@@ -16,8 +15,6 @@ require "open3"
 # ⚠️ A browser count that is too SMALL is the failure that matters: the page would call a draft
 # correct and the action would then refuse it. This spec runs both files and compares the lengths.
 RSpec.describe "Typography Ruby ↔ JavaScript contract" do
-  js_path = Rails.root.join("app/javascript/lib/typography.js")
-
   # Each shape that changes a length, and each shape that must not.
   #
   # ⚠️ **No character above the BMP here**, and an emoji spec below covers that. Ruby counts code
@@ -71,7 +68,9 @@ RSpec.describe "Typography Ruby ↔ JavaScript contract" do
     node = which_node
     skip "node is not on the PATH; `npm run build` needs it as well." if node.nil?
 
-    from_js = run_javascript(node, js_path)
+    from_js = run_javascript(node, libs: %w[typography social_mentions], drafts: TYPOGRAPHY_DRAFTS,
+                                   imports: 'import { applyLengthRules } from "./typography.mjs";',
+                                   answer: "drafts.map((d) => applyLengthRules(d).length)")
 
     TYPOGRAPHY_DRAFTS.each_with_index do |draft, index|
       from_ruby = Typography.apply(draft)
@@ -88,41 +87,5 @@ RSpec.describe "Typography Ruby ↔ JavaScript contract" do
   # whole post is the concern of `Bluesky.post_length` and of `social_post_controller.js`.
   it "changes no emoji" do
     expect(Typography.apply("Ride 🚴‍♂️ 👨‍👩‍👧")).to eq("Ride 🚴‍♂️ 👨‍👩‍👧")
-  end
-
-  # @return [String, nil] The path of node, or nil where it is absent.
-  def which_node
-    `command -v node 2>/dev/null`.strip.presence
-  end
-
-  # Runs the browser file over TYPOGRAPHY_DRAFTS and gives the length of each answer.
-  #
-  # ⚠️ It copies the two files to **.mjs**, because `package.json` has no `"type": "module"`. Node
-  # reads a plain `.js` as CommonJS, and the `export` of those files is then a syntax error.
-  # @return [Array<Integer>]
-  def run_javascript(node, js_path)
-    Dir.mktmpdir do |dir|
-      # ⚠️ typography.js imports URL_SOURCE from social_mentions.js, thus the copy needs that file
-      # as well. ⚠️ **The import specifier needs the extension written in.** esbuild resolves
-      # `./social_mentions` and node does NOT: an ESM import there must name the file exactly.
-      File.write(File.join(dir, "typography.mjs"),
-                 File.read(js_path).gsub(%r{(?<=from ")\./social_mentions(?=")},
-                                         "./social_mentions.mjs"))
-      FileUtils.cp(Rails.root.join("app/javascript/lib/social_mentions.js"),
-                   File.join(dir, "social_mentions.mjs"))
-      File.write(File.join(dir, "drafts.json"), JSON.generate(TYPOGRAPHY_DRAFTS))
-      File.write(File.join(dir, "run.mjs"), <<~JS)
-        import { readFileSync } from "node:fs";
-        import { applyLengthRules } from "./typography.mjs";
-
-        const drafts = JSON.parse(readFileSync(new URL("./drafts.json", import.meta.url), "utf8"));
-        process.stdout.write(JSON.stringify(drafts.map((d) => applyLengthRules(d).length)));
-      JS
-
-      out, err, status = Open3.capture3(node, File.join(dir, "run.mjs"))
-      raise "node could not run #{js_path.basename}: #{err}" unless status.success?
-
-      JSON.parse(out)
-    end
   end
 end

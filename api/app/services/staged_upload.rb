@@ -10,20 +10,13 @@
 # must not keep its records for all time. Thus these keys are in group 2 of "What Redis holds", and
 # `volatile-lru` can remove one at the memory cap. The job then fails that file and reports it.
 class StagedUpload
+  include ExpiringKeyStore
+
   KEY_PREFIX = "contentful:staged:".freeze
 
   # ⚠️ An Upload of Contentful is retained for 24 hours. This is below that number, thus a stale
   # tile fails here, with a message of ours, and never at Contentful with one of theirs.
   TTL = 12.hours
-
-  # The shape of an id, which `#store` makes.
-  ID_PATTERN = /\A\h{32}\z/
-
-  # @param value [Object]
-  # @return [Boolean] True when the value has the shape of an id.
-  def self.id?(value)
-    value.is_a?(String) && value.match?(ID_PATTERN)
-  end
 
   # Keeps one picked file.
   # @param thumbnail [String] The small JPEG of the tile, which Claude also reads.
@@ -34,16 +27,8 @@ class StagedUpload
   # @param height [Integer] The height of the thumbnail.
   # @return [String] The id.
   def store(thumbnail:, upload_id:, file_name:, content_type:, width:, height:)
-    id = SecureRandom.hex(16)
-    key = key_for(id)
-
-    # ⚠️ Both in one transaction, thus no key can exist with no TTL.
-    $redis.multi do |tx|
-      tx.hset(key, "thumbnail", thumbnail, "upload_id", upload_id.to_s, "file_name", file_name.to_s,
-              "content_type", content_type.to_s, "width", width.to_i, "height", height.to_i)
-      tx.expire(key, TTL.to_i)
-    end
-    id
+    write_new(TTL, "thumbnail" => thumbnail, "upload_id" => upload_id.to_s, "file_name" => file_name.to_s,
+                   "content_type" => content_type.to_s, "width" => width.to_i, "height" => height.to_i)
   end
 
   # @param id [String]
@@ -59,24 +44,5 @@ class StagedUpload
     # step that reads it as text raises.
     { thumbnail: thumbnail.b, upload_id: upload_id.to_s, file_name: file_name.to_s,
       content_type: content_type.to_s, width: width.to_i, height: height.to_i }
-  end
-
-  # @param id [String]
-  # @return [Boolean]
-  def exists?(id)
-    self.class.id?(id) && $redis.exists?(key_for(id))
-  end
-
-  # @param ids [Array<String>]
-  # @return [void]
-  def discard(ids)
-    keys = Array(ids).select { |id| self.class.id?(id) }.map { |id| key_for(id) }
-    $redis.del(*keys) if keys.any?
-  end
-
-  private
-
-  def key_for(id)
-    "#{KEY_PREFIX}#{id}"
   end
 end

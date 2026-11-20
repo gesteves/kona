@@ -1,12 +1,10 @@
-# Sidekiq::ProcessSet, for the "does a process do the queued jobs?" check below. The
-# `require "sidekiq/web"` in the initializer also loads it, but no code here must depend on that.
-require "sidekiq/api"
-
 module Admin
   # Renders the GPX tracks as static map cover images. It is a front end for the Mapbox Data
   # Workbench: upload one or more tracks, wait for Mapbox to publish each one as a vector tileset,
   # then set the frame and the style of one track and download the PNG.
   class CourseMapsController < BaseController
+    include WorkerCheck
+
     # The maximum size of one upload. The parse of the GPX occurs in the request, thus these
     # values limit the memory of the parse and its time against the 20-second request budget.
     MAX_FILES = 10
@@ -106,20 +104,6 @@ module Admin
 
     def library
       @library ||= TrackLibrary.new
-    end
-
-    # Tells if a Sidekiq process runs and can do the queued jobs.
-    #
-    # ⚠️ The code reads this only during a publish, and only to give the cause of a row that does
-    # not change. This is the one admin page whose main function needs the worker. Without this
-    # check, a track stays at "Processing" for all time and nothing says why. That is also why
-    # `worker` is not optional in .overmind.env. In production an empty set means that the worker
-    # machine is down.
-    def worker_running?
-      Sidekiq::ProcessSet.new.size.positive?
-    rescue StandardError => e
-      Rails.logger.warn("Maps: could not read Sidekiq's process set (#{e.class}: #{e.message})")
-      true # Don't cry wolf if the check itself is what's broken.
     end
 
     # Loads the track that the URL names. If the track is gone, it redirects.

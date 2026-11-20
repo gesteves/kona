@@ -89,26 +89,6 @@ class ThreadsCredentials
       "issued_at", now.utc.iso8601,
       "expires_at", (now + lifetime).utc.iso8601
     )
-    $redis.hdel(REDIS_KEY, "refresh_error")
-    nil
+    forget_refresh_error
   end
-
-  # Records a refused refresh. Refer to RefreshError for the rule.
-  # @param code [Integer, String] The HTTP status from the Threads token endpoint.
-  # @return [void]
-  def self.record_refresh_error(code)
-    return unless RefreshError.refused?(code)
-
-    $redis.hset(REDIS_KEY, "refresh_error", RefreshError.encode(code))
-    nil
-  end
-
-  # @param value [String, nil] An ISO8601 time.
-  # @return [Time, nil]
-  def self.parse_time(value)
-    Time.iso8601(value) if value.present?
-  rescue ArgumentError
-    nil
-  end
-  private_class_method :parse_time
 end

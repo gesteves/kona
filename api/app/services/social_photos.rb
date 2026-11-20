@@ -12,14 +12,13 @@
 # keep 20MB for all time. Thus these keys are in group 2 of "What Redis holds", and `volatile-lru`
 # can remove one at the memory cap. The job then fails that post permanently and reports it.
 class SocialPhotos
+  include ExpiringKeyStore
+
   KEY_PREFIX = "social:photo:".freeze
 
   # How long a photo stays before the owner posts the draft. `Admin::SocialController` makes it
   # longer at the submit, thus a scheduled post keeps its photos through the retry window.
   DRAFT_TTL = 24.hours
-
-  # The shape of an id, which `#store` makes.
-  ID_PATTERN = /\A\h{32}\z/
 
   # The salt of the key that signs a public URL.
   SIGNATURE_SALT = "social photo url".freeze
@@ -56,27 +55,13 @@ class SocialPhotos
       ActiveSupport::SecurityUtils.secure_compare(signature, signature(id))
   end
 
-  # @param value [Object]
-  # @return [Boolean] True when the value has the shape of an id.
-  def self.id?(value)
-    value.is_a?(String) && value.match?(ID_PATTERN)
-  end
-
   # Keeps one prepared photo.
   # @param image [String] The JPEG bytes.
   # @param width [Integer]
   # @param height [Integer]
   # @return [String] The id.
   def store(image:, width:, height:)
-    id = SecureRandom.hex(16)
-    key = key_for(id)
-
-    # ⚠️ Both in one transaction, thus no key can exist with no TTL.
-    $redis.multi do |tx|
-      tx.hset(key, "image", image, "width", width.to_i, "height", height.to_i)
-      tx.expire(key, DRAFT_TTL.to_i)
-    end
-    id
+    write_new(DRAFT_TTL, "image" => image, "width" => width.to_i, "height" => height.to_i)
   end
 
   # @param id [String]
@@ -92,30 +77,11 @@ class SocialPhotos
     { image: image.b, width: width.to_i, height: height.to_i }
   end
 
-  # @param id [String]
-  # @return [Boolean]
-  def exists?(id)
-    self.class.id?(id) && $redis.exists?(key_for(id))
-  end
-
   # Gives each photo a new TTL, for a post that waits.
   # @param ids [Array<String>]
   # @param seconds [Integer]
   # @return [void]
   def keep(ids, seconds)
     ids.select { |id| self.class.id?(id) }.each { |id| $redis.expire(key_for(id), seconds.to_i) }
-  end
-
-  # @param ids [Array<String>]
-  # @return [void]
-  def discard(ids)
-    keys = ids.select { |id| self.class.id?(id) }.map { |id| key_for(id) }
-    $redis.del(*keys) if keys.any?
-  end
-
-  private
-
-  def key_for(id)
-    "#{KEY_PREFIX}#{id}"
   end
 end

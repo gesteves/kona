@@ -20,7 +20,7 @@
 // ⚠️ An address goes through with NO change, exactly as `Typography` leaves it alone: a link that
 // holds `--` must keep it, and a count that shortened one would be smaller than the server's.
 
-import { TOKEN_SOURCE, urlRanges } from "./social_mentions";
+import { TOKEN_SOURCE, groupRanges, urlRanges } from "./social_mentions";
 
 const ELLIPSIS = /\.\.\.|\. \. \./g;
 const EM_DASH = /---/g;
@@ -81,23 +81,4 @@ function maskedRanges(text) {
     ([start]) => !urls.some(([from, to]) => start >= from && start < to)
   );
   return [...urls, ...tokens].sort((a, b) => a[0] - b[0]);
-}
-
-/**
- * The character ranges of group 1 of a pattern.
- * @param {string} text
- * @param {string} source
- * @returns {Array<[number, number]>}
- */
-function groupRanges(text, source) {
-  const pattern = new RegExp(source, "g");
-  const ranges = [];
-  let match;
-
-  while ((match = pattern.exec(text)) !== null) {
-    const start = match.index + match[0].length - match[1].length;
-    ranges.push([start, start + match[1].length]);
-    if (match.index === pattern.lastIndex) pattern.lastIndex += 1;
-  }
-  return ranges;
 }

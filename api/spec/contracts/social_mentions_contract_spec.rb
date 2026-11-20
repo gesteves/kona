@@ -1,5 +1,4 @@
 require "rails_helper"
-require "open3"
 
 # The mention patterns are in Ruby and in JavaScript, and the character count depends on both.
 #
@@ -79,10 +78,14 @@ RSpec.describe "SocialMentions Ruby ↔ JavaScript contract" do
   # the patterns alone cannot see a difference in the skip of a URL, in the trim of a field, or in
   # the words that replace a token.
   it "reads the same tokens and writes the same Bluesky text as the browser" do
-    node = `command -v node 2>/dev/null`.strip.presence
+    node = which_node
     skip "node is not on the PATH; `npm run build` needs it as well." if node.nil?
 
-    from_js = run_javascript(node, js_path)
+    from_js = run_javascript(
+      node, libs: %w[social_mentions], drafts: MENTION_DRAFTS,
+            imports: 'import { blueskyText, tokensOf } from "./social_mentions.mjs";',
+            answer: "drafts.map((d) => ({ tokens: tokensOf(d.text), text: blueskyText(d.text, d.values) }))"
+    )
 
     MENTION_DRAFTS.each_with_index do |draft, index|
       tokens = SocialMentions.tokens(draft["text"])
@@ -91,29 +94,6 @@ RSpec.describe "SocialMentions Ruby ↔ JavaScript contract" do
       expect(from_js[index]).to eq({ "tokens" => tokens, "text" => text }),
         "The two files read #{draft.inspect} differently. Ruby gives #{tokens.inspect} and " \
         "#{text.inspect}; the browser gives #{from_js[index].inspect}."
-    end
-  end
-
-  # Runs the browser file over MENTION_DRAFTS. It copies the file to a **.mjs**, because
-  # `package.json` has no `"type": "module"`.
-  # @return [Array<Hash>]
-  def run_javascript(node, js_path)
-    Dir.mktmpdir do |dir|
-      FileUtils.cp(js_path, File.join(dir, "social_mentions.mjs"))
-      File.write(File.join(dir, "drafts.json"), JSON.generate(MENTION_DRAFTS))
-      File.write(File.join(dir, "run.mjs"), <<~JS)
-        import { readFileSync } from "node:fs";
-        import { blueskyText, tokensOf } from "./social_mentions.mjs";
-
-        const drafts = JSON.parse(readFileSync(new URL("./drafts.json", import.meta.url), "utf8"));
-        const answers = drafts.map((d) => ({ tokens: tokensOf(d.text), text: blueskyText(d.text, d.values) }));
-        process.stdout.write(JSON.stringify(answers));
-      JS
-
-      out, err, status = Open3.capture3(node, File.join(dir, "run.mjs"))
-      raise "node could not run #{js_path.basename}: #{err}" unless status.success?
-
-      JSON.parse(out)
     end
   end
 end

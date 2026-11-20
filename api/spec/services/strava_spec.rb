@@ -10,10 +10,6 @@ RSpec.describe Strava do
     allow(ENV).to receive(:[]).with("STRAVA_CLIENT_SECRET").and_return("client-secret")
   end
 
-  def http_response(body, success: true, code: 200)
-    instance_double(HTTParty::Response, success?: success, code: code, body: body.to_json, request: nil)
-  end
-
   def connect!(expires_at: 6.hours.from_now)
     StravaCredentials.store_athlete(
       athlete_id: 42, athlete_name: "Athlete",

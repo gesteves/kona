@@ -49,10 +49,6 @@ RSpec.describe Threads do
 
   after { $redis.del(ThreadsCredentials::REDIS_KEY) }
 
-  def http_response(body, success: true, code: 200)
-    instance_double(HTTParty::Response, success?: success, code: code, body: body.to_json, request: nil)
-  end
-
   def connect!(issued_at: Time.current)
     ThreadsCredentials.store_account(
       access_token: "a-long-lived-token", expires_in: 60.days.to_i,

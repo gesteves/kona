@@ -6,16 +6,9 @@ module Admin
   # names one file. The bytes go into Redis, because `app` and `worker` are different fly
   # machines and the job cannot read a temporary file of this request.
   class SocialPhotosController < BaseController
-    # The most bytes of one upload. A camera JPEG is 20MB to 38MB, thus a smaller limit refuses the
-    # true photos of the owner.
-    #
-    # ⚠️ **Cloudflare Pro refuses a request body above 100MB**, at the edge, with a 413 that this
-    # app never sees and cannot write a message for. Thus this limit must stay well below that
-    # number, or a large upload fails with no words of ours.
-    # ⚠️ The file stays on the DISK: `PhotoBlob` reads the temporary file of Puma, thus neither
-    # this limit nor the size of the picture decides how much memory the request uses.
-    # `RequestBodyLimit` refuses a larger body before this code runs.
-    MAX_BYTES = 50.megabytes
+    include PictureUpload
+
+    I18N_SCOPE = "admin.social.photos".freeze
 
     # POST /social/photos
     #
@@ -26,13 +19,10 @@ module Admin
       file = params[:photo]
       return refuse(t("admin.social.photos.no_file")) unless file.is_a?(ActionDispatch::Http::UploadedFile)
 
-      if file.size > MAX_BYTES
-        return refuse(t("admin.social.photos.too_large",
-                        size: ActiveSupport::NumberHelper.number_to_human_size(file.size),
-                        limit: ActiveSupport::NumberHelper.number_to_human_size(MAX_BYTES)))
-      end
+      too_large = too_large_message(file, scope: I18N_SCOPE)
+      return refuse(too_large) if too_large
 
-      # ⚠️ It gives the PATH and not `file.read`. Refer to the ⚠️ on MAX_BYTES above.
+      # ⚠️ It gives the PATH and not `file.read`. Refer to the ⚠️ on PictureUpload::MAX_BYTES.
       photo = PhotoBlob.prepare(file.tempfile.path)
       # ⚠️ It reads the ORIGINAL file: the stored JPEG has no metadata.
       caption = PhotoCaption.read(file.tempfile.path)
@@ -60,25 +50,12 @@ module Admin
     # POST /social/photos/:id/alt
     #
     # Writes the alt text of one photo with Claude, and answers `{ alt }`. ⚠️ It sends the stored
-    # JPEG, which is the picture that Bluesky will show. A 503 says that there is no API key, and
-    # a 502 says that Claude gave no answer; the page shows each one in a toast.
+    # JPEG, which is the picture that Bluesky will show.
     def alt
       photo = SocialPhotos.new.fetch(params[:id].to_s)
       return head :not_found if photo.nil?
-      return refuse(t("admin.social.photos.alt_not_configured"), status: :service_unavailable) unless AltText.configured?
 
-      text = AltText.generate(image: photo[:image])
-      return refuse(t("admin.social.photos.alt_failed"), status: :bad_gateway) if text.blank?
-
-      render json: { alt: text }
-    end
-
-    private
-
-    # @param message [String]
-    # @param status [Symbol]
-    def refuse(message, status: :unprocessable_content)
-      render json: { error: message }, status: status
+      render_alt_text(photo[:image], scope: I18N_SCOPE)
     end
   end
 end

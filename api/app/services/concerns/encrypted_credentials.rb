@@ -1,5 +1,5 @@
 # The parts that each credential store shares: the Redis hash, the encryption of a secret field,
-# and the removal of the store.
+# the record of a refused token refresh, and the removal of the store.
 #
 # An includer declares `REDIS_KEY`, the hash, and `ENCRYPTION_SALT`, the salt of its key.
 #
@@ -21,7 +21,35 @@ module EncryptedCredentials
       nil
     end
 
+    # Records a refused token refresh in the "refresh_error" field of the hash. Refer to
+    # RefreshError for the rule. ⚠️ It has no TTL: only a token that arrives, or the removal of the
+    # store, takes it away, because the problem is real until one of those occurs.
+    # @param code [Integer, String] The HTTP status from the token endpoint.
+    # @return [void]
+    def record_refresh_error(code)
+      return unless RefreshError.refused?(code)
+
+      $redis.hset(self::REDIS_KEY, "refresh_error", RefreshError.encode(code))
+      nil
+    end
+
     private
+
+    # Removes the record of a refused refresh. A store calls this when it writes a token: a token
+    # that arrives is the correction.
+    # @return [void]
+    def forget_refresh_error
+      $redis.hdel(self::REDIS_KEY, "refresh_error")
+      nil
+    end
+
+    # @param value [String, nil] An ISO8601 time.
+    # @return [Time, nil]
+    def parse_time(value)
+      Time.iso8601(value) if value.present?
+    rescue ArgumentError
+      nil
+    end
 
     # @param value [String] A secret.
     # @return [String] The encrypted message.

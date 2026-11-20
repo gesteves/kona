@@ -84,7 +84,7 @@ export function urlRanges(text) {
  * @param {string} source A pattern whose first group ends the match.
  * @returns {Array<[number, number]>}
  */
-function groupRanges(text, source) {
+export function groupRanges(text, source) {
   const pattern = new RegExp(source, "g");
   const ranges = [];
   let match;

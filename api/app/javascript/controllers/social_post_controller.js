@@ -4,7 +4,7 @@ import { render } from "../lib/markdown_links";
 import { blueskyText } from "../lib/social_mentions";
 import { applyLengthRules } from "../lib/typography";
 import { toast } from "../lib/toast";
-import { csrfHeader } from "../lib/csrf";
+import { PictureTiles } from "../lib/picture_tiles";
 
 // How long the link field must be quiet before this reads the card. Each preview is one request of
 // this app, which then reads the page of another host.
@@ -51,10 +51,20 @@ export default class extends Controller {
     this.words = i18nTable(this.element);
     this.linkState = IDLE;
     this.photoState = IDLE;
-    // The upload of each tile that is still out, by tile. `disconnect()` and a remove abort it.
-    this.uploads = new Map();
-    // The alt text request of each tile that is still out, by tile, with the same rule.
-    this.generations = new Map();
+    // The upload and the alt text of each photo tile.
+    this.pictures = new PictureTiles({
+      element: this.element,
+      name: "photo",
+      selector: PHOTO,
+      uploadingClass: "social-photo--uploading",
+      field: "photo",
+      words: this.words,
+      url: () => this.uploadUrlValue,
+      template: () => this.photoTemplateTarget,
+      container: () => this.tilesTarget,
+      tiles: () => this.photoTargets,
+      changed: () => this.changed(),
+    });
     // ⚠️ It waits for the definitions: `value` is undefined on these components until the browser
     // upgrades them. A Turbo restoration visit, and a page that renders again after a refusal, both
     // hold values with no controller state.
@@ -63,7 +73,7 @@ export default class extends Controller {
     ).then(() => {
       // ⚠️ A snapshot of Turbo can hold a tile whose upload never finished: it has no id, and
       // nothing can finish it now. It goes, before the state below reads the count of the tiles.
-      this.dropUnfinishedPhotos();
+      if (this.pictures.dropUnfinished() > 0) this.changed();
       // ⚠️ Each state comes from the MARKUP, thus it is the state that the server already
       // rendered and nothing moves. `preview()` below promotes the link to ATTACHED when the page
       // reads, and the picker is open for a post that holds a photo.
@@ -87,11 +97,7 @@ export default class extends Controller {
     clearTimeout(this.previewTimer);
     this.previewSeq = (this.previewSeq ?? 0) + 1;
     this.previewAborter?.abort();
-    this.uploads.forEach((aborter) => aborter.abort());
-    this.uploads.clear();
-    this.generations.forEach((aborter) => aborter.abort());
-    this.generations.clear();
-    this.photoTargets.forEach((tile) => this.revokePreview(tile));
+    this.pictures.stop();
   }
 
   /**
@@ -229,112 +235,7 @@ export default class extends Controller {
     if (files.length > room) {
       toast(t(this.words, "too_many_photos", { limit: this.maxPhotosValue }), "warning");
     }
-    files.slice(0, room).forEach((file) => this.upload(file));
-  }
-
-  /**
-   * Adds a tile for one file and uploads it.
-   *
-   * ⚠️ The tile is on the page from the first moment, with the file itself as its picture: the CSP
-   * of the admin permits `blob:` in `img-src` for this. Its id stays empty until the server
-   * answers, and `social#canPost` keeps the submit button off while a tile is in that state.
-   *
-   * ⚠️ A refusal takes the tile away and says why in a toast. The server names the reason for a
-   * file that is not a photo or that is too large, and the toast shows those words.
-   * @param {File} file
-   */
-  async upload(file) {
-    const tile = this.buildTile(file);
-    this.tilesTarget.appendChild(tile);
-    this.changed();
-
-    const aborter = new AbortController();
-    this.uploads.set(tile, aborter);
-    const body = new FormData();
-    body.append("photo", file, file.name);
-
-    try {
-      const response = await fetch(this.uploadUrlValue, {
-        method: "POST",
-        headers: { Accept: "application/json", ...csrfHeader() },
-        body,
-        signal: aborter.signal,
-      });
-      const answer = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        this.dropTile(tile);
-        toast(answer.error || t(this.words, "upload_failed"), "danger");
-        return;
-      }
-      this.fillTile(tile, answer);
-      // ⚠️ No `await`. `social#canPost` waits for each upload, and it must not wait for Claude too.
-      this.requestAlt(tile, { auto: true });
-    } catch {
-      // A remove or a Turbo visit aborted it, and the tile is already gone.
-      if (aborter.signal.aborted) return;
-
-      this.dropTile(tile);
-      toast(t(this.words, "upload_unreachable"), "danger");
-    } finally {
-      this.uploads.delete(tile);
-      if (this.element.isConnected) this.changed();
-    }
-  }
-
-  /**
-   * One tile in its uploading state, from the template.
-   * @param {File} file
-   * @returns {HTMLElement}
-   */
-  buildTile(file) {
-    const tile = this.photoTemplateTarget.content.cloneNode(true).querySelector(PHOTO);
-    tile.classList.add("social-photo--uploading");
-    tile.querySelector("[data-photo-spinner]").hidden = false;
-
-    const image = tile.querySelector("[data-photo-image]");
-    image.src = URL.createObjectURL(file);
-    image.dataset.objectUrl = image.src;
-
-    return tile;
-  }
-
-  /**
-   * Writes the answer of the server into the tile.
-   *
-   * ⚠️ The picture changes to the path of our own store only after that copy has loaded, thus the
-   * tile never shows an empty box between the two. The object URL goes at that moment.
-   * @param {HTMLElement} tile
-   * @param {object} answer `{ id, path, alt_path, caption }`
-   */
-  fillTile(tile, answer) {
-    tile.querySelector("[data-photo-id]").value = answer.id ?? "";
-    tile.classList.remove("social-photo--uploading");
-    tile.querySelector("[data-photo-spinner]").hidden = true;
-
-    // The Generate control can run once the photo has an id and a path of its own.
-    tile.dataset.photoAltUrl = answer.alt_path ?? "";
-    const generate = tile.querySelector("[data-photo-generate]");
-    if (generate) generate.disabled = !answer.alt_path;
-
-    // ⚠️ The caption of the file goes into an EMPTY field only, before the automatic request.
-    // That request then sees a value and asks Claude for nothing.
-    const alt = tile.querySelector("[data-photo-alt]");
-    if (answer.caption && alt && !alt.value?.trim()) {
-      alt.value = answer.caption;
-      alt.dispatchEvent(new Event("input", { bubbles: true }));
-    }
-
-    const image = tile.querySelector("[data-photo-image]");
-    const stored = new Image();
-    const swap = () => {
-      if (!tile.isConnected) return;
-      image.src = answer.path;
-      this.revokePreview(tile);
-    };
-    stored.addEventListener("load", swap);
-    stored.addEventListener("error", swap);
-    stored.src = answer.path;
+    files.slice(0, room).forEach((file) => this.pictures.upload(file));
   }
 
   /**
@@ -346,45 +247,10 @@ export default class extends Controller {
     const tile = event.target.closest(PHOTO);
     if (!tile) return;
 
-    this.dropTile(tile);
+    this.pictures.drop(tile);
     this.changed();
     // The picker stays open, thus the focus goes to it and not to the button of the toolbar.
     this.fileInputTarget.focus();
-  }
-
-  /**
-   * Removes a tile, and stops its upload when one is out.
-   * @param {HTMLElement} tile
-   */
-  dropTile(tile) {
-    this.uploads.get(tile)?.abort();
-    this.uploads.delete(tile);
-    this.generations.get(tile)?.abort();
-    this.generations.delete(tile);
-    this.revokePreview(tile);
-    tile.remove();
-  }
-
-  /**
-   * Removes each tile whose upload never finished. ⚠️ It runs at connect, for a snapshot of Turbo
-   * that holds such a tile.
-   */
-  dropUnfinishedPhotos() {
-    const unfinished = this.photoTargets.filter((tile) => !tile.querySelector("[data-photo-id]")?.value);
-    unfinished.forEach((tile) => this.dropTile(tile));
-    if (unfinished.length > 0) this.changed();
-  }
-
-  /**
-   * Gives the browser back the bytes of the picture of a tile.
-   * @param {HTMLElement} tile
-   */
-  revokePreview(tile) {
-    const image = tile.querySelector("[data-photo-image]");
-    if (!image?.dataset.objectUrl) return;
-
-    URL.revokeObjectURL(image.dataset.objectUrl);
-    delete image.dataset.objectUrl;
   }
 
   /**
@@ -500,71 +366,7 @@ export default class extends Controller {
   generateAlt(event) {
     event.preventDefault();
     const tile = event.currentTarget.closest(PHOTO);
-    if (tile) this.requestAlt(tile);
-  }
-
-  /**
-   * Asks Claude for the alt text of the photo of a tile, and writes the answer into its field.
-   *
-   * ⚠️ **The button is `loading` AND `disabled` while the request is out.** The `loading`
-   * attribute draws the busy state and keeps the width of the button, and the docs do not say
-   * that it stops a click, thus `disabled` does. The check at the top stops a second request
-   * for the moment between a click and the render.
-   *
-   * ⚠️ A click REPLACES the field, because the owner asked for new words. The automatic request
-   * writes into an EMPTY field only: the owner can type while the upload or the request is out,
-   * and those words win. The caption of the file also fills the field first, thus a file with a
-   * caption gets no automatic request. A value that code writes fires no event, thus this
-   * dispatches `input` on the field: `countAlt` runs for the tile and `social#validate` runs for
-   * the form, exactly as a keystroke would. A refusal leaves the field as it was and says why in
-   * a toast.
-   *
-   * ⚠️ It runs only when the tile has the Generate control. The server renders that control only
-   * with a Claude key, thus with no key the upload asks for nothing.
-   * @param {HTMLElement} tile
-   * @param {object} [options]
-   * @param {boolean} [options.auto] True for the request that the upload starts.
-   */
-  async requestAlt(tile, { auto = false } = {}) {
-    const button = tile.querySelector("[data-photo-generate]");
-    const field = tile.querySelector("[data-photo-alt]");
-    const url = tile.dataset.photoAltUrl;
-    if (!button || !field || !url || button.loading) return;
-    if (auto && field.value?.trim()) return;
-
-    button.loading = true;
-    button.disabled = true;
-    const aborter = new AbortController();
-    this.generations.set(tile, aborter);
-
-    try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { Accept: "application/json", ...csrfHeader() },
-        signal: aborter.signal,
-      });
-      const answer = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        toast(answer.error || t(this.words, "alt_failed"), "danger");
-        return;
-      }
-      if (auto && field.value?.trim()) return;
-
-      field.value = answer.alt ?? "";
-      field.dispatchEvent(new Event("input", { bubbles: true }));
-    } catch {
-      // A remove or a Turbo visit aborted it, and there is nothing to say.
-      if (aborter.signal.aborted) return;
-
-      toast(t(this.words, "alt_unreachable"), "danger");
-    } finally {
-      this.generations.delete(tile);
-      if (tile.isConnected) {
-        button.loading = false;
-        button.disabled = false;
-      }
-    }
+    if (tile) this.pictures.requestAlt(tile);
   }
 
   /**

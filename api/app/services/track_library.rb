@@ -12,6 +12,8 @@ require "time"
 #
 # One Redis hash holds the records (refer to JsonHashStore), with the track id as the field.
 class TrackLibrary
+  include JsonRecordLibrary
+
   # The Redis hash: the field is the track id, and the value is the JSON record.
   REDIS_KEY = "maps:tracks".freeze
 
@@ -73,36 +75,6 @@ class TrackLibrary
     $redis.del(pending_key(id))
   end
 
-  # All the tracks, the newest first.
-  # @return [Array<Hash>]
-  def all
-    records.read_all.values.sort_by { |record| record["uploaded_at"].to_s }.reverse
-  end
-
-  # @param id [String]
-  # @return [Hash, nil]
-  def find(id)
-    records.read(id)
-  end
-
-  # id => status, for the poll endpoint of the page. It is not the full records, on purpose,
-  # because the page gets this each few seconds during an upload.
-  # @return [Hash{String => String}]
-  def statuses
-    all.to_h { |record| [ record["id"], record["status"].to_s ] }
-  end
-
-  # Changes one record in place.
-  # @param id [String]
-  # @param changes [Hash] The changes to put on top of the stored record.
-  # @return [Hash, nil] The new record, or nil if the record is gone.
-  def update(id, changes)
-    record = find(id)
-    return nil if record.nil?
-
-    write(id, record.merge(changes.transform_keys(&:to_s)))
-  end
-
   # Replaces the render settings of a track. It keeps only the keys that are settings, thus a form
   # that an attacker makes cannot write other fields into the record.
   # @param id [String]
@@ -121,27 +93,15 @@ class TrackLibrary
     StaticMap::DEFAULTS.keys
   end
 
+  # Removes a track, and the coordinates that its upload still holds.
   # @param id [String]
   # @return [Boolean] True if the code removed a record.
   def delete(id)
     discard_pending(id)
-    records.delete(id).positive?
-  end
-
-  # @return [Integer]
-  def count
-    records.count
+    super
   end
 
   private
-
-  def records
-    @records ||= JsonHashStore.new(REDIS_KEY)
-  end
-
-  def write(id, record)
-    records.write(id, record)
-  end
 
   def pending_key(id)
     "#{PENDING_KEY_PREFIX}#{id}"
