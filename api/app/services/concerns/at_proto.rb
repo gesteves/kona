@@ -28,7 +28,7 @@ module AtProto
 
   # The seconds that one handle resolution can take. ⚠️ It is shorter than SESSION_TIMEOUT, because
   # the Social media action resolves more than one handle inside one 20-second rack-timeout request.
-  # Refer to Admin::SocialController#bluesky_handle_error.
+  # Refer to SocialDraftValidator#bluesky_handle_error.
   RESOLVE_TIMEOUT = 5
 
   # How long a session stays in Redis. ⚠️ An access token of Bluesky lives approximately 2 hours,

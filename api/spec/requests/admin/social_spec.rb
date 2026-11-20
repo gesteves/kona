@@ -1309,7 +1309,7 @@ RSpec.describe "Admin social media", type: :request do
       it "stops the card reads at the budget, and gives the rest a blank card" do
         # A short budget and one slow read, on the true clock. The first read fits, and the second
         # one comes after the deadline.
-        stub_const("Admin::SocialController::CARD_READ_BUDGET", 0.05)
+        stub_const("SocialDraft::CARD_READ_BUDGET", 0.05)
         allow_any_instance_of(OpenGraph).to receive(:fetch) { sleep 0.1; card }
 
         body = preview(posts: [ { text: "One.", link: url }, { text: "Two.", link: "https://other.test/b/" } ])

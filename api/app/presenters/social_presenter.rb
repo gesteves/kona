@@ -14,14 +14,14 @@ class SocialPresenter
   # The one network with rich text. ⚠️ A Markdown link becomes a facet there: the words carry the
   # address and the URL uses none of the 300 characters. Mastodon and Threads post plain words,
   # thus a link there would reach a reader as its own syntax with the address gone. The composer
-  # unticks and disables those two rows, and `Admin::SocialController#markdown_network_error`
+  # unticks and disables those two rows, and `SocialDraftValidator#markdown_network_error`
   # refuses a request that ticks one anyway.
   MARKDOWN_NETWORK = "bluesky".freeze
 
   # The most photos on one post of each network. A network that is absent takes none. ⚠️ The limit
   # is per POST, but a network takes the draft only when EACH post fits. The composer unticks and
   # disables a row whose limit is below the largest post, and
-  # `Admin::SocialController#photos_network_error` refuses a request that ticks one anyway.
+  # `SocialDraftValidator#photos_network_error` refuses a request that ticks one anyway.
   PHOTO_LIMITS = {
     "bluesky" => Bluesky::MAX_IMAGES,
     "mastodon" => Mastodon::MAX_MEDIA_ATTACHMENTS,
@@ -215,7 +215,7 @@ class SocialPresenter
 
   # @param post [Post]
   # @return [Integer] The graphemes that Bluesky will count for that post, after the handles go in.
-  # ⚠️ The steps and their order are the ones of `Admin::SocialController#text_for`. Thus the count
+  # ⚠️ The steps and their order are the ones of `SocialDraft#text_for`. Thus the count
   # that the server renders and the first count of the browser are the same number.
   def bluesky_length(post)
     Bluesky.post_length(

@@ -28,7 +28,7 @@ class Mastodon < ApplicationService
   # default instance is 500. This class makes no length check of its own.
   # ⚠️ **The body of a draft is NOT always 300 or less.** Only the BLUESKY text carries that limit,
   # and a mention grows the text of each network by a different amount: "@tony" becomes
-  # "@tony@hachyderm.io" here. Thus Admin::SocialController#post_error checks this limit against the
+  # "@tony@hachyderm.io" here. Thus SocialDraftValidator#post_error checks this limit against the
   # text of THIS network, before it adds the job. Without that check a long draft raises here and
   # retries for 24 hours.
   # An instance with a limit below this one would refuse the post, and the job would then run again.

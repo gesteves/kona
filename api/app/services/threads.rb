@@ -50,7 +50,7 @@ class Threads < ApplicationService
   # The limit of the text of a post. Meta counts characters, and this class makes no check.
   # ⚠️ **The body of a draft is NOT always 300 or less.** Only the BLUESKY text carries that limit,
   # and a mention grows the text of each network by a different amount. Thus
-  # Admin::SocialController#post_error checks this limit against the text of THIS network, before it
+  # SocialDraftValidator#post_error checks this limit against the text of THIS network, before it
   # adds the job. Without that check a long draft raises here and retries for 24 hours.
   MAX_CHARACTERS = 500
 

@@ -339,7 +339,7 @@ export default class extends Controller {
    *
    * ⚠️ **A moment that has passed is NOT a schedule**, thus the label goes back to "Post now" and
    * the action posts at once. A label of "Schedule for" over a date in the past would promise
-   * something that cannot happen. `Admin::SocialController#scheduled_at` reads it the same way.
+   * something that cannot happen. `SocialDraft#scheduled_at` reads it the same way.
    * @returns {string}
    */
   get submitLabel() {
@@ -396,7 +396,7 @@ export default class extends Controller {
    * the URL uses none of the 300 characters. The other two post plain words, thus the same draft
    * would reach a reader as `[my post](https://…)`. **And each row takes its own number of
    * photos in a post**, from its `data-max-photos`: Mastodon 4, Threads 20.
-   * `Admin::SocialController#markdown_network_error` and `#photos_network_error` refuse such a
+   * `SocialDraftValidator#markdown_network_error` and `#photos_network_error` refuse such a
    * request as well, because a row that a browser cannot tick a hand-written request can.
    *
    * ⚠️ **It does nothing to a row while the reason of that row has not changed**, and that is not
@@ -466,7 +466,7 @@ export default class extends Controller {
    * @returns {boolean} True when any post of the thread holds a Markdown link.
    *
    * ⚠️ It is THREAD-LEVEL: a thread goes to a network as one unit, thus one link in one post
-   * decides the whole draft. `Admin::SocialController#markdown?` reads it the same way.
+   * decides the whole draft. `SocialDraft#markdown?` reads it the same way.
    */
   get hasMarkdown() {
     return this.postTargets.some((post) => hasLinks(post.querySelector(BODY)?.value ?? ""));
@@ -475,7 +475,7 @@ export default class extends Controller {
   /**
    * @returns {number} The most photos on one post of the thread, and that includes a photo whose
    *   upload is still out. It is THREAD-LEVEL, as `hasMarkdown` is, and
-   *   `Admin::SocialController#most_photos` reads it the same way.
+   *   `SocialDraft#most_photos` reads it the same way.
    */
   get mostPhotos() {
     return Math.max(0, ...this.postTargets.map((post) => post.querySelectorAll(PHOTO).length));
@@ -484,7 +484,7 @@ export default class extends Controller {
   /**
    * @returns {boolean} True while the draft holds something to show.
    *
-   * ⚠️ It reads text OR link, which is the rule that `Admin::SocialController#posts` follows: that
+   * ⚠️ It reads text OR link, which is the rule that `SocialDraft#posts` follows: that
    * method drops a block with nothing at all in it. Thus an empty draft gives no post, and a dialog
    * that opens to say "nothing yet" is worse than a button that is off.
    */
@@ -884,7 +884,7 @@ export default class extends Controller {
    * Fills the website card of a post, or leaves it away.
    *
    * ⚠️ It is the same shape that `social-post#showPreview` writes below the link field, because
-   * `Admin::SocialController#card_json` answers both. Thus the two cannot describe one page
+   * `SocialPreview#card_json` answers both. Thus the two cannot describe one page
    * differently.
    *
    * ⚠️ **The two do NOT draw the same set of cards, on purpose.** This one is what the network will

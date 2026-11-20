@@ -421,7 +421,7 @@ export default class extends Controller {
    * things make those different. A mention grows into a handle, thus "@tony" can become
    * "@tony.bsky.social". And a Markdown link keeps its address in a facet, thus
    * "[my post](https://example.com/a)" is 7 characters and not 30.
-   * `Admin::SocialController#post_error` and `Bluesky.post_length` measure the same string.
+   * `SocialDraftValidator#post_error` and `Bluesky.post_length` measure the same string.
    *
    * And the typography shortens the words: `...` becomes one character and `--` becomes one.
    *
@@ -434,7 +434,7 @@ export default class extends Controller {
    *
    * ⚠️ **The LINK is part of this count when the page it names gives no card.** Bluesky then makes
    * no embed and the link goes in the words, thus it uses characters.
-   * `Admin::SocialController#bluesky_text` composes the same string on the server. The link goes in
+   * `SocialDraft#bluesky_text` composes the same string on the server. The link goes in
    * between the typography and the Markdown, exactly as it does there.
    */
   count() {
@@ -579,7 +579,7 @@ export default class extends Controller {
     this.setLinkState(ATTACHED);
     // ⚠️ **This card is not the card of Bluesky.** A page with no og: tags gets no embed there, and
     // its link goes in the WORDS instead, thus the count holds it. Refer to
-    // `Admin::SocialController#bluesky_text`.
+    // `SocialDraft#bluesky_text`.
     this.setLinkInText(!card.embeddable);
   }
 
