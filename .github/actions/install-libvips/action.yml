@@ -1,0 +1,20 @@
+name: "Install libvips"
+description: "Install libvips from apt, for ruby-vips."
+
+# libvips is not on the runner image, thus apt downloads the full tree. `libvips` is a *virtual*
+# package that libvips42t64 supplies, and that package needs approximately 33 direct dependencies
+# (ImageMagick, poppler, librsvg, heif, jxl, and more).
+#
+# ⚠️ Keep --no-install-recommends. libvips42t64 declares no Recommends, but the packages below it
+# do, and apt installs the recommends by default.
+# ⚠️ Keep the virtual name, and do not write libvips42t64. The virtual name stays correct through
+# each Ubuntu package rename, and the t64 suffix is one of those renames.
+#
+# Each job that uses this gives its own reason at the step.
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install libvips (ruby-vips / blurhashes)
+      shell: bash
+      run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libvips

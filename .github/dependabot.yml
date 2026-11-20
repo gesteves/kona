@@ -117,8 +117,8 @@ updates:
   # `directory: "/"` covers .github/workflows only. The composite action in
   # .github/actions/notify-slack has its own `uses:`, which is slackapi/slack-github-action. Thus it
   # needs its own entry that points at the folder with its action.yml, or nothing updates it.
-  # ci-context is not here, because it uses no action from another repository. Add it if that
-  # changes.
+  # ci-context and install-libvips are not here, because they use no action from another
+  # repository. Add one if that changes.
   - package-ecosystem: "github-actions"
     directories:
       - "/"

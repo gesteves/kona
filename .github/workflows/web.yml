@@ -56,21 +56,102 @@ permissions:
 # progress, thus the workflow builds only the most recent content. This is safe during a deploy,
 # because wrangler activates the new Worker version only at the end. Thus a deploy that stops
 # keeps the current version live.
+# ⚠️ A content publish has the ref of main, thus it also stops a push run on main before its
+# checks end. The `gate` job is what makes that safe.
 concurrency:
   group: web-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  # Tells if the code on main already passed `checks` and `security`. A content publish and a
+  # manual build skip those two jobs only when this job says yes.
+  #
+  # ⚠️ Nothing else makes sure that main is green. Without this job, a push whose checks fail
+  # stops its own deploy, and the next content publish then sends that same commit to production.
+  # A publish also stops a push run that is in progress (refer to `concurrency` above), and that
+  # commit then has no checks at all.
+  #
+  # The rule: the newest push run of this workflow on main passed both jobs, and no file that this
+  # workflow builds changed between that commit and this one. A commit with [skip ci] makes no
+  # push run, and that is the reason for the comparison of the files.
+  #
+  # ⚠️ Each failure here gives `verified=false`, and the two jobs then run. A problem with the API
+  # of GitHub can make a deploy slower. It must never let a deploy go out with no checks.
+  gate:
+    name: Check that main passed
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # A manual run from a different branch never deploys, thus it needs no answer.
+    if: >-
+      github.event_name == 'repository_dispatch' ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    # `actions: read` is for the runs and their jobs. `contents: read` is for the comparison.
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      verified: ${{ steps.main.outputs.verified }}
+
+    steps:
+      - name: Read the newest push run on main
+        id: main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          # Writes the answer and its reason, then ends the step. ⚠️ It always exits with 0: refer
+          # to the ⚠️ above the job. Each command below that can fail calls it with `false`.
+          answer() {
+            echo "verified=$1" >> "$GITHUB_OUTPUT"
+            echo "$2"
+            exit 0
+          }
+
+          run=$(gh api "repos/$REPOSITORY/actions/workflows/web.yml/runs?branch=main&event=push&per_page=1" \
+            --jq '.workflow_runs[0] | "\(.id) \(.head_sha)"') || answer false "Could not read the push runs."
+          read -r run_id run_sha <<< "$run"
+          case "$run_id" in
+            ''|*[!0-9]*) answer false "There is no push run on main." ;;
+          esac
+
+          # ⚠️ These are the `name:` values of the two jobs below. With a different name there, this
+          # count is 0, and each content publish then runs the checks.
+          passed=$(gh api "repos/$REPOSITORY/actions/runs/$run_id/jobs" \
+            --jq '[.jobs[] | select((.name == "Checks" or .name == "Security scan") and .conclusion == "success")] | length') \
+            || answer false "Could not read the jobs of run $run_id."
+          [ "$passed" = "2" ] || answer false "Run $run_id did not pass the checks and the security scan."
+
+          [ "$run_sha" = "$GITHUB_SHA" ] && answer true "Run $run_id passed for this commit."
+
+          # ⚠️ Keep this pattern the same as the `paths` list at the top of this file. The API gives
+          # 300 files at the most, thus a larger difference has no answer.
+          changed=$(gh api "repos/$REPOSITORY/compare/$run_sha...$GITHUB_SHA" --jq '
+            if .status != "ahead" or (.files | length) >= 300 then "unknown"
+            else [.files[].filename | select(test("^(web/|\\.github/workflows/web\\.yml$|\\.github/actions/)"))] | length
+            end') || answer false "Could not compare $run_sha with $GITHUB_SHA."
+          [ "$changed" = "0" ] || answer false "Web files changed after run $run_id, or the difference is not known ($changed)."
+
+          answer true "Run $run_id passed, and no web file changed after it."
+
   checks:
+    # ⚠️ The `gate` job finds this job by this name.
     name: Checks
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    needs: [gate]
     # This does not run for a Contentful publish (repository_dispatch) or for a manual build
-    # (workflow_dispatch). Both build the code that is already on main with the current content.
-    # Thus there is nothing new to test, to lint, or to typecheck, and the code on main passed the
-    # checks at the push. This keeps a content publish and an on-demand preview build off the test
-    # path, which takes approximately one minute.
-    if: github.event_name != 'repository_dispatch' && github.event_name != 'workflow_dispatch'
+    # (workflow_dispatch) when `gate` says that the code on main passed at the push. Both build
+    # the code that is already on main with the current content, thus there is nothing new to
+    # test, to lint, or to typecheck. This keeps a content publish and an on-demand preview build
+    # off the test path, which takes approximately one minute.
+    #
+    # ⚠️ `!cancelled()` is necessary: `gate` does not run for a push or a PR, and a job with a
+    # skipped dependency does not run without it. A `gate` that failed is not "skipped" and it
+    # gives no output, thus this job runs.
+    if: >-
+      !cancelled() &&
+      ((github.event_name != 'repository_dispatch' && github.event_name != 'workflow_dispatch') ||
+      (needs.gate.result != 'skipped' && needs.gate.outputs.verified != 'true'))
 
     defaults:
       run:
@@ -89,18 +170,12 @@ jobs:
       # This is one of the slower steps, but its time changes with the apt mirror. Different runs
       # of `deploy` measured 13s and 48s, against approximately 16s for the site build. That ratio
       # is why the blurhash generation stays here: a move into the api would remove this install
-      # but would not save much time. libvips is not on the runner image, thus apt downloads the
-      # full tree. `libvips` is a *virtual* package that libvips42t64 supplies, and that package
-      # needs approximately 33 direct dependencies (ImageMagick, poppler, librsvg, heif, jxl, and
-      # more). libvips42t64 declares no Recommends, but the packages below it do, and apt installs
-      # the recommends by default. Thus this uses --no-install-recommends. Keep the virtual name
-      # and do not use libvips42t64: the virtual name stays correct through the Ubuntu package
-      # renames (the t64 suffix is one of those renames).
-      # ⚠️ BOTH jobs need this. web/lib/helpers/image_helpers.rb requires 'vips' at the top level.
-      # Thus rspec cannot load the helper without it, and the specs that stub Vips::Image do not
-      # help.
-      - name: Install libvips (ruby-vips / blurhashes)
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libvips
+      # but would not save much time.
+      # ⚠️ BOTH `checks` and `deploy` need this. web/lib/helpers/image_helpers.rb requires 'vips'
+      # at the top level. Thus rspec cannot load the helper without it, and the specs that stub
+      # Vips::Image do not help.
+      - name: Install libvips
+        uses: ./.github/actions/install-libvips
 
       - name: Set up Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
@@ -154,11 +229,17 @@ jobs:
         run: npm run format:check
 
   security:
+    # ⚠️ The `gate` job finds this job by this name.
     name: Security scan
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # The same rule as `checks`: a content publish builds code that already passed at the push.
-    if: github.event_name != 'repository_dispatch' && github.event_name != 'workflow_dispatch'
+    needs: [gate]
+    # The same rule as `checks`, and keep the two expressions the same: a content publish skips
+    # this only when `gate` says that the code on main passed at the push.
+    if: >-
+      !cancelled() &&
+      ((github.event_name != 'repository_dispatch' && github.event_name != 'workflow_dispatch') ||
+      (needs.gate.result != 'skipped' && needs.gate.outputs.verified != 'true'))
 
     defaults:
       run:
@@ -212,9 +293,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     needs: [checks, security]
-    # Use always(), thus a failure in checks still sends a message. This does not run for the
-    # dispatch trigger or the manual trigger, where checks did not run.
-    if: ${{ always() && github.event_name != 'repository_dispatch' && github.event_name != 'workflow_dispatch' }}
+    # Use always(), thus a failure in checks still sends a message. This does not run when both
+    # jobs were skipped: a content publish or a manual build of code that already passed.
+    # ⚠️ It does run for a content publish whose checks ran. A failure there stops the deploy, and
+    # this message is the only sign that the publish did not go out.
+    if: ${{ always() && (needs.checks.result != 'skipped' || needs.security.result != 'skipped') }}
 
     steps:
       # This job only sends a message to Slack. The checkout is here only to make the local
@@ -259,8 +342,9 @@ jobs:
     # and causes no damage: the checks do not run and this condition stops the deploy. The
     # [skip deploy] and [no deploy] text applies only to a push, because a dispatch run or a
     # manual run has no commit. The result conditions let the deploy run when a dependency is
-    # *skipped* (a content dispatch or a manual run, where neither checks nor security runs) and
-    # also when it is *successful* (a code push). They do not let it run when a dependency fails.
+    # *skipped* (a content dispatch or a manual run of code that `gate` found green) and also when
+    # it is *successful* (a code push, or a dispatch whose checks ran here). They do not let it
+    # run when a dependency fails.
     # !cancelled() is what lets this expression continue past a dependency that did not run.
     #
     # ⚠️ Name both `needs` here. `!cancelled()` replaces the implicit "all needs are successful"
@@ -310,21 +394,10 @@ jobs:
           working-directory: web
           bundler-cache: true
 
-      # This is one of the slower steps, but its time changes with the apt mirror. Different runs
-      # of `deploy` measured 13s and 48s, against approximately 16s for the site build. That ratio
-      # is why the blurhash generation stays here: a move into the api would remove this install
-      # but would not save much time. libvips is not on the runner image, thus apt downloads the
-      # full tree. `libvips` is a *virtual* package that libvips42t64 supplies, and that package
-      # needs approximately 33 direct dependencies (ImageMagick, poppler, librsvg, heif, jxl, and
-      # more). libvips42t64 declares no Recommends, but the packages below it do, and apt installs
-      # the recommends by default. Thus this uses --no-install-recommends. Keep the virtual name
-      # and do not use libvips42t64: the virtual name stays correct through the Ubuntu package
-      # renames (the t64 suffix is one of those renames).
-      # ⚠️ BOTH jobs need this. web/lib/helpers/image_helpers.rb requires 'vips' at the top level.
-      # Thus rspec cannot load the helper without it, and the specs that stub Vips::Image do not
-      # help.
-      - name: Install libvips (ruby-vips / blurhashes)
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libvips
+      # The build makes the blurhash of each image with libvips. Refer to the same step in
+      # `checks`.
+      - name: Install libvips
+        uses: ./.github/actions/install-libvips
 
       - name: Set up Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7

@@ -50,6 +50,11 @@ runs:
         # backslash that the quote rule just added.
         COMMIT_MESSAGE="$(printf '%s' "$COMMIT_MESSAGE" | head -n 1 | sed 's/\\/\\\\/g; s/"/\\"/g')"
 
+        # A branch name can hold a double quote, and it goes into the same YAML block. In the URL,
+        # the quote becomes its percent escape.
+        BRANCH_NAME="$(printf '%s' "$BRANCH_NAME" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+        BRANCH_URL="$(printf '%s' "$BRANCH_URL" | sed 's/"/%22/g')"
+
         # COMMIT_CONTEXT is the first line of the Slack attachment. Only a push event and a PR
         # event describe a change. For the two deploy triggers that do not, the usual
         # "<sha> - <message>" gives only a hash and a hyphen. Give those a label that names the
