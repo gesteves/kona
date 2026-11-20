@@ -76,6 +76,14 @@ module ImageHelpers
     asset&.content_type
   end
 
+  # ⚠️ A GIF gets no transformation and no srcset, thus it keeps its animation. A width makes
+  # Cloudflare give one static frame of it. Each image method reads this rule here.
+  # @param asset_id [String] The ID of the asset.
+  # @return [Boolean] True if the asset is a GIF.
+  def gif_asset?(asset_id)
+    get_asset_content_type(asset_id) == "image/gif"
+  end
+
   # @param asset_id [String] The ID of the asset.
   # @return [String, nil] The URL of the asset, or nil if the app cannot find it.
   def get_asset_url(asset_id)
@@ -200,9 +208,7 @@ module ImageHelpers
     # of the page, thus a caller can pass it for each card in a list and one card only takes it.
     lcp = eager && claim_lcp_image
 
-    # A GIF gets no transformation and no srcset: a transformation makes one static frame from it.
-    # responsivize_images and resize_images have the same rule.
-    gif = get_asset_content_type(asset_id) == "image/gif"
+    gif = gif_asset?(asset_id)
     # ⚠️ The src must be one of the candidates below, word for word, and `fm` is part of that.
     # Cloudflare renders and bills one transformation for each different URL, thus a src that only
     # looks the same is a second render of each cover image that no browser uses.
@@ -244,8 +250,8 @@ module ImageHelpers
     tag(:img, attributes)
   end
 
-  # The candidate widths of a card image. It removes each width above the width of the asset,
-  # because Cloudflare does not make an image larger than its source.
+  # The candidate widths of an image, for a card and for a body image. It removes each width above
+  # the width of the asset, because Cloudflare does not make an image larger than its source.
   # @param widths [Array<Integer>] The widths of the variant.
   # @param asset_width [Integer, nil] The width of the asset.
   # @return [Array<Integer>] The widths, in order, with no duplicate.

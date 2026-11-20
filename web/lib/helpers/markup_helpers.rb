@@ -109,31 +109,6 @@ module MarkupHelpers
     end
   end
 
-  # Renders a body as portable Markdown, for a reader on another site. It uses the feed transforms,
-  # then changes each construct with no Markdown form into plain Markdown.
-  #
-  # ⚠️ A construct that normalize_for_markdown does not know goes out as its text only. Add a step
-  # there for each new kind of markup in a body.
-  # @param text [String] The Markdown text from Contentful.
-  # @param base_url [String] The URL of the page. Each relative link resolves against it.
-  # @return [String, nil] The Markdown, or nil for a blank input.
-  def render_markdown_body(text, base_url:)
-    return if text.blank?
-
-    html = render_markup(text) do |doc|
-      add_image_data_attributes(doc)
-      add_figure_elements_to_images(doc)
-      add_figure_elements_to_iframes(doc)
-      add_figure_elements_to_embeds(doc)
-      set_caption_credit(doc)
-      resize_images(doc, width: data.srcsets.entry.widths.max)
-      set_alt_text(doc)
-      set_iframe_titles(doc)
-      normalize_for_markdown(doc, base_url: base_url)
-    end
-    html_to_markdown(html)
-  end
-
   # Renders a body for the home page, with square images and no change to the degree notation.
   # @param text [String] The Markdown text to render.
   # @return [String] The HTML after the transforms.
@@ -377,15 +352,6 @@ module MarkupHelpers
     end
   end
 
-  # Adds srcset, sizes, and the true dimensions to each asset image. A <picture> element is not
-  # necessary: the srcset asks for format=auto, thus Cloudflare selects the format from the
-  # Accept header. This also keeps each candidate to one transformation that Cloudflare bills.
-  # @param html [String, Nokogiri::XML::Node] The HTML to change.
-  # @param widths [Array<Integer>] The candidate widths. The width of the asset is the maximum.
-  # @param sizes [String] The value of the sizes attribute.
-  # @param lazy [Boolean] True to load the image only when it is necessary.
-  # @param square [Boolean] True to cut the image to a square.
-  # @return [String, Nokogiri::XML::Node] The HTML after the change.
   # Marks the first asset image of the page as the probable LCP element.
   #
   # ⚠️ The flag is an instance variable, thus it covers the full page: `_body.html.erb` calls
@@ -397,6 +363,10 @@ module MarkupHelpers
     @lcp_image_claimed = true
   end
 
+  # Adds srcset, sizes, and the true dimensions to each asset image. A <picture> element is not
+  # necessary: the srcset asks for format=auto, thus Cloudflare selects the format from the
+  # Accept header. This also keeps each candidate to one transformation that Cloudflare bills.
+  #
   # `first_image` gives the first asset image of the PAGE a role:
   #   :priority  `fetchpriority="high"`, and the image stays lazy.
   #   :eager     the same, and `loading="eager"`.
@@ -405,33 +375,32 @@ module MarkupHelpers
   # `sizes` list that has no `auto`. `auto` is valid on a lazy image only, and a browser ignores it
   # on an eager image. Today the home page hero is the one such image. Most body images are below
   # the fold, thus `:priority` is correct there and `:eager` would get an image that nobody sees.
+  # @param html [String, Nokogiri::XML::Node] The HTML to change.
+  # @param widths [Array<Integer>] The candidate widths. The width of the asset is the maximum.
+  # @param sizes [String] The value of the sizes attribute.
+  # @param lazy [Boolean] True to load the image only when it is necessary.
+  # @param square [Boolean] True to cut the image to a square.
+  # @param first_image [Symbol, nil] :priority, :eager, or nil for no role.
+  # @return [String, Nokogiri::XML::Node] The HTML after the change.
   def responsivize_images(html, widths: [ 100, 200, 300 ], sizes: "100vw", lazy: true, square: false,
                           first_image: nil)
     with_nokogiri_doc(html) do |doc|
       each_asset_image(doc) do |img, asset_id, original_url|
         width, height = get_asset_dimensions(asset_id)
-        content_type = get_asset_content_type(asset_id)
-
-        img_widths = widths.dup
-        if width.present?
-          img_widths << width if width < img_widths.max
-          img_widths = img_widths.reject { |w| w > width }
-        end
-        img_widths = img_widths.uniq.sort
+        img_widths = card_widths(widths, width)
 
         img["loading"] = "lazy" if lazy
         if first_image && claim_lcp_image
           img["fetchpriority"] = "high"
           img["loading"] = "eager" if first_image == :eager
         end
-        if width.present? && height.present?
+        # An asset with no size, or with a size of 0, gets neither attribute: `width="0"` hides it.
+        if width.to_i.positive? && height.to_i.positive?
           img["width"] = width
           img["height"] = square ? width : height
         end
 
-        # No transformation for a GIF, thus it keeps its animation. A width would make one static
-        # frame from it. resize_images has the same rule.
-        if content_type == "image/gif"
+        if gif_asset?(asset_id)
           img["src"] = cdn_image_url(original_url)
           next
         end
@@ -458,11 +427,8 @@ module MarkupHelpers
     with_nokogiri_doc(html) do |doc|
       each_asset_image(doc) do |img, asset_id, original_url|
         asset_width, _ = get_asset_dimensions(asset_id)
-        content_type = get_asset_content_type(asset_id)
 
-        img["src"] = if content_type == "image/gif"
-          # No transformation, thus a GIF keeps its animation. If you give this a width,
-          # Cloudflare makes one static frame from it.
+        img["src"] = if gif_asset?(asset_id)
           cdn_image_url(original_url)
         else
           cdn_image_url(original_url, { w: [ width, asset_width ].compact.min })
@@ -586,16 +552,17 @@ module MarkupHelpers
     end
   end
 
-  # Marks each Amazon Associates link as sponsored and opens it in a new tab.
+  # Marks each Amazon Associates link as sponsored and opens it in a new tab. It adds to the rel
+  # that the author wrote, as open_external_links_in_new_tabs does.
   # @param html [String, Nokogiri::XML::Node] The HTML to change.
   # @return [String, Nokogiri::XML::Node] The HTML after the change.
   def mark_affiliate_links(html)
     with_nokogiri_doc(html) do |doc|
       doc.css("a").each do |a|
-        if amazon_associates_link?(a["href"])
-          a["rel"] = "sponsored nofollow noopener"
-          a["target"] = "_blank"
-        end
+        next unless amazon_associates_link?(a["href"])
+
+        a["rel"] = (%w[sponsored nofollow noopener] + a["rel"].to_s.split).uniq.join(" ")
+        a["target"] = "_blank"
       end
     end
   end
@@ -730,97 +697,6 @@ module MarkupHelpers
 
   private
 
-  # Changes the HTML of the feed transforms into HTML that has a Markdown form.
-  # @param doc [Nokogiri::HTML::DocumentFragment] The parsed body.
-  # @param base_url [String] The URL that each relative link resolves against.
-  # @return [void]
-  def normalize_for_markdown(doc, base_url:)
-    doc.css("script, style").remove
-    doc.css("figure").each { |figure| unwrap_figure(doc, figure) }
-    doc.css("iframe").each { |iframe| iframe.replace(iframe_link(doc, iframe)) }
-    doc.css("cite").each { |cite| cite.name = "em" }
-    doc.css("[data-imperial]").each do |element|
-      element.replace(Nokogiri::XML::Text.new("#{element.text} (#{element['data-imperial']})", doc))
-    end
-    doc.css("a[href]").each { |a| a["href"] = absolute_url(base_url, a["href"]) }
-    doc.css("img[src]").each { |img| img["src"] = absolute_url(base_url, img["src"]) }
-  end
-
-  # Replaces a <figure> with its content and a paragraph for its caption. An image goes in a
-  # paragraph, and an iframe becomes a link.
-  # @param doc [Nokogiri::HTML::DocumentFragment] The parsed body.
-  # @param figure [Nokogiri::XML::Node] The figure.
-  # @return [void]
-  def unwrap_figure(doc, figure)
-    figcaption = figure.at_css("figcaption")&.remove
-    nodes = figure.element_children.map do |child|
-      case child.name
-      when "img" then wrap_node(doc, "p", child)
-      when "iframe" then wrap_node(doc, "p", iframe_link(doc, child))
-      else child
-      end
-    end
-    nodes << caption_paragraph(figcaption) if figcaption&.text.present?
-    nodes.each { |node| figure.add_previous_sibling(node) }
-    figure.remove
-  end
-
-  # Changes a figcaption into a paragraph. Its credit becomes plain text after the caption, with the
-  # " | " separator that the author wrote.
-  # @param figcaption [Nokogiri::XML::Node] The figcaption.
-  # @return [Nokogiri::XML::Node] The paragraph.
-  def caption_paragraph(figcaption)
-    credit = figcaption.at_xpath("./cite")
-    if credit
-      # set_caption_credit already put a space before the credit.
-      caption = credit.xpath("preceding-sibling::node()").map(&:text).join.strip
-      credit.add_previous_sibling(Nokogiri::XML::Text.new("| ", figcaption.document)) if caption.present?
-      credit.replace(credit.children)
-    end
-    figcaption.name = "p"
-    figcaption
-  end
-
-  # A link to the content of an iframe. A YouTube embed links to the watch page of its video.
-  # @param doc [Nokogiri::HTML::DocumentFragment] The parsed body.
-  # @param iframe [Nokogiri::XML::Node] The iframe.
-  # @return [Nokogiri::XML::Node] The link.
-  def iframe_link(doc, iframe)
-    src = iframe["src"].to_s
-    youtube_id = src[YOUTUBE_EMBED_REGEX, 1]
-    title = iframe["title"].presence || iframe_title(iframe)
-
-    a = Nokogiri::XML::Node.new("a", doc)
-    if youtube_id
-      a["href"] = "https://www.youtube.com/watch?v=#{youtube_id}"
-      a.content = title == YOUTUBE_PLAYER_TITLE ? "Watch on YouTube" : title
-    else
-      a["href"] = src
-      a.content = title
-    end
-    a
-  end
-
-  # @param doc [Nokogiri::HTML::DocumentFragment] The parsed body.
-  # @param name [String] The name of the new element.
-  # @param node [Nokogiri::XML::Node] The node to put in it.
-  # @return [Nokogiri::XML::Node] The new element.
-  def wrap_node(doc, name, node)
-    wrapper = Nokogiri::XML::Node.new(name, doc)
-    wrapper.add_child(node)
-    wrapper
-  end
-
-  # Resolves a URL against the URL of the page. A URL with an incorrect shape stays as it is.
-  # @param base_url [String] The URL of the page.
-  # @param url [String] The URL to resolve.
-  # @return [String] The absolute URL.
-  def absolute_url(base_url, url)
-    URI.join(base_url, url).to_s
-  rescue URI::Error
-    url
-  end
-
   # The name for an iframe with no title: the caption of its figure, or the host that it embeds.
   # @param iframe [Nokogiri::XML::Node] The iframe.
   # @return [String] The title.
@@ -838,7 +714,6 @@ module MarkupHelpers
 
   # Puts a node in a <figure>, but not if its parent is already a <figure>. Then it adds the
   # figure classes.
-  # Puts a node in a <figure>.
   #
   # ⚠️ A node in a paragraph replaces that paragraph, as an image does, and the other content of
   # the paragraph goes into a <figcaption>. A <figure> inside a <p> is not valid HTML: the browser

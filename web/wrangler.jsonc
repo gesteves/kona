@@ -25,15 +25,11 @@
     // straight from the static asset layer and never runs Worker code. Requires wrangler ≥ 4.20;
     // globs cross `/`.
     //
-    // We flipped from the old "/* minus ~25 asset negations" model once the page-serving
-    // fallthrough stopped doing any per-view work: server-side Known Agents tracking was removed,
-    // so running the Worker on every page view only cost an invocation + a log line. Page views
-    // now skip the Worker entirely. This form also retires the extension-negation traps the old
-    // model kept tripping on (a blanket `!/*.js` used to swallow /pa/script.js; `!/*.xml` would
-    // swallow the feeds) — there are simply no negations any more.
+    // ⚠️ Do not go back to `/*` with one negation for each kind of asset. A wide negation such as
+    // `!/*.js` also stops the Worker for /pa/script.js, and nothing reports it.
     //
-    // The two dynamic routes that MUST run the Worker (see src/index.ts) — neither has a static
-    // asset, so assets-first would 404 them and they have to reach an origin:
+    // The route families that MUST run the Worker (refer to src/index.ts). None has a static
+    // asset, thus the asset layer would answer each one with a 404:
     //   /widgets/*, /api/contact  → kona-api proxy (no asset; must reach the origin)
     //   /pa/*                     → Plausible first-party proxy (no asset; proxied upstream)
     //   /og.png, /*/og.png        → the on-demand Open Graph card renderer (src/og.ts)

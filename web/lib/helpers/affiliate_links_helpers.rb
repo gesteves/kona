@@ -11,8 +11,11 @@ module AffiliateLinksHelpers
   # ⚠️ The store is at the module level, by collection, and not an instance variable. Each rendered
   # file has its own template context, and the disclosure partial of a feed reads this for each
   # entry of each of the ~40 feeds: an instance variable made the full parse run again in each.
+  # ⚠️ Both collections are in the key, because the about page reads this too. With the articles
+  # alone, an edit to a page on the development server keeps the old answer.
   def has_amazon_associates_links?(content)
-    memoize_entry(:amazon_associates_links, content.sys&.id, (data.articles if respond_to?(:data))) do
+    collections = respond_to?(:data) ? [ data.articles, data.pages ] : [ nil ]
+    memoize_entry(:amazon_associates_links, content.sys&.id, *collections) do
       scan_for_amazon_associates_links(content)
     end
   end

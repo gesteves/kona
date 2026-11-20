@@ -15,7 +15,7 @@ const SITE_KEY = '0x000000000000000000';
 // The fields have no default values, on purpose. `form.reset()` puts the DEFAULTS back. Thus a test
 // for "the form is empty" against markup with values would pass for each action of the controller.
 // `mountForm` puts text into the fields after the mount, as a visitor does.
-const form = ({ siteKey = '', submitTarget = true } = {}) => `
+const form = ({ siteKey = '', submitTarget = true, staleWidget = '' } = {}) => `
   <form action="/api/contact" method="post" data-controller="contact"
         data-action="submit->contact#submit"
         ${siteKey ? `data-contact-site-key-value="${siteKey}"` : ''}>
@@ -23,7 +23,7 @@ const form = ({ siteKey = '', submitTarget = true } = {}) => `
     <input type="email" name="email">
     <textarea name="message"></textarea>
     <input type="text" name="comment">
-    <div data-contact-target="turnstile"></div>
+    <div data-contact-target="turnstile">${staleWidget}</div>
     ${submitTarget ? '<wa-button data-contact-target="submit"></wa-button>' : ''}
   </form>
 `;
@@ -291,6 +291,27 @@ describe('Turnstile', () => {
     expect(window.turnstile.render).toHaveBeenCalledWith(
       element.querySelector('[data-contact-target="turnstile"]'),
       expect.objectContaining({ sitekey: SITE_KEY })
+    );
+  });
+
+  // ⚠️ Turbo takes its snapshot before disconnect() runs. A page that Turbo restores holds a dead
+  // copy of the widget, and its hidden field has an old token that the form would send.
+  it('empties the element before the render, for a page that Turbo restored', async () => {
+    const { element } = await mountForm({
+      siteKey: SITE_KEY,
+      staleWidget:
+        '<iframe class="stale"></iframe><input type="hidden" name="cf-turnstile-response" value="old-token">',
+    });
+    const target = element.querySelector('[data-contact-target="turnstile"]');
+    expect(target.children).toHaveLength(2);
+
+    await resolveTurnstileScript();
+
+    expect(target.children).toHaveLength(0);
+    expect(new FormData(element).has('cf-turnstile-response')).toBe(false);
+    expect(window.turnstile.render).toHaveBeenCalledWith(
+      target,
+      expect.anything()
     );
   });
 

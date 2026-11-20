@@ -36,6 +36,10 @@ export default class extends Controller {
         // result. Without this check, the widget renders into an element that is not in the
         // document, and the code sets widgetId after disconnect() ran. Thus nothing removes it.
         if (!this.element.isConnected) return;
+        // ⚠️ Turbo takes its snapshot before disconnect() runs. Thus a page that Turbo restores
+        // holds a dead copy of the widget: an iframe that nothing controls, and a hidden field
+        // with an old token that the form would send. Empty the element before the render.
+        this.turnstileTarget.replaceChildren();
         this.widgetId = window.turnstile.render(this.turnstileTarget, {
           sitekey: this.siteKeyValue,
           callback: (token) => {

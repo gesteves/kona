@@ -1,35 +1,42 @@
 import { Controller } from '@hotwired/stimulus';
 
-// One formatter for each timezone, for the whole page. A listing page has one controller for each
-// card, and each render made two formatters.
+// The two shapes of a date: the YYYY-MM-DD calendar day, which `en-CA` writes, and the absolute
+// date in the words of the server, "Saturday, August 1, 2026".
+const DAY = {
+  locale: 'en-CA',
+  options: { year: 'numeric', month: '2-digit', day: '2-digit' },
+};
+const LONG = {
+  locale: 'en-US',
+  options: { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' },
+};
+
+// One formatter for each shape and each timezone, for the whole page. A listing page has one
+// controller for each card, and each render made two formatters.
 const dateFormatters = new Map();
 
 /**
+ * @param {{locale: string, options: object}} shape - DAY or LONG.
  * @param {string} timeZone - An IANA timezone id, or an empty string for the zone of the viewer.
  * @returns {Intl.DateTimeFormat}
  */
-function dateFormatter(timeZone) {
-  if (!dateFormatters.has(timeZone)) {
+function dateFormatter(shape, timeZone) {
+  const key = `${shape.locale}|${timeZone}`;
+  if (!dateFormatters.has(key)) {
     let formatter;
     try {
-      formatter = new Intl.DateTimeFormat('en-CA', {
+      formatter = new Intl.DateTimeFormat(shape.locale, {
+        ...shape.options,
         timeZone: timeZone || undefined,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
       });
     } catch {
       // ⚠️ A TIME_ZONE with a mistake raises here, and that would remove each badge and each
       // clock on the site. The zone of the viewer is the fallback.
-      formatter = new Intl.DateTimeFormat('en-CA', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      });
+      formatter = new Intl.DateTimeFormat(shape.locale, shape.options);
     }
-    dateFormatters.set(timeZone, formatter);
+    dateFormatters.set(key, formatter);
   }
-  return dateFormatters.get(timeZone);
+  return dateFormatters.get(key);
 }
 
 /**
@@ -144,24 +151,9 @@ export default class extends Controller {
    * @returns {string}
    */
   absoluteDate() {
-    let formatter;
-    try {
-      formatter = new Intl.DateTimeFormat('en-US', {
-        timeZone: this.timeZoneValue || undefined,
-        weekday: 'long',
-        month: 'long',
-        day: 'numeric',
-        year: 'numeric',
-      });
-    } catch {
-      formatter = new Intl.DateTimeFormat('en-US', {
-        weekday: 'long',
-        month: 'long',
-        day: 'numeric',
-        year: 'numeric',
-      });
-    }
-    return formatter.format(new Date(this.datetimeValue));
+    return dateFormatter(LONG, this.timeZoneValue || '').format(
+      new Date(this.datetimeValue)
+    );
   }
 
   publishedOn() {
@@ -179,6 +171,6 @@ export default class extends Controller {
    * @returns {string}
    */
   dateInTimeZone(date) {
-    return dateFormatter(this.timeZoneValue || '').format(date);
+    return dateFormatter(DAY, this.timeZoneValue || '').format(date);
   }
 }
