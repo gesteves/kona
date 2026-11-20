@@ -13,12 +13,6 @@ module Admin
       @apps = [ bluesky_app, mastodon_app, strava_app, threads_app, trainer_road_app, whoop_app ].compact
     end
 
-    # DELETE /connected-apps/whoop
-    def whoop
-      Whoop.new.disconnect!
-      redirect_to connected_apps_path, status: :see_other, notice: t("admin.connected_apps.flash.whoop_disconnected")
-    end
-
     private
 
     def bluesky_app
@@ -157,7 +151,7 @@ module Admin
           summary: t("admin.connected_apps.summary.whoop")
         ),
         connected: connected,
-        connect_path: "/whoop/auth",
+        connect_path: whoop_authorize_path,
         disconnect_path: whoop_connection_path,
         error: (refresh_error_message(service.refresh_error, name: t("admin.networks.whoop"),
                                       consequence: t("admin.connected_apps.whoop.consequence")) if connected)

@@ -1,6 +1,5 @@
 require "graphql/client"
 require "graphql/client/http"
-require "httparty"
 
 # The GraphQL client of the Font Awesome API. It is the same as
 # lib/data/graphql/font_awesome.rb of the web app. The code makes the HTTP client and the schema at

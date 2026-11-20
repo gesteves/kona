@@ -401,20 +401,6 @@ RSpec.describe "Admin connected apps", type: :request do
     end
   end
 
-  describe "DELETE /connected-apps/whoop" do
-    before { sign_in! }
-
-    it "forgets the stored credentials and returns to the page" do
-      expect_any_instance_of(Whoop).to receive(:disconnect!)
-
-      delete "/connected-apps/whoop"
-
-      expect(response).to have_http_status(:see_other)
-      expect(response).to redirect_to("/connected-apps")
-      expect(flash[:notice]).to eq(I18n.t("admin.connected_apps.flash.whoop_disconnected"))
-    end
-  end
-
   describe "without an owner session" do
     it "redirects the page to the login screen" do
       get "/connected-apps"

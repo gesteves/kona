@@ -1,5 +1,3 @@
-require "httparty"
-
 # Sends an email through the Resend HTTP API. That API works from fly, because it is an HTTPS call
 # and fly blocks outbound SMTP. It needs only SPF and DKIM, thus it works with a Google Workspace
 # mailbox on the same domain and it does not change the root MX record.

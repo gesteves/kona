@@ -1,5 +1,3 @@
-require "nokogiri"
-
 module MarkupHelper
   # Renders a tag that is connected to the units Stimulus controller. It uses the content_tag form
   # with no block, on purpose: the block form needs an output buffer, and a presenter has none.

@@ -1,5 +1,3 @@
-require "vips"
-require "blurhash"
 require "base64"
 require "erb"
 require "open-uri"

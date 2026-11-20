@@ -6,9 +6,6 @@ module Api
   # The parameters: `weight`, which is necessary; `unit`, which is "kg" or "lb" and has the default
   # "kg"; and `date`, an ISO 8601 day with the default of today in the time zone of the location.
   class WeightController < BaseController
-    # The API_TOKEN bearer check comes from BaseController.
-    skip_forgery_protection
-
     def create
       return render json: { error: "Missing weight" }, status: :unprocessable_content if params[:weight].blank?
 

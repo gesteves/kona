@@ -19,7 +19,7 @@ Rack::Attack.cache.store =
   if Rails.env.test?
     ActiveSupport::Cache::MemoryStore.new
   else
-    ActiveSupport::Cache::RedisCacheStore.new(url: ENV.fetch("REDIS_URL", "redis://localhost:6379"))
+    ActiveSupport::Cache::RedisCacheStore.new(url: Rails.application.config.x.redis_url)
   end
 
 # The prefixes of the true routes of the app. Each path outside them is a probe. `/assets` belongs

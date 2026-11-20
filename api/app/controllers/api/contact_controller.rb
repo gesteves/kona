@@ -7,8 +7,7 @@ module Api
   # check, and the email run in ContactMailJob, thus the request returns quickly.
   class ContactController < BaseController
     # This is a cross-origin POST. The bearer check from the parent class authenticates it, and not
-    # a session.
-    skip_forgery_protection
+    # a session, and the parent class also turns the forgery check off.
 
     # A hidden field. A person cannot see it, and a bot often writes a value in it.
     HONEYPOT_FIELD = :comment

@@ -1,5 +1,3 @@
-require "httparty"
-
 # Checks a Cloudflare Turnstile token with siteverify, to know that a contact-form submission passed
 # the challenge in the browser. A token works one time and it expires after 300s, thus this code
 # runs in the request path and not in the job.

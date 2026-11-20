@@ -28,6 +28,10 @@ module Api
 
     config.autoload_lib(ignore: %w[assets middleware tasks])
 
+    # The Redis of the cache, the Sidekiq queues, and Rack::Attack. The three initializers that
+    # connect read this one value, thus they cannot disagree about the default.
+    config.x.redis_url = ENV["REDIS_URL"].presence || "redis://localhost:6379"
+
     # The test suite is in spec/, and not in test/.
     config.generators do |g|
       g.test_framework :rspec

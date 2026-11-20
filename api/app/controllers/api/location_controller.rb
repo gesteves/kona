@@ -9,10 +9,6 @@ module Api
   # two always agree. This endpoint keeps its own error messages, because an external caller reads
   # them.
   class LocationController < BaseController
-    # The API_TOKEN bearer check comes from BaseController. Only the forgery protection needs code
-    # here, because this is a POST.
-    skip_forgery_protection
-
     def create
       if params[:latitude].blank? || params[:longitude].blank?
         return render json: { error: "Missing coordinates" }, status: :unprocessable_content

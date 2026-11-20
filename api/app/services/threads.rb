@@ -1,4 +1,3 @@
-require "httparty"
 require "uri"
 
 # Connects a Threads account with the OAuth2 authorization code flow, keeps its token alive, and

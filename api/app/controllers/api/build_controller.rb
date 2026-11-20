@@ -7,8 +7,6 @@ module Api
   # Thus a caller with the bearer token can reach this path, and a browser never can. Do not add it
   # to that list.
   class BuildController < BaseController
-    skip_forgery_protection
-
     # A short lock, thus a caller that sends many requests cannot start many Actions runs. A second
     # request in that time gets a 429. SiteBuildJob holds the key and the window, because the
     # Republish page of the admin shares the same lock.

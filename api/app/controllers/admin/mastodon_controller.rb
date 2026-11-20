@@ -7,9 +7,8 @@ module Admin
   # ConnectedAppsController.
   #
   # ⚠️ The callback is an admin page, thus the owner session controls it, and the one-time state
-  # value controls it a second time. The Whoop callback cannot do that: Whoop redirects to a
-  # public host. Mastodon redirects the browser of the owner back to this host, and that browser
-  # has the session.
+  # value controls it a second time. Mastodon redirects the browser of the owner back to this
+  # host, and that browser has the session.
   class MastodonController < BaseController
     include OauthState
 

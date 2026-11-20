@@ -1,5 +1,3 @@
-require "nokogiri"
-
 # Reads the Open Graph tags of a URL, and its standard.site link tags, for the website card of a
 # post.
 #

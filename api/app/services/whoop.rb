@@ -1,4 +1,3 @@
-require "httparty"
 require "uri"
 
 # Gets the sleep, recovery, and strain data from the Whoop API, and does the OAuth2 flow that
@@ -148,7 +147,7 @@ class Whoop < ApplicationService
 
   # @param state [String] A value with no meaning. The app checks it when Whoop redirects back.
   # @return [String, nil] The OAuth authorization URL, or nil if there are no credentials.
-  def get_authorization_url(state)
+  def authorization_url(state)
     return unless valid_credentials?
 
     params = {
@@ -165,7 +164,7 @@ class Whoop < ApplicationService
   # Changes an authorization code into tokens and stores them in Redis.
   # @param authorization_code [String] The code from the OAuth callback.
   # @return [Hash, nil] The token data, or nil if the exchange failed.
-  def exchange_code_for_tokens(authorization_code)
+  def connect!(authorization_code)
     return unless valid_credentials?
 
     params = {
@@ -205,7 +204,7 @@ class Whoop < ApplicationService
     $redis.get(account_email_key).presence
   end
 
-  # Gets the profile of the athlete and stores the email address. `exchange_code_for_tokens` calls
+  # Gets the profile of the athlete and stores the email address. `connect!` calls
   # this, and `WhoopTokenRefreshJob` calls it for a connection that this app made before this code
   # existed.
   #
@@ -243,6 +242,22 @@ class Whoop < ApplicationService
   # @return [String, nil] The new access token, or nil if the refresh failed.
   def refresh_tokens!
     refresh_access_token(force: true)
+  end
+
+  # The Redis keys of this account that have no TTL and no other copy, each with a label.
+  #
+  # ⚠️ `rake redis:export` reads this list, and that task is the only backup. A new key with no
+  # TTL belongs here, or the backup does not hold it. The access token is absent, on purpose: a
+  # refresh makes it again.
+  # @return [Array<Array(String, String)>] `[label, key]` pairs. It is empty with no client id.
+  def durable_keys
+    return [] if @client_id.blank?
+
+    [
+      [ "whoop refresh token", refresh_token_key ],
+      [ "whoop refresh error", refresh_error_key ],
+      [ "whoop account email", account_email_key ]
+    ]
   end
 
   # Removes the stored credentials and disconnects the account.
@@ -482,7 +497,7 @@ class Whoop < ApplicationService
     $redis.setex(access_token_key, access_cache_duration, WhoopCredentials.seal(access_token)) if access_cache_duration.positive?
     $redis.set(refresh_token_key, WhoopCredentials.seal(refresh_token)) if refresh_token.present?
 
-    # This also covers the re-authorization path, because exchange_code_for_tokens comes here.
+    # This also covers the re-authorization path, because connect! comes here.
     $redis.del(refresh_error_key)
   end
 

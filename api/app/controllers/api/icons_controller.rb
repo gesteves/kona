@@ -6,8 +6,6 @@ module Api
   # It needs a bearer token, because a new id causes an upstream call that costs money. The edge
   # does not cache it: the build gets it, and FontAwesome already keeps each SVG in Redis.
   class IconsController < BaseController
-    skip_forgery_protection
-
     # ⚠️ This is the maximum work for one request. Each icon that is not in the cache is a Font
     # Awesome call that costs money and a Redis key that stays for a year. The rule that web posts
     # small groups belongs to the caller, and this endpoint did not enforce it. The true list is ten

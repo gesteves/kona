@@ -160,8 +160,6 @@ en:
       refresh_error:
         on_date: "%{name} refused the last token refresh (HTTP %{code}) on %{date}. %{consequence}"
         plain: "%{name} refused the last token refresh (HTTP %{code}). %{consequence}"
-      flash:
-        whoop_disconnected: "Whoop disconnected."
 
     # The back link that the Bluesky page and the Mastodon page share.
     back_to_connected_apps: "← Connected apps"
@@ -218,6 +216,15 @@ en:
         no_token: "Threads didn't give an access token. Connect the account again."
         unconfigured: "Threads is not configured. Set THREADS_APP_ID and THREADS_APP_SECRET."
         unauthorized: "Threads didn't authorize the app (%{error})."
+
+    whoop:
+      flash:
+        connected: "Whoop connected."
+        disconnected: "Whoop disconnected."
+        no_token: "Whoop didn't give an access token. Connect the account again."
+        unconfigured: "Whoop is not configured. Set WHOOP_CLIENT_ID, WHOOP_CLIENT_SECRET, and
+          WHOOP_REDIRECT_URI."
+        unauthorized: "Whoop didn't authorize the app (%{error})."
 
     # ⚠️ Mastodon and Threads both use this one. The two messages were the same words in two
     # places, thus a change to one of them left the other one behind.

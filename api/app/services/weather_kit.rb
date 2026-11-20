@@ -1,5 +1,3 @@
-require "jwt"
-require "httparty"
 require "openssl"
 require "base64"
 

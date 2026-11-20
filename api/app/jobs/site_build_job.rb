@@ -1,4 +1,3 @@
-require "httparty"
 require "sidekiq/api"
 
 # Builds the web site again and deploys it. It sends a GitHub `repository_dispatch`, and

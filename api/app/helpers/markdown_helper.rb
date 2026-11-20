@@ -1,6 +1,3 @@
-require "sanitize"
-require "redcarpet"
-
 module MarkdownHelper
   # The Markdown extensions for each Markdown parse in the app: here, and in the plain-text code of
   # the standard.site sync, whose output must not change between two runs.

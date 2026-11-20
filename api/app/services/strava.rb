@@ -1,4 +1,3 @@
-require "httparty"
 require "uri"
 
 # Connects a Strava athlete with the OAuth2 authorization code flow, and writes the name and the

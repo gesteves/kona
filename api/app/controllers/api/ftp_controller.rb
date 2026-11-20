@@ -5,9 +5,6 @@ module Api
   #
   # The parameter: `ftp`, in watts, which is necessary.
   class FtpController < BaseController
-    # The API_TOKEN bearer check comes from BaseController.
-    skip_forgery_protection
-
     def create
       return render json: { error: "Missing FTP" }, status: :unprocessable_content if params[:ftp].blank?
 

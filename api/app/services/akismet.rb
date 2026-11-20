@@ -1,5 +1,3 @@
-require "httparty"
-
 # Checks each contact-form submission with Akismet. Akismet returns a plain "true" or "false"
 # body, and not JSON. Thus this class calls HTTParty directly, and not through the JSON methods.
 #

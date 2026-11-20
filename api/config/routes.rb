@@ -88,12 +88,6 @@ Rails.application.routes.draw do
   end
 
   constraints(admin_only) do
-    # The Whoop OAuth flow. Only the owner can authorize, and the state value checks the public
-    # callback.
-    # ⚠️ WHOOP_REDIRECT_URI and the Whoop dashboard must name the admin host, not the API host.
-    get "/whoop/auth" => "whoop_oauth#authorize"
-    get "/whoop/callback" => "whoop_oauth#callback"
-
     # The owner authentication: Google OAuth for OWNER_EMAIL only. Middleware does the OmniAuth
     # request phase before the routing, thus only these four paths need routes. For the same
     # reason that phase stays available on the API host. The callback below is not available
@@ -119,7 +113,14 @@ Rails.application.routes.draw do
     scope module: "admin" do
       root to: "home#show"
       get    "connected-apps"       => "connected_apps#show",  as: :connected_apps
-      delete "connected-apps/whoop" => "connected_apps#whoop", as: :whoop_connection
+
+      # Whoop does the same OAuth round trip as Threads and Strava, with app credentials from the
+      # environment. ⚠️ Its two paths are at the top level, and not below /connected-apps:
+      # WHOOP_REDIRECT_URI and the Whoop dashboard name the callback, and both must name the admin
+      # host, not the API host.
+      get    "whoop/auth"           => "whoop#authorize", as: :whoop_authorize
+      get    "whoop/callback"       => "whoop#callback",  as: :whoop_callback
+      delete "connected-apps/whoop" => "whoop#destroy",   as: :whoop_connection
 
       # Bluesky connects with a form, and not with an OAuth redirect. Thus it needs its own page,
       # and all three of its actions are on that controller, and not on connected_apps#.

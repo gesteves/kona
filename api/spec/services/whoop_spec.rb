@@ -112,6 +112,20 @@ RSpec.describe Whoop do
     end
   end
 
+  # ⚠️ `rake redis:export` is the only backup, and it reads this list. The refresh token has no
+  # other copy.
+  describe "#durable_keys" do
+    it "names the refresh token, the refresh failure, and the label, and not the access token" do
+      expect(service.durable_keys.map(&:last)).to eq([ refresh_token_key, error_key, "whoop:cid:account_email" ])
+    end
+
+    it "is empty with no client id" do
+      allow(ENV).to receive(:[]).with("WHOOP_CLIENT_ID").and_return(nil)
+
+      expect(described_class.new.durable_keys).to eq([])
+    end
+  end
+
   describe "#get_access_token" do
     it "returns the cached access token without refreshing" do
       allow($redis).to receive(:get).with(access_token_key).and_return("cached-token")

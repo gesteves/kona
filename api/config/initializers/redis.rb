@@ -22,7 +22,7 @@ REDIS_POOL_SIZE = Integer(ENV.fetch("REDIS_POOL_SIZE", 10))
 
 $redis ||= ConnectionPool::Wrapper.new(size: REDIS_POOL_SIZE, timeout: 5) do
   Redis.new(
-    url: ENV["REDIS_URL"] || "redis://localhost:6379",
+    url: Rails.application.config.x.redis_url,
     connect_timeout: 5,
     read_timeout: 3,
     write_timeout: 3,

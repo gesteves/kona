@@ -14,7 +14,7 @@ Copy `.env.example` to `.env` for local development; in production set these as 
 - **Intervals.icu** — activity stats. Set `ICU_ATHLETE_ID`, `ICU_API_KEY` (from the Intervals.icu settings page).
 - **Google Maps** — geocodes the location and powers pollen/AQI lookups. Set `GOOGLE_API_KEY` for a project with the Geocoding, Time Zone, Maps Elevation, Air Quality, and Pollen APIs enabled.
 - **WeatherKit** — current weather and forecast. Follow Apple's [WeatherKit REST setup](https://developer.apple.com/documentation/weatherkitrestapi/request_authentication_for_weatherkit_rest_api) and set `WEATHERKIT_KEY_ID`, `WEATHERKIT_TEAM_ID`, `WEATHERKIT_SERVICE_ID`, and `WEATHERKIT_PRIVATE_KEY` (the base64-encoded `.p8` key).
-- **Whoop** — sleep/recovery/strain. Create a Whoop OAuth app and set `WHOOP_CLIENT_ID`, `WHOOP_CLIENT_SECRET`, and `WHOOP_REDIRECT_URI` (must match the app, e.g. `https://<your-app-host>/whoop/callback`). `GET /whoop/auth` is gated by HTTP Basic Auth (`WHOOP_AUTH_USERNAME`, `WHOOP_AUTH_PASSWORD`); visit it once to connect your account, after which tokens are stored in Redis.
+- **Whoop** — sleep/recovery/strain. Create a Whoop OAuth app and set `WHOOP_CLIENT_ID`, `WHOOP_CLIENT_SECRET`, and `WHOOP_REDIRECT_URI` (must match the app, e.g. `https://<your-app-host>/whoop/callback`). The redirect URI must name the admin host. Connect the account with the Whoop card of the Connected apps page; the tokens then go into Redis.
 - **API token** — set `API_TOKEN`, the bearer token required by `POST /api/location`, `POST /api/weight`, and `POST /api/ftp`.
 - **Site URL** — set `SITE_URL`, the public site root (used for the `/` redirect and the standard.site publication URL).
 

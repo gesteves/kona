@@ -30,22 +30,15 @@ namespace :redis do
   # The plain string keys to export.
   #
   # ⚠️ The Whoop refresh token has no expiry and no other copy, and it is the one key that the
-  # comment of `redis/fly.toml` named first. The access token is absent here, on purpose: a refresh
-  # makes it again.
+  # comment of `redis/fly.toml` named first. `Whoop#durable_keys` gives the names, thus a change
+  # to a key there cannot leave this file behind.
   durable_strings = lambda do
-    keys = [
+    [
       [ "location",           Location::LOCATION_CACHE_KEY ],
       [ "standard.site DID",  StandardSite::DID_CACHE_KEY ],
-      [ "strava subscription", Strava::SUBSCRIPTION_KEY ]
+      [ "strava subscription", Strava::SUBSCRIPTION_KEY ],
+      *Whoop.new.durable_keys
     ]
-
-    client_id = ENV["WHOOP_CLIENT_ID"].presence
-    if client_id
-      keys << [ "whoop refresh token", "whoop:#{client_id}:refresh_token" ]
-      keys << [ "whoop refresh error", "whoop:#{client_id}:refresh_error" ]
-      keys << [ "whoop account email", "whoop:#{client_id}:account_email" ]
-    end
-    keys
   end
 
   # The path of the dump file.

@@ -1,5 +1,3 @@
-require "anthropic"
-
 # One Anthropic call with a structured output, or with a plain text answer. The services that make
 # such a call share it: the lines of the activity description, the subject line and the abuse check
 # of the contact form, and the alt text of a photo. They are different only in the env var that

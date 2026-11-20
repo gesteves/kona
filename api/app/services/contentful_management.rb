@@ -1,5 +1,3 @@
-require "httparty"
-
 # The Contentful Management API: the write side of Contentful.
 #
 # `ContentfulClient` reads content with the GraphQL delivery API, and this class writes it. The two

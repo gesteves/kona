@@ -1,4 +1,3 @@
-require "httparty"
 require "digest"
 
 # The base class for the external-API service objects. It has the read-through Redis cache, the

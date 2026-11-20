@@ -4,8 +4,7 @@ require "securerandom"
 # it.
 #
 # ⚠️ The state is in the session, and not in Redis. Thus only the browser that started the flow
-# can complete it, a second flow in another browser cannot cancel the first, and the callback of
-# Whoop, which the owner session does not control, still has one binding to the owner.
+# can complete it, and a second flow in another browser cannot cancel the first.
 #
 # ⚠️ The state goes away after a successful exchange only. A failed exchange keeps it, thus a
 # short problem at the provider does not send the owner back to the start.

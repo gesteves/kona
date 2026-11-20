@@ -1,4 +1,3 @@
-require "httparty"
 require "uri"
 
 # Connects a Mastodon account with the OAuth2 authorization code flow, and posts to it.

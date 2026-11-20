@@ -1,5 +1,3 @@
-require "icalendar"
-
 # Reads the planned workouts from a TrainerRoad iCalendar feed, for the rest-day check and for the
 # planned-workout line that the description generator writes.
 class TrainerRoad < ApplicationService

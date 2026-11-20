@@ -1,4 +1,3 @@
-require "aws-sdk-s3"
 require "net/http"
 require "tempfile"
 

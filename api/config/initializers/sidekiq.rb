@@ -6,7 +6,7 @@ require "sidekiq-scheduler/web"
 
 # The Sidekiq queues are in the Redis of the API, at the same REDIS_URL as the cache. This code sets
 # it, although Sidekiq would use it by default, to be the same as config/initializers/redis.rb.
-redis_url = ENV.fetch("REDIS_URL", "redis://localhost:6379")
+redis_url = Rails.application.config.x.redis_url
 
 # ⚠️ The read timeout of the server and the read timeout of the client are different, on purpose. Do
 # not put them in one shared hash. The fetch loop must wait; a job that goes into the queue must fail
