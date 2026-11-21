@@ -34,7 +34,7 @@
     "globals": "^17.14.0",
     "jsdom": "^31.0.1",
     "prettier": "^3.10.1",
-    "stylelint": "^17.16.0",
+    "stylelint": "^18.1.0",
     "stylelint-config-standard-scss": "^18.0.0",
     "stylelint-scss": "^7.4.0",
     "typescript": "^7.0.2",
