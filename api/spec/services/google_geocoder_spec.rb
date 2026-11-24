@@ -6,8 +6,7 @@ RSpec.describe GoogleGeocoder do
   end
 
   before do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("GOOGLE_API_KEY").and_return("google-key")
+    stub_env("GOOGLE_API_KEY" => "google-key")
 
     # The cache always gives a miss. The code records each write, and each write does nothing.
     allow($redis).to receive(:get).and_return(nil)
@@ -39,7 +38,7 @@ RSpec.describe GoogleGeocoder do
   end
 
   it "asks for nothing without an API key" do
-    allow(ENV).to receive(:[]).with("GOOGLE_API_KEY").and_return(nil)
+    stub_env("GOOGLE_API_KEY" => nil)
 
     expect(described_class.new("Kona").coordinates).to be_nil
     expect(HTTParty).not_to have_received(:get)

@@ -5,8 +5,7 @@ require "rails_helper"
 # thus these tests need no Redis. The render with a session reads Redis, and no test covers it.
 RSpec.describe "Sidekiq::Web mount", type: :request do
   before do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("OWNER_EMAIL").and_return("owner@example.com")
+    stub_env("OWNER_EMAIL" => "owner@example.com")
   end
 
   it "redirects to /signin without an owner session" do

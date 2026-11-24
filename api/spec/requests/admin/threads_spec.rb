@@ -1,19 +1,13 @@
 require "rails_helper"
 
 RSpec.describe "Admin Threads connection", type: :request do
-  let(:owner_email) { "owner@example.com" }
+  include_context "the admin UI"
   let(:redirect_uri) { "http://www.example.com/connected-apps/threads/callback" }
 
   before do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("OWNER_EMAIL").and_return(owner_email)
-    allow(ENV).to receive(:[]).with("THREADS_APP_ID").and_return("app-id")
-    allow(ENV).to receive(:[]).with("THREADS_APP_SECRET").and_return("app-secret")
-    allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
+    stub_env("THREADS_APP_ID" => "app-id", "THREADS_APP_SECRET" => "app-secret")
     $redis.del(ThreadsCredentials::REDIS_KEY)
   end
-
-  after { $redis.del(ThreadsCredentials::REDIS_KEY) }
 
   def sign_in! = sign_in_as(email: owner_email)
 
@@ -52,7 +46,7 @@ RSpec.describe "Admin Threads connection", type: :request do
     end
 
     it "says so when the Meta app credentials are missing" do
-      allow(ENV).to receive(:[]).with("THREADS_APP_ID").and_return(nil)
+      stub_env("THREADS_APP_ID" => nil)
 
       get "/connected-apps/threads/authorize"
 

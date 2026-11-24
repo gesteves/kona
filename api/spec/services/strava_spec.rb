@@ -5,9 +5,7 @@ RSpec.describe Strava do
 
   before do
     $redis.del(StravaCredentials::REDIS_KEY, Strava::REFRESH_LOCK_KEY, Strava::SUBSCRIPTION_KEY)
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("STRAVA_CLIENT_ID").and_return("client-id")
-    allow(ENV).to receive(:[]).with("STRAVA_CLIENT_SECRET").and_return("client-secret")
+    stub_env("STRAVA_CLIENT_ID" => "client-id", "STRAVA_CLIENT_SECRET" => "client-secret")
   end
 
   def connect!(expires_at: 6.hours.from_now)
@@ -37,7 +35,7 @@ RSpec.describe Strava do
     end
 
     it "gives nil without the app credentials" do
-      allow(ENV).to receive(:[]).with("STRAVA_CLIENT_ID").and_return(nil)
+      stub_env("STRAVA_CLIENT_ID" => nil)
 
       expect(described_class.new.authorization_url("the-state", redirect_uri: redirect_uri)).to be_nil
     end
@@ -213,7 +211,7 @@ RSpec.describe Strava do
   describe "#subscribe!" do
     let(:callback_url) { "https://api.example.test/webhooks/strava" }
 
-    before { allow(ENV).to receive(:[]).with("STRAVA_WEBHOOK_VERIFY_TOKEN").and_return("the-verify-token") }
+    before { stub_env("STRAVA_WEBHOOK_VERIFY_TOKEN" => "the-verify-token") }
 
     it "makes the subscription and stores its id" do
       allow(HTTParty).to receive(:get).and_return(http_response([]))

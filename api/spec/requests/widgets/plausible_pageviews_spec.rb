@@ -6,8 +6,7 @@ RSpec.describe "Widgets::Plausible pageviews", type: :request do
   before do
     # The widget is empty with no site id. This stub gives one, thus the spec does not depend on the
     # local .env of a person. That var has no value in CI.
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("PLAUSIBLE_SITE_ID").and_return("example.com")
+    stub_env("PLAUSIBLE_SITE_ID" => "example.com")
 
     allow_any_instance_of(Articles).to receive(:find).and_return(article)
     allow_any_instance_of(Plausible).to receive(:pageviews_by_path).and_return("/2026/05/01/my-race-report/" => 1234)
@@ -162,8 +161,7 @@ RSpec.describe "Widgets::Plausible pageviews", type: :request do
 
   context "when PLAUSIBLE_SITE_ID is unset" do
     before do
-      allow(ENV).to receive(:[]).and_call_original
-      allow(ENV).to receive(:[]).with("PLAUSIBLE_SITE_ID").and_return(nil)
+      stub_env("PLAUSIBLE_SITE_ID" => nil)
     end
 
     it "returns an empty body without querying Plausible" do

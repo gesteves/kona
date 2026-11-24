@@ -1,13 +1,7 @@
 require "rails_helper"
 
 RSpec.describe "Owner sessions", type: :request do
-  let(:owner_email) { "owner@example.com" }
-
-  before do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("OWNER_EMAIL").and_return(owner_email)
-    allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
-  end
+  include_context "the admin UI"
 
   describe "GET /signin" do
     it "renders the Google sign-in button" do
@@ -90,7 +84,7 @@ RSpec.describe "Owner sessions", type: :request do
     end
 
     it "rejects when OWNER_EMAIL is not configured" do
-      allow(ENV).to receive(:[]).with("OWNER_EMAIL").and_return(nil)
+      stub_env("OWNER_EMAIL" => nil)
       sign_in_as(email: owner_email)
       expect(response).to have_http_status(:forbidden)
     end

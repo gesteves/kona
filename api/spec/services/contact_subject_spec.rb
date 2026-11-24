@@ -4,8 +4,7 @@ RSpec.describe ContactSubject do
   let(:client) { instance_double(Anthropic::Client) }
 
   before do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("ANTHROPIC_API_KEY").and_return("key")
+    stub_env("ANTHROPIC_API_KEY" => "key")
     allow(described_class).to receive(:anthropic_client).and_return(client)
   end
 
@@ -47,7 +46,7 @@ RSpec.describe ContactSubject do
 
       expect(described_class.generate(name: "Jane", message: " ")).to be_nil
 
-      allow(ENV).to receive(:[]).with("ANTHROPIC_API_KEY").and_return(nil)
+      stub_env("ANTHROPIC_API_KEY" => nil)
       expect(described_class.generate(name: "Jane", message: "Hello")).to be_nil
 
       expect(client).not_to have_received(:messages)
@@ -64,10 +63,10 @@ RSpec.describe ContactSubject do
 
   describe ".model" do
     it "defaults to claude-sonnet-5-5 and honors the override" do
-      allow(ENV).to receive(:[]).with("ANTHROPIC_CONTACT_SUBJECT_MODEL").and_return(nil)
+      stub_env("ANTHROPIC_CONTACT_SUBJECT_MODEL" => nil)
       expect(described_class.model).to eq("claude-sonnet-5-5")
 
-      allow(ENV).to receive(:[]).with("ANTHROPIC_CONTACT_SUBJECT_MODEL").and_return("claude-haiku-4-5")
+      stub_env("ANTHROPIC_CONTACT_SUBJECT_MODEL" => "claude-haiku-4-5")
       expect(described_class.model).to eq("claude-haiku-4-5")
     end
   end

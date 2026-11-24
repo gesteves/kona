@@ -1,14 +1,10 @@
 require "rails_helper"
 
 RSpec.describe "Admin Contentful uploads", type: :request do
-  let(:owner_email) { "owner@example.com" }
+  include_context "the admin UI"
 
   before do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("OWNER_EMAIL").and_return(owner_email)
-    allow(ENV).to receive(:[]).with("CONTENTFUL_SPACE").and_return("space123")
-    allow(ENV).to receive(:[]).with("CONTENTFUL_MANAGEMENT_TOKEN").and_return("cma-token")
-    allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
+    stub_env("CONTENTFUL_SPACE" => "space123", "CONTENTFUL_MANAGEMENT_TOKEN" => "cma-token")
     $redis.del(UploadLibrary::REDIS_KEY)
   end
 
@@ -59,7 +55,7 @@ RSpec.describe "Admin Contentful uploads", type: :request do
         picker = Nokogiri::HTML(response.body).at("wa-file-input")
         expect(picker["disabled"]).to be_nil
 
-        allow(ENV).to receive(:[]).with("CONTENTFUL_MANAGEMENT_TOKEN").and_return(nil)
+        stub_env("CONTENTFUL_MANAGEMENT_TOKEN" => nil)
         get "/contentful/uploads"
 
         expect(response).to have_http_status(:ok)
@@ -70,11 +66,11 @@ RSpec.describe "Admin Contentful uploads", type: :request do
       # ⚠️ The Generate control renders with an Anthropic key alone, as the two other Claude
       # features stay silent without one.
       it "renders the Generate control only with an Anthropic key" do
-        allow(ENV).to receive(:[]).with("ANTHROPIC_API_KEY").and_return(nil)
+        stub_env("ANTHROPIC_API_KEY" => nil)
         get "/contentful/uploads"
         expect(response.body).not_to include(I18n.t("admin.contentful_uploads.file.generate_alt"))
 
-        allow(ENV).to receive(:[]).with("ANTHROPIC_API_KEY").and_return("key")
+        stub_env("ANTHROPIC_API_KEY" => "key")
         get "/contentful/uploads"
         expect(response.body).to include(I18n.t("admin.contentful_uploads.file.generate_alt"))
       end
@@ -244,7 +240,7 @@ RSpec.describe "Admin Contentful uploads", type: :request do
       end
 
       it "refuses a submit with no management token" do
-        allow(ENV).to receive(:[]).with("CONTENTFUL_MANAGEMENT_TOKEN").and_return(nil)
+        stub_env("CONTENTFUL_MANAGEMENT_TOKEN" => nil)
 
         post "/contentful/uploads", params: { files: { ids: [ stage ], titles: [ "A" ], alts: [ "B" ] } }
 

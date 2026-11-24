@@ -11,11 +11,12 @@ RSpec.describe WeatherKit do
   end
 
   before do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("WEATHERKIT_KEY_ID").and_return("KEY1")
-    allow(ENV).to receive(:[]).with("WEATHERKIT_TEAM_ID").and_return("TEAM1")
-    allow(ENV).to receive(:[]).with("WEATHERKIT_SERVICE_ID").and_return("com.example.weather")
-    allow(ENV).to receive(:[]).with("WEATHERKIT_PRIVATE_KEY").and_return(Base64.strict_encode64(private_key.to_pem))
+    stub_env(
+      "WEATHERKIT_KEY_ID" => "KEY1",
+      "WEATHERKIT_TEAM_ID" => "TEAM1",
+      "WEATHERKIT_SERVICE_ID" => "com.example.weather",
+      "WEATHERKIT_PRIVATE_KEY" => Base64.strict_encode64(private_key.to_pem)
+    )
     allow(service).to receive(:sleep)
 
     keys = $redis.keys("weatherkit:*")
@@ -74,7 +75,7 @@ RSpec.describe WeatherKit do
   # ⚠️ A token that the code cannot sign gives a 401 on each attempt. The code stops before the
   # request, and the report is the only message.
   it "gives nil, reports, and makes no request when the key cannot be signed" do
-    allow(ENV).to receive(:[]).with("WEATHERKIT_PRIVATE_KEY").and_return(Base64.strict_encode64("not a key"))
+    stub_env("WEATHERKIT_PRIVATE_KEY" => Base64.strict_encode64("not a key"))
     allow(ErrorReporter).to receive(:report_upstream)
 
     expect(service.data).to be_nil

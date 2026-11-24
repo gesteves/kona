@@ -1,16 +1,12 @@
 require "rails_helper"
 
 RSpec.describe "Admin Strava connection", type: :request do
-  let(:owner_email) { "owner@example.com" }
+  include_context "the admin UI"
   let(:redirect_uri) { "http://www.example.com/connected-apps/strava/callback" }
   let(:scope) { "read,activity:read_all,activity:write,profile:write" }
 
   before do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("OWNER_EMAIL").and_return(owner_email)
-    allow(ENV).to receive(:[]).with("STRAVA_CLIENT_ID").and_return("client-id")
-    allow(ENV).to receive(:[]).with("STRAVA_CLIENT_SECRET").and_return("client-secret")
-    allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
+    stub_env("STRAVA_CLIENT_ID" => "client-id", "STRAVA_CLIENT_SECRET" => "client-secret")
     $redis.del(StravaCredentials::REDIS_KEY)
   end
 
@@ -37,7 +33,7 @@ RSpec.describe "Admin Strava connection", type: :request do
     end
 
     it "says so when the Strava app credentials are missing" do
-      allow(ENV).to receive(:[]).with("STRAVA_CLIENT_ID").and_return(nil)
+      stub_env("STRAVA_CLIENT_ID" => nil)
 
       get "/connected-apps/strava/authorize"
 

@@ -46,8 +46,7 @@ RSpec.describe ActivityDescription::Generator do
     allow(intervals).to receive(:activity!).with("i1").and_return(activity)
     allow($redis).to receive(:set).and_return(true)
     allow($redis).to receive(:del)
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("ANTHROPIC_API_KEY").and_return(nil)
+    stub_env("ANTHROPIC_API_KEY" => nil)
   end
 
   describe "the dedup lock" do
@@ -426,7 +425,7 @@ RSpec.describe ActivityDescription::Generator do
 
   describe "the planned-workout headline" do
     before do
-      allow(ENV).to receive(:[]).with("ANTHROPIC_API_KEY").and_return("key")
+      stub_env("ANTHROPIC_API_KEY" => "key")
       allow(ActivityDescription::Llm).to receive(:planned_summary).and_return("2 hours of sweet spot")
     end
 

@@ -5,8 +5,6 @@ RSpec.describe StravaCredentials do
 
   before { $redis.del(described_class::REDIS_KEY) }
 
-  after { $redis.del(described_class::REDIS_KEY) }
-
   def connect!(expires_at: 6.hours.from_now.to_i)
     described_class.store_athlete(
       athlete_id: 12_345, athlete_name: "A Rider",

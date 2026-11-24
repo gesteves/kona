@@ -2,9 +2,7 @@ require "rails_helper"
 
 RSpec.describe MapboxTileset do
   before do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("MAPBOX_USERNAME").and_return("testuser")
-    allow(ENV).to receive(:[]).with("MAPBOX_SECRET_TOKEN").and_return("sk.test-token")
+    stub_env("MAPBOX_USERNAME" => "testuser", "MAPBOX_SECRET_TOKEN" => "sk.test-token")
   end
 
   def response(success:, code: 200, body: "{}")
@@ -17,7 +15,7 @@ RSpec.describe MapboxTileset do
     end
 
     it "is false without them, so dev and CI stay inert" do
-      allow(ENV).to receive(:[]).with("MAPBOX_SECRET_TOKEN").and_return(nil)
+      stub_env("MAPBOX_SECRET_TOKEN" => nil)
 
       expect(described_class).not_to be_configured
     end
@@ -25,13 +23,13 @@ RSpec.describe MapboxTileset do
 
   describe "#initialize" do
     it "refuses to run without a username" do
-      allow(ENV).to receive(:[]).with("MAPBOX_USERNAME").and_return(nil)
+      stub_env("MAPBOX_USERNAME" => nil)
 
       expect { described_class.new }.to raise_error(described_class::ConfigurationError, /MAPBOX_USERNAME/)
     end
 
     it "refuses to run without a secret token" do
-      allow(ENV).to receive(:[]).with("MAPBOX_SECRET_TOKEN").and_return(nil)
+      stub_env("MAPBOX_SECRET_TOKEN" => nil)
 
       expect { described_class.new }.to raise_error(described_class::ConfigurationError, /MAPBOX_SECRET_TOKEN/)
     end

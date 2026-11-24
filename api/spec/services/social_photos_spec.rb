@@ -49,10 +49,8 @@ RSpec.describe SocialPhotos do
   end
 
   describe ".public_url" do
-    before { allow(ENV).to receive(:[]).and_call_original }
-
     it "gives a signed URL on the public API host" do
-      allow(ENV).to receive(:[]).with("API_HOST").and_return("api.example.test")
+      stub_env("API_HOST" => "api.example.test")
 
       expect(described_class.public_url(id))
         .to eq("https://api.example.test/api/social-photos/#{id}/#{described_class.signature(id)}")
@@ -60,7 +58,7 @@ RSpec.describe SocialPhotos do
 
     # ⚠️ Meta cannot GET a local URL, thus the job must fail for good and not retry for a day.
     it "raises a permanent error with no API_HOST" do
-      allow(ENV).to receive(:[]).with("API_HOST").and_return(nil)
+      stub_env("API_HOST" => nil)
 
       expect { described_class.public_url(id) }.to raise_error(PermanentError, /API_HOST/)
     end

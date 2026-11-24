@@ -14,9 +14,7 @@ RSpec.describe ContactMailJob do
     allow(ContactSubject).to receive(:generate).and_return(nil)
     # The same for the abuse check: by default the message is not abusive.
     allow(ContactModeration).to receive(:abusive?).and_return(false)
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("CONTACT_TO_ADDRESS").and_return("owner@example.test")
-    allow(ENV).to receive(:[]).with("TIME_ZONE").and_return("America/Los_Angeles")
+    stub_env("CONTACT_TO_ADDRESS" => "owner@example.test", "TIME_ZONE" => "America/Los_Angeles")
   end
 
   it "spam-checks a clean submission and enqueues a delivery job with the composed email" do

@@ -61,8 +61,7 @@ RSpec.describe SpamMessagePresenter do
   end
 
   it "gives the submission time to the second, in the local zone and in UTC" do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("TIME_ZONE").and_return("America/Los_Angeles")
+    stub_env("TIME_ZONE" => "America/Los_Angeles")
 
     expect(presenter.submitted_at).to eq("Saturday, August 1, 2026, 5:00:00 AM PDT (2026-08-01T12:00:00Z)")
   end

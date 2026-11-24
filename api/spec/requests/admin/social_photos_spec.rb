@@ -2,13 +2,7 @@ require "rails_helper"
 require "vips"
 
 RSpec.describe "Admin social photos", type: :request do
-  let(:owner_email) { "owner@example.com" }
-
-  before do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("OWNER_EMAIL").and_return(owner_email)
-    allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
-  end
+  include_context "the admin UI"
 
   after { $redis.del(*@stored.map { |id| "#{SocialPhotos::KEY_PREFIX}#{id}" }) if @stored.present? }
 
@@ -209,7 +203,7 @@ RSpec.describe "Admin social photos", type: :request do
     let(:id) { remember(SocialPhotos.new.store(image: jpeg, width: 2, height: 1)) }
 
     before do
-      allow(ENV).to receive(:[]).with("ANTHROPIC_API_KEY").and_return("key")
+      stub_env("ANTHROPIC_API_KEY" => "key")
       allow(AltText).to receive(:generate).and_return("A dog running on a beach.")
     end
 
@@ -241,7 +235,7 @@ RSpec.describe "Admin social photos", type: :request do
       end
 
       it "says when there is no API key, and asks nothing" do
-        allow(ENV).to receive(:[]).with("ANTHROPIC_API_KEY").and_return(nil)
+        stub_env("ANTHROPIC_API_KEY" => nil)
 
         post "/social/photos/#{id}/alt", headers: { "Accept" => "application/json" }
 

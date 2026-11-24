@@ -3,13 +3,10 @@ require "rails_helper"
 RSpec.describe "Admin republish", type: :request do
   include ActiveSupport::Testing::TimeHelpers
 
-  let(:owner_email) { "owner@example.com" }
+  include_context "the admin UI"
   let(:quarantine) { instance_double(SpamQuarantine, count: 0) }
 
   before do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("OWNER_EMAIL").and_return(owner_email)
-    allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
     allow(SpamQuarantine).to receive(:new).and_return(quarantine)
     # The lock is free unless an example says that it is not.
     allow($redis).to receive(:set).and_return(true)

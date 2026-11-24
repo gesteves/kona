@@ -2,17 +2,13 @@ require "rails_helper"
 require "vips"
 
 RSpec.describe "Admin Contentful upload files", type: :request do
-  let(:owner_email) { "owner@example.com" }
+  include_context "the admin UI"
   let(:contentful) { instance_double(ContentfulManagement) }
 
   before do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("OWNER_EMAIL").and_return(owner_email)
-    allow(ENV).to receive(:[]).with("CONTENTFUL_SPACE").and_return("space123")
-    allow(ENV).to receive(:[]).with("CONTENTFUL_MANAGEMENT_TOKEN").and_return("cma-token")
+    stub_env("CONTENTFUL_SPACE" => "space123", "CONTENTFUL_MANAGEMENT_TOKEN" => "cma-token")
     allow(ContentfulManagement).to receive(:new).and_return(contentful)
     allow(contentful).to receive(:create_upload).and_return("upload-1")
-    allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
   end
 
   after { $redis.del(*@stored.map { |id| "#{StagedUpload::KEY_PREFIX}#{id}" }) if @stored.present? }
@@ -162,7 +158,7 @@ RSpec.describe "Admin Contentful upload files", type: :request do
       end
 
       it "says when there is no management token, and reads nothing" do
-        allow(ENV).to receive(:[]).with("CONTENTFUL_MANAGEMENT_TOKEN").and_return(nil)
+        stub_env("CONTENTFUL_MANAGEMENT_TOKEN" => nil)
         allow(PhotoBlob).to receive(:thumbnail)
 
         post "/contentful/uploads/files", params: { file: upload }, headers: { "Accept" => "application/json" }
@@ -259,7 +255,7 @@ RSpec.describe "Admin Contentful upload files", type: :request do
     let(:id) { stage }
 
     before do
-      allow(ENV).to receive(:[]).with("ANTHROPIC_API_KEY").and_return("key")
+      stub_env("ANTHROPIC_API_KEY" => "key")
       allow(AltText).to receive(:generate).and_return("A dog running on a beach.")
     end
 
@@ -292,7 +288,7 @@ RSpec.describe "Admin Contentful upload files", type: :request do
       end
 
       it "says when there is no API key, and asks nothing" do
-        allow(ENV).to receive(:[]).with("ANTHROPIC_API_KEY").and_return(nil)
+        stub_env("ANTHROPIC_API_KEY" => nil)
 
         post "/contentful/uploads/files/#{id}/alt", headers: { "Accept" => "application/json" }
 

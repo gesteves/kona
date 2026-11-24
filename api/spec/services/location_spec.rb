@@ -2,8 +2,7 @@ require "rails_helper"
 
 RSpec.describe Location do
   def with_location(env:, redis: nil)
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("LOCATION").and_return(env)
+    stub_env("LOCATION" => env)
     allow($redis).to receive(:get).with(described_class::LOCATION_CACHE_KEY).and_return(redis)
     described_class.new
   end
@@ -108,8 +107,7 @@ RSpec.describe Location do
 
   describe ".stored" do
     it "reads the coordinates in Redis, ignoring the override" do
-      allow(ENV).to receive(:[]).and_call_original
-      allow(ENV).to receive(:[]).with("LOCATION").and_return("43.48,-110.76")
+      stub_env("LOCATION" => "43.48,-110.76")
       allow($redis).to receive(:get).with(described_class::LOCATION_CACHE_KEY).and_return("37.77,-122.42")
 
       expect(described_class.stored).to eq([ 37.77, -122.42 ])

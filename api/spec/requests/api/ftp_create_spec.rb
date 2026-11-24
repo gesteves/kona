@@ -5,8 +5,7 @@ RSpec.describe "FTP", type: :request do
   let(:headers) { { "Authorization" => "Bearer #{token}" } }
 
   before do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("API_TOKEN").and_return(token)
+    stub_env("API_TOKEN" => token)
   end
 
   it "rejects requests without a bearer token" do

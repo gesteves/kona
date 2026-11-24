@@ -20,8 +20,7 @@ RSpec.describe "Whoop", type: :request do
   it_behaves_like "a live-update fragment", "/widgets/whoop"
 
   it "renders the referral link with the hidden new-tab hint as markup" do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("WHOOP_REFERRAL_URL").and_return("https://join.example.com/whoop")
+    stub_env("WHOOP_REFERRAL_URL" => "https://join.example.com/whoop")
 
     get "/widgets/whoop", headers: auth_headers
 

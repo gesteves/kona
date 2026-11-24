@@ -1,12 +1,9 @@
 require "rails_helper"
 
 RSpec.describe "Admin connected apps", type: :request do
-  let(:owner_email) { "owner@example.com" }
+  include_context "the admin UI"
 
   before do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("OWNER_EMAIL").and_return(owner_email)
-    allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
     # Bluesky, Mastodon, and TrainerRoad each have their own card on this page. Remove their
     # credentials, thus the Whoop examples do not depend on the credentials that are available.
     $redis.del(BlueskyCredentials::REDIS_KEY, MastodonCredentials::REDIS_KEY, ThreadsCredentials::REDIS_KEY,
@@ -273,8 +270,7 @@ RSpec.describe "Admin connected apps", type: :request do
     before do
       sign_in!
       allow_any_instance_of(Whoop).to receive(:configured?).and_return(false)
-      allow(ENV).to receive(:[]).with("STRAVA_CLIENT_ID").and_return("client-id")
-      allow(ENV).to receive(:[]).with("STRAVA_CLIENT_SECRET").and_return("client-secret")
+      stub_env("STRAVA_CLIENT_ID" => "client-id", "STRAVA_CLIENT_SECRET" => "client-secret")
     end
 
     it "offers the authorize link when no athlete is connected" do
@@ -285,7 +281,7 @@ RSpec.describe "Admin connected apps", type: :request do
     end
 
     it "leaves the card off the page without the Strava app credentials" do
-      allow(ENV).to receive(:[]).with("STRAVA_CLIENT_ID").and_return(nil)
+      stub_env("STRAVA_CLIENT_ID" => nil)
 
       get "/connected-apps"
 
@@ -323,8 +319,7 @@ RSpec.describe "Admin connected apps", type: :request do
     before do
       sign_in!
       allow_any_instance_of(Whoop).to receive(:configured?).and_return(false)
-      allow(ENV).to receive(:[]).with("THREADS_APP_ID").and_return("app-id")
-      allow(ENV).to receive(:[]).with("THREADS_APP_SECRET").and_return("app-secret")
+      stub_env("THREADS_APP_ID" => "app-id", "THREADS_APP_SECRET" => "app-secret")
     end
 
     it "offers the authorize link when no account is attached" do
@@ -336,7 +331,7 @@ RSpec.describe "Admin connected apps", type: :request do
 
     # Unlike Bluesky and Mastodon, this one needs app credentials in the environment.
     it "leaves the card off the page without the Meta app credentials" do
-      allow(ENV).to receive(:[]).with("THREADS_APP_ID").and_return(nil)
+      stub_env("THREADS_APP_ID" => nil)
 
       get "/connected-apps"
 

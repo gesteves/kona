@@ -16,23 +16,21 @@ RSpec.describe AnthropicStructuredOutput do
   let(:client) { instance_double(Anthropic::Client, messages: messages) }
 
   before do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("ANTHROPIC_API_KEY").and_return("key")
-    allow(ENV).to receive(:[]).with("SPEC_ANTHROPIC_MODEL").and_return(nil)
+    stub_env("ANTHROPIC_API_KEY" => "key", "SPEC_ANTHROPIC_MODEL" => nil)
     allow(Anthropic::Client).to receive(:new).with(api_key: "key").and_return(client)
   end
 
   it "is configured with an API key only" do
     expect(host.configured?).to be(true)
 
-    allow(ENV).to receive(:[]).with("ANTHROPIC_API_KEY").and_return("")
+    stub_env("ANTHROPIC_API_KEY" => "")
     expect(host.configured?).to be(false)
   end
 
   it "reads the model from the env var of the caller, and uses the default without one" do
     expect(host.model).to eq("claude-default")
 
-    allow(ENV).to receive(:[]).with("SPEC_ANTHROPIC_MODEL").and_return("claude-other")
+    stub_env("SPEC_ANTHROPIC_MODEL" => "claude-other")
     expect(host.model).to eq("claude-other")
   end
 
@@ -69,11 +67,11 @@ RSpec.describe AnthropicStructuredOutput do
   it "turns the thinking off with between_tools on Claude Sonnet 5.5, and with disabled on each other model" do
     allow(messages).to receive(:create).and_return(double("message", content: [ double("block", type: :text, text: "A.") ]))
 
-    allow(ENV).to receive(:[]).with("SPEC_ANTHROPIC_MODEL").and_return("claude-sonnet-5-5")
+    stub_env("SPEC_ANTHROPIC_MODEL" => "claude-sonnet-5-5")
     host.text_call(system: "s", content: "c")
     expect(messages).to have_received(:create).with(hash_including(thinking: { type: :between_tools }))
 
-    allow(ENV).to receive(:[]).with("SPEC_ANTHROPIC_MODEL").and_return("claude-haiku-4-5")
+    stub_env("SPEC_ANTHROPIC_MODEL" => "claude-haiku-4-5")
     host.text_call(system: "s", content: "c")
     expect(messages).to have_received(:create).with(hash_including(thinking: { type: :disabled }))
   end

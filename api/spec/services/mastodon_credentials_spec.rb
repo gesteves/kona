@@ -5,8 +5,6 @@ RSpec.describe MastodonCredentials do
 
   before { $redis.del(described_class::REDIS_KEY) }
 
-  after { $redis.del(described_class::REDIS_KEY) }
-
   def store_client!(instance: "mastodon.social")
     described_class.store_client(
       instance: instance, client_id: "client-id", client_secret: "client-secret",

@@ -12,9 +12,7 @@ require "rails_helper"
 RSpec.describe "Root", type: :request do
   describe "GET / with API_HOST unset" do
     before do
-      allow(ENV).to receive(:[]).and_call_original
-      allow(ENV).to receive(:[]).with("SITE_URL").and_return("https://www.example.test")
-      allow(ENV).to receive(:[]).with("API_HOST").and_return(nil)
+      stub_env("SITE_URL" => "https://www.example.test", "API_HOST" => nil)
     end
 
     it "serves the admin home page, sending a signed-out visitor to sign in" do
@@ -24,7 +22,7 @@ RSpec.describe "Root", type: :request do
     end
 
     it "serves the home page itself once signed in" do
-      allow(ENV).to receive(:[]).with("OWNER_EMAIL").and_return("owner@example.com")
+      stub_env("OWNER_EMAIL" => "owner@example.com")
       allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
       sign_in_as(email: "owner@example.com")
 
@@ -37,9 +35,7 @@ RSpec.describe "Root", type: :request do
 
   describe "GET / on the public API host" do
     before do
-      allow(ENV).to receive(:[]).and_call_original
-      allow(ENV).to receive(:[]).with("SITE_URL").and_return("https://www.example.test")
-      allow(ENV).to receive(:[]).with("API_HOST").and_return("api.example.test")
+      stub_env("SITE_URL" => "https://www.example.test", "API_HOST" => "api.example.test")
     end
 
     it "permanently redirects to the main site (host from SITE_URL)" do

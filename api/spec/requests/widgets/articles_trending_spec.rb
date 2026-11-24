@@ -65,9 +65,7 @@ RSpec.describe "Widgets::Articles trending", type: :request do
 
   describe "the cover image" do
     it "renders the image in a link that is not a tab stop, and gives the image an empty alt" do
-      allow(ENV).to receive(:[]).and_call_original
-      allow(ENV).to receive(:[]).with("IMAGES_URL").and_return("https://site.example")
-      allow(ENV).to receive(:[]).with("IMAGE_HOST").and_return("images.example")
+      stub_env("IMAGES_URL" => "https://site.example", "IMAGE_HOST" => "images.example")
 
       get "/widgets/articles/trending", headers: auth_headers
 
@@ -79,9 +77,7 @@ RSpec.describe "Widgets::Articles trending", type: :request do
     end
 
     it "renders no image for an article with no cover image" do
-      allow(ENV).to receive(:[]).and_call_original
-      allow(ENV).to receive(:[]).with("IMAGES_URL").and_return("https://site.example")
-      allow(ENV).to receive(:[]).with("IMAGE_HOST").and_return("images.example")
+      stub_env("IMAGES_URL" => "https://site.example", "IMAGE_HOST" => "images.example")
 
       get "/widgets/articles/trending", headers: auth_headers
 
@@ -89,9 +85,7 @@ RSpec.describe "Widgets::Articles trending", type: :request do
     end
 
     it "renders no image at all when IMAGE_HOST has no value, and never a ctfassets src" do
-      allow(ENV).to receive(:[]).and_call_original
-      allow(ENV).to receive(:[]).with("IMAGES_URL").and_return("https://site.example")
-      allow(ENV).to receive(:[]).with("IMAGE_HOST").and_return(nil)
+      stub_env("IMAGES_URL" => "https://site.example", "IMAGE_HOST" => nil)
 
       get "/widgets/articles/trending", headers: auth_headers
 
@@ -143,9 +137,7 @@ RSpec.describe "Widgets::Articles trending", type: :request do
     # walks four nodes up from the click at the most, thus the classes cannot move to the card.
     # Refer to the root CLAUDE.md.
     it "tags each link into an article with the trending section, for the analytics" do
-      allow(ENV).to receive(:[]).and_call_original
-      allow(ENV).to receive(:[]).with("IMAGES_URL").and_return("https://site.example")
-      allow(ENV).to receive(:[]).with("IMAGE_HOST").and_return("images.example")
+      stub_env("IMAGES_URL" => "https://site.example", "IMAGE_HOST" => "images.example")
 
       get "/widgets/articles/trending", headers: auth_headers
 

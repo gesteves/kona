@@ -4,8 +4,7 @@ RSpec.describe SubmissionTime do
   include ActiveSupport::Testing::TimeHelpers
 
   before do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("TIME_ZONE").and_return("America/Los_Angeles")
+    stub_env("TIME_ZONE" => "America/Los_Angeles")
   end
 
   it "gives the local time to the second, with the UTC value" do

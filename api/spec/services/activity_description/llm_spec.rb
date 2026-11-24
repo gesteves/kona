@@ -4,8 +4,7 @@ RSpec.describe ActivityDescription::Llm do
   let(:client) { instance_double(Anthropic::Client) }
 
   before do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("ANTHROPIC_API_KEY").and_return("key")
+    stub_env("ANTHROPIC_API_KEY" => "key")
     allow(described_class).to receive(:anthropic_client).and_return(client)
   end
 
@@ -64,7 +63,7 @@ RSpec.describe ActivityDescription::Llm do
     it "returns nil for blank input or when unconfigured" do
       expect(described_class.planned_summary(" ")).to be_nil
 
-      allow(ENV).to receive(:[]).with("ANTHROPIC_API_KEY").and_return(nil)
+      stub_env("ANTHROPIC_API_KEY" => nil)
       expect(described_class.planned_summary("2x20")).to be_nil
     end
   end
@@ -117,17 +116,17 @@ RSpec.describe ActivityDescription::Llm do
     it "returns nil with no facts or when unconfigured" do
       expect(described_class.weather_conditions(nil)).to be_nil
 
-      allow(ENV).to receive(:[]).with("ANTHROPIC_API_KEY").and_return(nil)
+      stub_env("ANTHROPIC_API_KEY" => nil)
       expect(described_class.weather_conditions(facts)).to be_nil
     end
   end
 
   describe ".model" do
     it "defaults to claude-sonnet-5-5 and honors the override" do
-      allow(ENV).to receive(:[]).with("ANTHROPIC_DESCRIPTION_MODEL").and_return(nil)
+      stub_env("ANTHROPIC_DESCRIPTION_MODEL" => nil)
       expect(described_class.model).to eq("claude-sonnet-5-5")
 
-      allow(ENV).to receive(:[]).with("ANTHROPIC_DESCRIPTION_MODEL").and_return("claude-opus-4-8")
+      stub_env("ANTHROPIC_DESCRIPTION_MODEL" => "claude-opus-4-8")
       expect(described_class.model).to eq("claude-opus-4-8")
     end
   end

@@ -9,11 +9,12 @@ describe AssetMirror do
   let(:key) { "space/asset1/token/photo.jpg" }
 
   def stub_r2(account: "acct", access_key: "key", secret: "secret", bucket: "kona-images")
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("R2_ACCOUNT_ID").and_return(account)
-    allow(ENV).to receive(:[]).with("R2_ACCESS_KEY_ID").and_return(access_key)
-    allow(ENV).to receive(:[]).with("R2_SECRET_ACCESS_KEY").and_return(secret)
-    allow(ENV).to receive(:[]).with("R2_BUCKET").and_return(bucket)
+    stub_env(
+      "R2_ACCOUNT_ID" => account,
+      "R2_ACCESS_KEY_ID" => access_key,
+      "R2_SECRET_ACCESS_KEY" => secret,
+      "R2_BUCKET" => bucket
+    )
   end
 
   # Says that the object is absent, if a test does not say another thing.

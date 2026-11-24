@@ -5,8 +5,6 @@ RSpec.describe Mastodon do
 
   before { $redis.del(MastodonCredentials::REDIS_KEY) }
 
-  after { $redis.del(MastodonCredentials::REDIS_KEY) }
-
   def register_client!
     MastodonCredentials.store_client(
       instance: "mastodon.social", client_id: "client-id", client_secret: "client-secret",
@@ -210,8 +208,6 @@ RSpec.describe Mastodon do
       allow(HTTParty).to receive(:post)
         .and_return(http_response({ id: "1", url: "https://mastodon.social/@me/1" }))
     end
-
-    after { $redis.del(status_key) }
 
     def post!(**overrides)
       described_class.new.post!(**{ text: "Read this", url: url, idempotency_key: "3kabc" }.merge(overrides))

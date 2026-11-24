@@ -5,9 +5,7 @@ RSpec.describe ContactModeration do
   let(:messages) { instance_double(Anthropic::Resources::Messages) }
 
   before do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("ANTHROPIC_API_KEY").and_return("key")
-    allow(ENV).to receive(:[]).with("ANTHROPIC_CONTACT_MODERATION_MODEL").and_return(nil)
+    stub_env("ANTHROPIC_API_KEY" => "key", "ANTHROPIC_CONTACT_MODERATION_MODEL" => nil)
     allow(described_class).to receive(:anthropic_client).and_return(client)
     allow(client).to receive(:messages).and_return(messages)
   end
@@ -55,7 +53,7 @@ RSpec.describe ContactModeration do
 
       expect(described_class.abusive?(name: "Jane", message: " ")).to be(false)
 
-      allow(ENV).to receive(:[]).with("ANTHROPIC_API_KEY").and_return(nil)
+      stub_env("ANTHROPIC_API_KEY" => nil)
       expect(described_class.abusive?(name: "Jane", message: "Hello")).to be(false)
 
       expect(messages).not_to have_received(:create)
@@ -73,7 +71,7 @@ RSpec.describe ContactModeration do
     it "defaults to claude-sonnet-5-5 and honors the override" do
       expect(described_class.model).to eq("claude-sonnet-5-5")
 
-      allow(ENV).to receive(:[]).with("ANTHROPIC_CONTACT_MODERATION_MODEL").and_return("claude-opus-5-5")
+      stub_env("ANTHROPIC_CONTACT_MODERATION_MODEL" => "claude-opus-5-5")
       expect(described_class.model).to eq("claude-opus-5-5")
     end
   end

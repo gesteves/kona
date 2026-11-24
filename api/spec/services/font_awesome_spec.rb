@@ -8,8 +8,7 @@ RSpec.describe FontAwesome do
   let(:graphql_client) { double("GraphQL client") }
 
   before do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("FONT_AWESOME_VERSION").and_return(nil)
+    stub_env("FONT_AWESOME_VERSION" => nil)
 
     allow($redis).to receive(:get).and_return(nil)
     allow($redis).to receive(:setex)

@@ -42,12 +42,8 @@ RSpec.describe Threads do
 
   before do
     $redis.del(ThreadsCredentials::REDIS_KEY)
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("THREADS_APP_ID").and_return("app-id")
-    allow(ENV).to receive(:[]).with("THREADS_APP_SECRET").and_return("app-secret")
+    stub_env("THREADS_APP_ID" => "app-id", "THREADS_APP_SECRET" => "app-secret")
   end
-
-  after { $redis.del(ThreadsCredentials::REDIS_KEY) }
 
   def connect!(issued_at: Time.current)
     ThreadsCredentials.store_account(
@@ -63,7 +59,7 @@ RSpec.describe Threads do
     end
 
     it "is false without them" do
-      allow(ENV).to receive(:[]).with("THREADS_APP_SECRET").and_return(nil)
+      stub_env("THREADS_APP_SECRET" => nil)
 
       expect(described_class.new).not_to be_configured
     end
@@ -82,7 +78,7 @@ RSpec.describe Threads do
     end
 
     it "is nil with no app credentials" do
-      allow(ENV).to receive(:[]).with("THREADS_APP_ID").and_return(nil)
+      stub_env("THREADS_APP_ID" => nil)
 
       expect(described_class.new.authorization_url("a-state", redirect_uri: redirect_uri)).to be_nil
     end
@@ -164,7 +160,7 @@ RSpec.describe Threads do
     end
 
     it "does nothing with no app credentials" do
-      allow(ENV).to receive(:[]).with("THREADS_APP_ID").and_return(nil)
+      stub_env("THREADS_APP_ID" => nil)
       allow(HTTParty).to receive(:post)
 
       expect(described_class.new.connect!("a-code", redirect_uri: redirect_uri)).to be(false)
@@ -343,8 +339,6 @@ RSpec.describe Threads do
         end
       end
     end
-
-    after { $redis.del(container_key, published_key) }
 
     def post!(**overrides)
       described_class.new.post!(**{ text: "Read this", url: url, idempotency_key: key }.merge(overrides))

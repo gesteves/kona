@@ -4,7 +4,6 @@ RSpec.describe FontAwesomeClient do
   let(:key) { "font_awesome:access_token" }
 
   before { $redis.del(key) }
-  after { $redis.del(key) }
 
   def response(body, success: true, code: 200)
     instance_double(HTTParty::Response, success?: success, code: code, body: body)

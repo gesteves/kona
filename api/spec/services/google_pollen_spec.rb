@@ -8,8 +8,7 @@ RSpec.describe GooglePollen do
   end
 
   before do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("GOOGLE_API_KEY").and_return("api-key")
+    stub_env("GOOGLE_API_KEY" => "api-key")
     allow($redis).to receive(:get).and_return(nil)
     allow($redis).to receive(:setex)
     allow(HTTParty).to receive(:get).and_return(instance_double(HTTParty::Response, success?: true, body: body, request: nil))

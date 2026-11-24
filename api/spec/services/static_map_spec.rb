@@ -18,9 +18,10 @@ RSpec.describe StaticMap do
   end
 
   before do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("MAPBOX_SECRET_TOKEN").and_return("sk.test-token")
-    allow(ENV).to receive(:[]).with("MAPBOX_STYLE_URL").and_return("mapbox://styles/testuser/teststyle")
+    stub_env(
+      "MAPBOX_SECRET_TOKEN" => "sk.test-token",
+      "MAPBOX_STYLE_URL" => "mapbox://styles/testuser/teststyle"
+    )
   end
 
   describe "#url" do
@@ -50,15 +51,13 @@ RSpec.describe StaticMap do
     end
 
     it "prefers the public token when no secret one is set" do
-      allow(ENV).to receive(:[]).with("MAPBOX_SECRET_TOKEN").and_return(nil)
-      allow(ENV).to receive(:[]).with("MAPBOX_ACCESS_TOKEN").and_return("pk.public")
+      stub_env("MAPBOX_SECRET_TOKEN" => nil, "MAPBOX_ACCESS_TOKEN" => "pk.public")
 
       expect(map.url).to include("access_token=pk.public")
     end
 
     it "raises rather than rendering unauthenticated" do
-      allow(ENV).to receive(:[]).with("MAPBOX_SECRET_TOKEN").and_return(nil)
-      allow(ENV).to receive(:[]).with("MAPBOX_ACCESS_TOKEN").and_return(nil)
+      stub_env("MAPBOX_SECRET_TOKEN" => nil, "MAPBOX_ACCESS_TOKEN" => nil)
 
       expect { map.url }.to raise_error(described_class::RenderError, /token is missing/)
     end

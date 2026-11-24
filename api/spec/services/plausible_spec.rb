@@ -4,9 +4,7 @@ RSpec.describe Plausible do
   subject(:service) { described_class.new }
 
   before do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("PLAUSIBLE_API_KEY").and_return("key")
-    allow(ENV).to receive(:[]).with("PLAUSIBLE_SITE_ID").and_return("example.com")
+    stub_env("PLAUSIBLE_API_KEY" => "key", "PLAUSIBLE_SITE_ID" => "example.com")
 
     allow($redis).to receive(:get).and_return(nil)
     allow($redis).to receive(:setex)
@@ -79,7 +77,7 @@ RSpec.describe Plausible do
     end
 
     it "returns nil when unconfigured, without calling the API" do
-      allow(ENV).to receive(:[]).with("PLAUSIBLE_API_KEY").and_return(nil)
+      stub_env("PLAUSIBLE_API_KEY" => nil)
       expect(service).not_to receive(:post_json)
 
       expect(service.pageviews_by_path).to be_nil

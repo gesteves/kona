@@ -9,10 +9,11 @@ RSpec.describe Whoop do
   let(:error_key) { "whoop:cid:refresh_error" }
 
   before do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("WHOOP_CLIENT_ID").and_return("cid")
-    allow(ENV).to receive(:[]).with("WHOOP_CLIENT_SECRET").and_return("secret")
-    allow(ENV).to receive(:[]).with("WHOOP_REDIRECT_URI").and_return("https://example.com/whoop/callback")
+    stub_env(
+      "WHOOP_CLIENT_ID" => "cid",
+      "WHOOP_CLIENT_SECRET" => "secret",
+      "WHOOP_REDIRECT_URI" => "https://example.com/whoop/callback"
+    )
 
     allow($redis).to receive(:get).and_return(nil)
     allow($redis).to receive(:set).and_return(true)
@@ -46,7 +47,7 @@ RSpec.describe Whoop do
     # With no credentials, the key name is not correct, because the client id is nil. Thus the code
     # returns early and does not read Redis.
     it "is false — without touching Redis — when the credentials are missing" do
-      allow(ENV).to receive(:[]).with("WHOOP_CLIENT_SECRET").and_return(nil)
+      stub_env("WHOOP_CLIENT_SECRET" => nil)
       expect($redis).not_to receive(:exists?)
 
       expect(service).not_to be_connected
@@ -120,7 +121,7 @@ RSpec.describe Whoop do
     end
 
     it "is empty with no client id" do
-      allow(ENV).to receive(:[]).with("WHOOP_CLIENT_ID").and_return(nil)
+      stub_env("WHOOP_CLIENT_ID" => nil)
 
       expect(described_class.new.durable_keys).to eq([])
     end

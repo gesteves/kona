@@ -6,10 +6,11 @@ RSpec.describe ContentfulManagement do
   let(:token) { "cma-token" }
 
   before do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("CONTENTFUL_SPACE").and_return("space123")
-    allow(ENV).to receive(:[]).with("CONTENTFUL_MANAGEMENT_TOKEN").and_return(token)
-    allow(ENV).to receive(:[]).with("CONTENTFUL_ENVIRONMENT").and_return(nil)
+    stub_env(
+      "CONTENTFUL_SPACE" => "space123",
+      "CONTENTFUL_MANAGEMENT_TOKEN" => token,
+      "CONTENTFUL_ENVIRONMENT" => nil
+    )
   end
 
   def response_for(body, code: 200)
@@ -22,7 +23,7 @@ RSpec.describe ContentfulManagement do
     it "needs the space and the management token" do
       expect(described_class).to be_configured
 
-      allow(ENV).to receive(:[]).with("CONTENTFUL_MANAGEMENT_TOKEN").and_return(nil)
+      stub_env("CONTENTFUL_MANAGEMENT_TOKEN" => nil)
       expect(described_class).not_to be_configured
     end
   end
@@ -31,7 +32,7 @@ RSpec.describe ContentfulManagement do
     it "is master with no value, and the value when there is one" do
       expect(cma.environment).to eq("master")
 
-      allow(ENV).to receive(:[]).with("CONTENTFUL_ENVIRONMENT").and_return("staging")
+      stub_env("CONTENTFUL_ENVIRONMENT" => "staging")
       expect(cma.environment).to eq("staging")
     end
   end

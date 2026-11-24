@@ -21,9 +21,7 @@ RSpec.describe ImagesHelper do
   end
 
   def stub_images(images_url: "https://site.example", image_host: "images.example")
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("IMAGES_URL").and_return(images_url)
-    allow(ENV).to receive(:[]).with("IMAGE_HOST").and_return(image_host)
+    stub_env("IMAGES_URL" => images_url, "IMAGE_HOST" => image_host)
   end
 
   def article(url: "https://images.ctfassets.net/space/asset1/token/photo.jpg", width: 3000,

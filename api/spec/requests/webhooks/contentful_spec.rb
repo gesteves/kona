@@ -5,8 +5,7 @@ RSpec.describe "Webhooks::Contentful", type: :request do
   let(:webhook_secret) { "a" * 64 }
 
   before do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("CONTENTFUL_WEBHOOK_SECRET").and_return(webhook_secret)
+    stub_env("CONTENTFUL_WEBHOOK_SECRET" => webhook_secret)
     # The webhook only adds a job to the queue. Each job runs in the fake mode, thus no code here
     # uses the PDS.
     # ⚠️ The coalescing window of the asset build is a Redis key with a TTL of a minute. It stays
@@ -71,7 +70,6 @@ RSpec.describe "Webhooks::Contentful", type: :request do
       expect(response).to have_http_status(:no_content)
       expect(StandardSiteSyncJob.jobs).to be_empty
     end
-
 
     it "logs receipt and the dispatched operation" do
       allow(Rails.logger).to receive(:info).and_call_original
@@ -232,7 +230,7 @@ RSpec.describe "Webhooks::Contentful", type: :request do
   end
 
   context "when the secret is not configured" do
-    before { allow(ENV).to receive(:[]).with("CONTENTFUL_WEBHOOK_SECRET").and_return(nil) }
+    before { stub_env("CONTENTFUL_WEBHOOK_SECRET" => nil) }
 
     it "rejects the request" do
       post_webhook(entry_payload("entry123", "article"), topic: "ContentManagement.Entry.publish")

@@ -14,9 +14,14 @@ RSpec.describe "Admin JavaScript i18n keys" do
     "controllers/social_controller.js" => %w[admin.js.social admin.js],
     "controllers/social_post_controller.js" => %w[admin.js.social_post admin.js],
     "controllers/republish_controller.js" => %w[admin.js.republish],
+    "controllers/media_upload_controller.js" => %w[admin.js.media_upload],
     # The Preview panel gets the table of the social controller.
     "lib/preview_panel.js" => %w[admin.js.social admin.js]
   }.freeze
+
+  # The picture tiles get the table of the controller that makes them, thus each of their keys
+  # must be below EACH of these scopes.
+  SHARED = { "lib/picture_tiles.js" => %w[admin.js.social_post admin.js.media_upload] }.freeze
 
   # A key in `this.words("…")` or `t(this.words, "…")`. A key in a template literal names its
   # part at run time, and the spec reads the parts before the `${`.
@@ -33,6 +38,18 @@ RSpec.describe "Admin JavaScript i18n keys" do
           I18n.exists?("#{scope}.#{key}") || I18n.t("#{scope}.#{key}", default: nil).is_a?(Hash)
         end
         expect(found).to be(true), "#{file} reads #{key.inspect}, which is below none of #{scopes.inspect} in en.yml."
+      end
+    end
+  end
+
+  SHARED.each do |file, scopes|
+    it "names keys of #{file} that config/locales/en.yml holds for each controller that uses it" do
+      source = Rails.root.join("app/javascript", file).read
+      keys = source.scan(KEY_CALL).map { |plain, literal| plain || literal.split("${").first.chomp(".") }
+      expect(keys).not_to be_empty, "#{file} reads no keys, thus this spec covers nothing."
+
+      keys.uniq.product(scopes).each do |key, scope|
+        expect(I18n.exists?("#{scope}.#{key}")).to be(true), "#{file} reads #{key.inspect}, which #{scope} does not hold in en.yml."
       end
     end
   end

@@ -3,17 +3,12 @@ require "rails_helper"
 RSpec.describe "Admin location", type: :request do
   include ActiveSupport::Testing::TimeHelpers
 
-  let(:owner_email) { "owner@example.com" }
+  include_context "the admin UI"
   let(:public_token) { "pk.test-token" }
   let(:secret_token) { "sk.secret-token" }
 
   before do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("OWNER_EMAIL").and_return(owner_email)
-    allow(ENV).to receive(:[]).with("MAPBOX_ACCESS_TOKEN").and_return(public_token)
-    allow(ENV).to receive(:[]).with("MAPBOX_SECRET_TOKEN").and_return(secret_token)
-    allow(ENV).to receive(:[]).with("LOCATION").and_return(nil)
-    allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
+    stub_env("MAPBOX_ACCESS_TOKEN" => public_token, "MAPBOX_SECRET_TOKEN" => secret_token, "LOCATION" => nil)
     stub_geocoding(place: "Jackson Hole, Wyoming")
     stub_stored_location("43.48,-110.76")
     stub_events([])
@@ -97,7 +92,7 @@ RSpec.describe "Admin location", type: :request do
     end
 
     it "says so when there's no Mapbox token" do
-      allow(ENV).to receive(:[]).with("MAPBOX_ACCESS_TOKEN").and_return(nil)
+      stub_env("MAPBOX_ACCESS_TOKEN" => nil)
 
       get "/location"
 
@@ -107,7 +102,7 @@ RSpec.describe "Admin location", type: :request do
     # Location uses the env var first, thus a pin writes to Redis and changes nothing that a person
     # reads.
     it "warns when LOCATION overrides whatever is stored" do
-      allow(ENV).to receive(:[]).with("LOCATION").and_return("37.77,-122.42")
+      stub_env("LOCATION" => "37.77,-122.42")
 
       get "/location"
 

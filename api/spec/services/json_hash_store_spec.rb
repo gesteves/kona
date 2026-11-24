@@ -5,8 +5,6 @@ RSpec.describe JsonHashStore do
 
   let(:key) { "spec:json_hash_store" }
 
-  after { $redis.del(key) }
-
   it "writes, reads, counts, and deletes records by id" do
     store.write("a", { "n" => 1 })
     store.write("b", { "n" => 2 })

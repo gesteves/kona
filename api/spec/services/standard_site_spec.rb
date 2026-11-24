@@ -33,8 +33,7 @@ describe StandardSite do
   end
 
   before do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("SITE_URL").and_return("https://www.giventotri.com")
+    stub_env("SITE_URL" => "https://www.giventotri.com")
   end
 
   describe "#list_record_rkeys" do
@@ -453,8 +452,6 @@ describe StandardSite do
     subject(:client) do
       described_class.new(credentials: BlueskyCredentials::Credentials.new(handle: "me.bsky.social", app_password: "pw"))
     end
-
-    after { $redis.del(StandardSite::DID_CACHE_KEY) }
 
     def stub_session(response)
       allow(HTTParty).to receive(:post)

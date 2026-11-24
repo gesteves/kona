@@ -7,8 +7,7 @@ RSpec.describe "Webhooks::Whoop", type: :request do
   let(:whoop) { instance_double(Whoop, user_id: 12345) }
 
   before do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("WHOOP_CLIENT_SECRET").and_return(client_secret)
+    stub_env("WHOOP_CLIENT_SECRET" => client_secret)
     allow(Whoop).to receive(:new).and_return(whoop)
     # The webhook only adds a job to the queue. Each job runs in the fake mode, thus no code here
     # calls Whoop or Intervals.icu.
@@ -122,7 +121,7 @@ RSpec.describe "Webhooks::Whoop", type: :request do
   end
 
   context "when the secret is not configured" do
-    before { allow(ENV).to receive(:[]).with("WHOOP_CLIENT_SECRET").and_return(nil) }
+    before { stub_env("WHOOP_CLIENT_SECRET" => nil) }
 
     it "rejects the request" do
       post_webhook(payload)

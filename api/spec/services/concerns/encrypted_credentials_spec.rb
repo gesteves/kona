@@ -10,8 +10,6 @@ RSpec.describe EncryptedCredentials do
     end
   end
 
-  after { $redis.del("spec:credentials") }
-
   it "encrypts a secret, thus Redis never holds it in the clear, and decrypts it again" do
     sealed = store.send(:encrypt, "an app password")
 

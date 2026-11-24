@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe "Admin course maps", type: :request do
-  let(:owner_email) { "owner@example.com" }
+  include_context "the admin UI"
   let(:library) { instance_double(TrackLibrary) }
 
   let(:ready_track) do
@@ -21,11 +21,7 @@ RSpec.describe "Admin course maps", type: :request do
   end
 
   before do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("OWNER_EMAIL").and_return(owner_email)
-    allow(ENV).to receive(:[]).with("MAPBOX_USERNAME").and_return("testuser")
-    allow(ENV).to receive(:[]).with("MAPBOX_SECRET_TOKEN").and_return("sk.test-token")
-    allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
+    stub_env("MAPBOX_USERNAME" => "testuser", "MAPBOX_SECRET_TOKEN" => "sk.test-token")
     allow(TrackLibrary).to receive(:new).and_return(library)
     allow(library).to receive(:all).and_return([])
     allow(library).to receive(:find).and_return(nil)
@@ -112,7 +108,7 @@ RSpec.describe "Admin course maps", type: :request do
     end
 
     it "says so when Mapbox isn't configured" do
-      allow(ENV).to receive(:[]).with("MAPBOX_SECRET_TOKEN").and_return(nil)
+      stub_env("MAPBOX_SECRET_TOKEN" => nil)
 
       get "/course-maps"
 

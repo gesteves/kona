@@ -1,19 +1,13 @@
 require "rails_helper"
 
 RSpec.describe "Admin social media", type: :request do
-  let(:owner_email) { "owner@example.com" }
+  include_context "the admin UI"
 
   before do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("OWNER_EMAIL").and_return(owner_email)
-    allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
-
     # The credentials of each network live in Redis. Each example says which ones are connected.
     $redis.del(BlueskyCredentials::REDIS_KEY, MastodonCredentials::REDIS_KEY, ThreadsCredentials::REDIS_KEY)
     connect(bluesky: true, mastodon: false, threads: false)
   end
-
-  after { $redis.del(BlueskyCredentials::REDIS_KEY, MastodonCredentials::REDIS_KEY, ThreadsCredentials::REDIS_KEY) }
 
   # One job for each network, thus each example clears all three.
   before { [ BlueskyPostJob, MastodonPostJob, ThreadsPostJob ].each { |job| job.jobs.clear } }
@@ -377,7 +371,6 @@ RSpec.describe "Admin social media", type: :request do
       end
 
       let(:url) { "https://example.test/2026/07/12/ironman-canada/" }
-
 
       it "adds the job of the network, with the link and the body" do
         post "/social", params: { posts: [ { text: "A long day.", link: url } ], networks: [ "bluesky" ] }
@@ -1686,7 +1679,7 @@ RSpec.describe "Admin social media", type: :request do
       # ⚠️ The control renders with an Anthropic key alone, as the two other Claude features stay
       # silent without one. The template renders it disabled: a new tile has no id yet.
       it "renders the Generate control of a tile with an Anthropic key, disabled in the template" do
-        allow(ENV).to receive(:[]).with("ANTHROPIC_API_KEY").and_return("key")
+        stub_env("ANTHROPIC_API_KEY" => "key")
 
         get "/social"
 
@@ -1696,7 +1689,7 @@ RSpec.describe "Admin social media", type: :request do
       end
 
       it "renders no Generate control without an Anthropic key" do
-        allow(ENV).to receive(:[]).with("ANTHROPIC_API_KEY").and_return(nil)
+        stub_env("ANTHROPIC_API_KEY" => nil)
 
         get "/social"
 

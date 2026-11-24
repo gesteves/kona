@@ -45,10 +45,8 @@ RSpec.describe ThreadsPostJob do
     let!(:first) { store.store(image: "\xFF\xD8jpeg".b, width: 4, height: 3) }
     let(:with_photos) { post("3kabc", "A photo").merge("photos" => [ { "id" => first, "alt" => "A cat" } ]) }
 
-    before { allow(ENV).to receive(:[]).and_call_original }
-
     it "gives Threads the signed public URL and the alt text of each photo, and reads no bytes" do
-      allow(ENV).to receive(:[]).with("API_HOST").and_return("api.example.test")
+      stub_env("API_HOST" => "api.example.test")
       expect_any_instance_of(SocialPhotos).not_to receive(:fetch)
 
       described_class.new.perform([ with_photos ])
@@ -59,7 +57,7 @@ RSpec.describe ThreadsPostJob do
     end
 
     it "fails the post for good when a photo is gone, and posts nothing" do
-      allow(ENV).to receive(:[]).with("API_HOST").and_return("api.example.test")
+      stub_env("API_HOST" => "api.example.test")
       store.discard([ first ])
 
       expect { described_class.new.perform([ with_photos ]) }
@@ -69,7 +67,7 @@ RSpec.describe ThreadsPostJob do
 
     # ⚠️ Meta cannot GET a local URL.
     it "fails the post for good with no API_HOST" do
-      allow(ENV).to receive(:[]).with("API_HOST").and_return(nil)
+      stub_env("API_HOST" => nil)
 
       expect { described_class.new.perform([ with_photos ]) }
         .to raise_error(PermanentError, /API_HOST/)

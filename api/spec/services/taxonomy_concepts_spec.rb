@@ -6,9 +6,7 @@ RSpec.describe TaxonomyConcepts do
   before do
     allow($redis).to receive(:get).and_return(nil)
     allow($redis).to receive(:setex)
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("CONTENTFUL_SPACE").and_return("space")
-    allow(ENV).to receive(:[]).with("CONTENTFUL_TOKEN").and_return("token")
+    stub_env("CONTENTFUL_SPACE" => "space", "CONTENTFUL_TOKEN" => "token")
   end
 
   it "maps concept ids to their localized prefLabel" do
@@ -60,7 +58,7 @@ RSpec.describe TaxonomyConcepts do
   end
 
   it "no-ops without Contentful credentials" do
-    allow(ENV).to receive(:[]).with("CONTENTFUL_SPACE").and_return(nil)
+    stub_env("CONTENTFUL_SPACE" => nil)
     expect(service).not_to receive(:get_json)
     expect(service.names).to eq({})
   end

@@ -5,9 +5,7 @@ RSpec.describe AltText do
   let(:jpeg) { "\xFF\xD8\xFF\xE0jpeg".b }
 
   before do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("ANTHROPIC_API_KEY").and_return("key")
-    allow(ENV).to receive(:[]).with("ANTHROPIC_ALT_TEXT_MODEL").and_return(nil)
+    stub_env("ANTHROPIC_API_KEY" => "key", "ANTHROPIC_ALT_TEXT_MODEL" => nil)
     allow(described_class).to receive(:anthropic_client).and_return(client)
   end
 
@@ -50,7 +48,7 @@ RSpec.describe AltText do
     end
 
     it "reads the model from its own env var" do
-      allow(ENV).to receive(:[]).with("ANTHROPIC_ALT_TEXT_MODEL").and_return("claude-other")
+      stub_env("ANTHROPIC_ALT_TEXT_MODEL" => "claude-other")
       allow(client).to receive(:messages).and_return(
         instance_double(Anthropic::Resources::Messages, create: message_with("A cat."))
       )
@@ -85,7 +83,7 @@ RSpec.describe AltText do
 
       expect(described_class.generate(image: "")).to be_nil
 
-      allow(ENV).to receive(:[]).with("ANTHROPIC_API_KEY").and_return(nil)
+      stub_env("ANTHROPIC_API_KEY" => nil)
       expect(described_class.generate(image: jpeg)).to be_nil
 
       expect(client).not_to have_received(:messages)

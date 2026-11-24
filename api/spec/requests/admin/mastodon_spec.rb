@@ -1,17 +1,12 @@
 require "rails_helper"
 
 RSpec.describe "Admin Mastodon connection", type: :request do
-  let(:owner_email) { "owner@example.com" }
+  include_context "the admin UI"
   let(:redirect_uri) { "http://www.example.com/connected-apps/mastodon/callback" }
 
   before do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("OWNER_EMAIL").and_return(owner_email)
-    allow_any_instance_of(FontAwesome).to receive(:svg).and_return('<svg class="stub-icon"></svg>')
     $redis.del(MastodonCredentials::REDIS_KEY)
   end
-
-  after { $redis.del(MastodonCredentials::REDIS_KEY) }
 
   def sign_in! = sign_in_as(email: owner_email)
 

@@ -2,8 +2,7 @@ require "rails_helper"
 
 RSpec.describe "Strava webhook", type: :request do
   before do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("STRAVA_WEBHOOK_VERIFY_TOKEN").and_return("the-verify-token")
+    stub_env("STRAVA_WEBHOOK_VERIFY_TOKEN" => "the-verify-token")
     $redis.set(Strava::SUBSCRIPTION_KEY, "77")
     StravaCredentials.store_athlete(
       athlete_id: 42, athlete_name: "Athlete",
@@ -35,7 +34,7 @@ RSpec.describe "Strava webhook", type: :request do
     end
 
     it "refuses every token when none is configured" do
-      allow(ENV).to receive(:[]).with("STRAVA_WEBHOOK_VERIFY_TOKEN").and_return(nil)
+      stub_env("STRAVA_WEBHOOK_VERIFY_TOKEN" => nil)
 
       get "/webhooks/strava", params: { "hub.mode" => "subscribe", "hub.challenge" => "abc", "hub.verify_token" => "" }
 

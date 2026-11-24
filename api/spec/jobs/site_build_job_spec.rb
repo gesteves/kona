@@ -4,9 +4,7 @@ RSpec.describe SiteBuildJob do
   let(:success) { instance_double(HTTParty::Response, success?: true, code: 204) }
 
   before do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("GITHUB_DISPATCH_TOKEN").and_return("ghp_test")
-    allow(ENV).to receive(:[]).with("GITHUB_REPOSITORY").and_return("owner/kona")
+    stub_env("GITHUB_DISPATCH_TOKEN" => "ghp_test", "GITHUB_REPOSITORY" => "owner/kona")
   end
 
   it "POSTs a repository_dispatch event to the configured repo with the auth + api headers" do
@@ -58,13 +56,13 @@ RSpec.describe SiteBuildJob do
   end
 
   it "is a no-op (no HTTP call) when GITHUB_DISPATCH_TOKEN is unset" do
-    allow(ENV).to receive(:[]).with("GITHUB_DISPATCH_TOKEN").and_return(nil)
+    stub_env("GITHUB_DISPATCH_TOKEN" => nil)
     expect(HTTParty).not_to receive(:post)
     described_class.new.perform
   end
 
   it "is a no-op (no HTTP call) when GITHUB_REPOSITORY is unset" do
-    allow(ENV).to receive(:[]).with("GITHUB_REPOSITORY").and_return(nil)
+    stub_env("GITHUB_REPOSITORY" => nil)
     expect(HTTParty).not_to receive(:post)
     described_class.new.perform
   end

@@ -5,8 +5,6 @@ RSpec.describe TrainerRoadCredentials do
 
   before { $redis.del(described_class::REDIS_KEY) }
 
-  after { $redis.del(described_class::REDIS_KEY) }
-
   describe ".store and .fetch" do
     it "round-trips a stored URL" do
       described_class.store(calendar_url: url)

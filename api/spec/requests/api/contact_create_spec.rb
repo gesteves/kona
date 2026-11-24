@@ -11,12 +11,10 @@ RSpec.describe "Contact", type: :request do
   let(:html) { auth.merge("Accept" => "text/html") }
 
   before do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("API_TOKEN").and_return(token)
-    allow(ENV).to receive(:[]).with("SITE_URL").and_return(site_url)
+    stub_env("API_TOKEN" => token, "SITE_URL" => site_url)
     # By default, Turnstile has no configuration. Thus these specs do not depend on a local .env with
     # TURNSTILE_SECRET in it. The "Turnstile verification" group stubs Turnstile#verify.
-    allow(ENV).to receive(:[]).with("TURNSTILE_SECRET").and_return(nil)
+    stub_env("TURNSTILE_SECRET" => nil)
     # No spec makes a real DNS query. The "Email domain" group changes this.
     allow(EmailDomain).to receive(:accepts_mail?).and_return(true)
   end

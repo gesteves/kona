@@ -6,8 +6,7 @@ RSpec.describe "Admin Whoop connection", type: :request do
   let(:owner_email) { "owner@example.com" }
 
   before do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("OWNER_EMAIL").and_return(owner_email)
+    stub_env("OWNER_EMAIL" => owner_email)
     allow_any_instance_of(Whoop).to receive(:authorization_url) do |_whoop, state|
       "https://api.prod.whoop.com/oauth/oauth2/auth?state=#{state}"
     end
