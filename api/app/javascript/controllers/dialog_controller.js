@@ -5,7 +5,7 @@ import { Controller } from "@hotwired/stimulus";
  *
  * ⚠️ Turbo makes its snapshot of the DOM as it is. Thus an open confirmation dialog, a navigation
  * away, and a press of Back give a page with that dialog still open. A restoration visit never
- * renders again, thus nothing would close it. The flash controller exists for the same problem.
+ * renders again, thus nothing would close it. The toast controller exists for the same problem.
  *
  * ⚠️ A nav item with a dialog has no `data-drawer="close"`, because the drawer would stop its
  * click. Thus this controller closes the drawer. Refer to layouts/_admin_nav_item.html.erb.

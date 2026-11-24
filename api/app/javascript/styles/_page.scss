@@ -4,15 +4,13 @@
 
 wa-page {
   // The content row of the header. The nav button is the tallest element in it, thus this value
-  // sets its height and <wa-button> does not. Without this, a component default would decide the
-  // height of the bar and the offset that each other element uses to stay below it.
+  // sets its height, and the height of the bar does not come from a <wa-button> default.
   --header-content-height: 2rem;
 
   // ⚠️ <wa-page> declares --header-height but it never measures it. It stays 0px until this code
   // sets it, and its own --scroll-margin-top, for the skip link and the anchor targets, comes from
-  // it. This code calculates the value and does not use a fixed one: a fixed height fought the
-  // padding below and pushed the wordmark past the bottom edge of the bar. The value is the same
-  // space on each side, plus the row that it contains.
+  // it. The value is the same space on each side, plus the row that it contains. A fixed value
+  // would not follow the padding, and the wordmark would go past the bottom edge of the bar.
   --header-height: calc(var(--header-content-height) + (var(--wa-space-m) * 2));
 
   // The width of the sidebar track. It is wide enough for the longest label ("Connected apps") on
@@ -27,11 +25,10 @@ wa-page[view="mobile"] {
   --menu-width: auto;
 }
 
-// ⚠️ <wa-page> sets `view` to "desktop" at the start and corrects it only after its ResizeObserver
-// runs, one frame later. Thus on a phone the navigation appears as a full-width sidebar before it
-// moves into the drawer. `wa-cloak` does not help: it goes away when the element exists, which is
-// before that first render. Below the breakpoint there is no sidebar layout to show, whatever
-// `view` says. Thus this code hides it until the component agrees.
+// ⚠️ <wa-page> sets `view` to "desktop" at the start and corrects it one frame later, after its
+// ResizeObserver runs. Thus on a phone the navigation appears as a full-width sidebar before it
+// moves into the drawer. `wa-cloak` does not help: it goes away before that first render. Thus
+// this code hides the sidebar below the breakpoint until the component agrees.
 // ⚠️ The width must be the same as the `mobile-breakpoint` attribute in layouts/admin.html.erb.
 @media (width < 768px) {
   wa-page {
@@ -43,11 +40,10 @@ wa-page[view="mobile"] {
   }
 
   // The same frame, from the other side: the page needs the nav button of the header below the
-  // breakpoint, whatever `view` says. Without this, the button appears late and moves the wordmark
-  // beside it to the side.
+  // breakpoint. Without this, the button appears late and moves the wordmark beside it.
   // ⚠️ This works only because the button has no `wa-mobile-only` class. `wa-base` hides
-  // `[data-toggle-nav]` on the desktop with no `!important`, and the rule of that class uses one,
-  // which no unlayered rule of ours can win against.
+  // `[data-toggle-nav]` on the desktop with no `!important`. The rule of that class uses one, and
+  // no unlayered rule of ours can win against it.
   wa-page:not([view="mobile"]) [data-toggle-nav] {
     display: inline-block;
   }

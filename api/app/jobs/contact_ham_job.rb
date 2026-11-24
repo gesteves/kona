@@ -2,9 +2,6 @@
 # the spam quarantine. Thus Akismet stops the mark on the same sender. It is a separate job, thus a
 # failure of the report retries and never stops the delivery of the message.
 class ContactHamJob < ContactJob
-  # @param name [String] The name of the sender.
-  # @param email [String] The email address of the sender.
-  # @param message [String] The body of the message.
   # @param context [Hash] The sender data from the quarantine: "ip" and "user_agent" go to Akismet.
   def perform(name, email, message, context = {})
     context ||= {}

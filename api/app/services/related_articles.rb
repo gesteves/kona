@@ -9,9 +9,9 @@
 #                 date of the query article.
 #
 # ⚠️ The prior is large enough to select inside a group of candidates with a near-equal relevance.
-# For a race report, the candidates are twenty other race reports and their relevance forms a flat
-# band, and the words that they share are noise. In that band, the popularity and the season are
-# what predict a click. `rake related:evaluate` measures this against the real navigation.
+# For a race report, the candidates are other race reports: their relevance forms a flat band, and
+# the words that they share are noise. In that band, the popularity and the season predict a
+# click. `rake related:evaluate` measures this against the real navigation.
 class RelatedArticles < ApplicationService
   include ArticleRanking # candidates, shared with TrendingArticles
 
@@ -37,9 +37,7 @@ class RelatedArticles < ApplicationService
   # reports of the same race are near-copies of each other and MMR takes one of them.
   SAME_RACE_FACTOR = 0.85
 
-  # @param articles [Articles] The source of the articles. A test can supply its own.
-  # @param plausible [Plausible] The source of the analytics. A test can supply its own.
-  # @param taxonomy [TaxonomyConcepts] The source of the concept tree. A test can supply its own.
+  # Each argument is a data source, and a test can supply its own.
   def initialize(articles: Articles.new, plausible: Plausible.new, taxonomy: TaxonomyConcepts.new)
     @articles = articles
     @plausible = plausible
@@ -47,12 +45,10 @@ class RelatedArticles < ApplicationService
   end
 
   # The nearest neighbors of each entry, for the static "You May Also Like" section of the web
-  # build. This reads the articles one time, and not one time for each article: the index is made
-  # one time and the rest is arithmetic.
+  # build. It makes the index one time for the full corpus, and not one time for each article.
   #
-  # ⚠️ No cache holds this. The build calls it one time, immediately after a publish. That is the
-  # one moment when a list from ten minutes ago would be wrong, because it would omit the entry
-  # that started the build.
+  # ⚠️ No cache holds this. The build calls it one time, immediately after a publish, and a cached
+  # list would omit the entry that started the build.
   #
   # ⚠️ There is a key for each published entry, and not only for each candidate. A Short is a
   # correct query article, because the section appears on its own page, but a Short can never be a
@@ -209,10 +205,9 @@ class RelatedArticles < ApplicationService
   # The addition for the popularity of each candidate, from the visitors of all time. It is never
   # more than POPULARITY_WEIGHT.
   #
-  # ⚠️ The code adds this and does not multiply by it. A multiplier would give the largest lift to
-  # the candidate that is already the most relevant, and almost none to the others. Thus it would
-  # make the first position stronger and it would not select between two near-equal candidates,
-  # which is the one purpose of this addition.
+  # ⚠️ The code adds this and does not multiply by it. A multiplier gives the largest lift to the
+  # candidate that is already the most relevant. Thus it would not select between two near-equal
+  # candidates, which is the one purpose of this addition.
   # @return [Hash{String=>Float}] id => the addition.
   def popularity(pool)
     visitors = all_time_visitors

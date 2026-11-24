@@ -13,8 +13,9 @@ module Webhooks
     # has the activity, thus a job at once would almost always miss and wait for a retry.
     INTERVALS_DELAY = 30.seconds
 
-    # GET /webhooks/strava — the challenge that Strava sends when `rake strava:subscribe` makes the
-    # subscription.
+    # GET /webhooks/strava
+    #
+    # The challenge that Strava sends when `rake strava:subscribe` makes the subscription.
     def show
       expected = ENV["STRAVA_WEBHOOK_VERIFY_TOKEN"].to_s
       unless params["hub.mode"] == "subscribe" && expected.present? &&

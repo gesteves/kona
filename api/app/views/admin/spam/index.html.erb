@@ -1,10 +1,9 @@
 <%= render "layouts/page_header", title: t("admin.pages.spam") %>
 
 <%# ⚠️ Each field on these cards is input from an attacker, and no code removes anything from it.
-    This is the one place in the app where that is true of rendered HTML. The escape that ERB does
-    by default is the only protection: use no `raw`, no `html_safe`, and no `simple_format` on a
-    message field. The line breaks come from `white-space: pre-wrap` in _spam.scss. The
-    `raw icon_svg(...)` code that the other admin pages use must never come to these values. %>
+    The escape that ERB does by default is the only protection: use no `raw`, no `html_safe`, and
+    no `simple_format` on a message field. The line breaks come from `white-space: pre-wrap` in
+    _spam.scss. %>
 
 <% if @messages.empty? %>
   <wa-callout variant="neutral">
@@ -66,11 +65,10 @@
                   [data-dialog="open <id>"] and [data-dialog="close"]. Thus the modal needs no
                   Stimulus action. The `dialog` controller only closes it before Turbo caches the
                   page. %>
-              <%# ⚠️ Use neutral, and not danger, on purpose: the brand colors here ARE red. Thus a
-                  danger variant beside the brand-accent "Not spam" makes the safe action the most
-                  prominent one on the card, and it looks the same as the action that deletes. Red
-                  is for the confirm button in the dialog only, where the person makes the
-                  decision. %>
+              <%# ⚠️ Use neutral, and not danger, on purpose: the brand colors here are red. Thus a
+                  danger variant makes the brand-accent "Not spam" look the same as the action that
+                  deletes. Red is for the confirm button in the dialog only, where the person makes
+                  the decision. %>
               <wa-button variant="neutral" appearance="outlined" data-dialog="open <%= message.dialog_id %>">
                 <%= slotted_icon_svg("classic", "light", "trash") %>
                 <%= t("admin.actions.delete") %>

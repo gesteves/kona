@@ -6,10 +6,9 @@
 # ⚠️ The decode IS the check that the file is a picture. A content type from the browser is not
 # one: a person can name any file with any extension.
 # ⚠️ `strip: true` removes each EXIF field, and that includes the GPS position of a personal photo.
-# ⚠️ **It reads the file from the DISK, and never from a String of the bytes.** Puma writes a large
-# body to a temporary file, thus the upload is already there, and libvips shrinks it at the decode.
-# A `File.read` of it would put the full file in the Ruby heap, three times over at three Puma
-# threads, on a 512MB machine. That is the failure that the first R2 backfill met.
+# ⚠️ It reads the file from the disk, and never from a String of the bytes. Puma writes a large
+# body to a temporary file, and libvips shrinks it at the decode. A `File.read` would put the full
+# file in the Ruby heap of each of the three Puma threads, on a 512MB machine.
 module PhotoBlob
   class Error < StandardError; end
   # The bytes are not a picture that libvips can read.
@@ -52,8 +51,8 @@ module PhotoBlob
     smallest = nil
     STEPS.each do |step|
       # ⚠️ `thumbnail` shrinks at the decode and applies the EXIF orientation. A full decode of a
-      # camera file is more than 100MB of pixels on a 512MB machine. It reads the path, thus the
-      # bytes never go into the Ruby heap; refer to the ⚠️ at the top of this file.
+      # camera file is more than 100MB of pixels on a 512MB machine. It reads the path: refer to the
+      # ⚠️ at the top of this file.
       image = Vips::Image.thumbnail(path, step[:edge], height: step[:edge], size: :down)
       # A JPEG has no alpha channel: without this, a transparent PNG gets a black background.
       image = image.flatten(background: [ 255, 255, 255 ]) if image.has_alpha?
@@ -77,12 +76,10 @@ module PhotoBlob
   # alt text.
   #
   # ⚠️ This is NOT the picture that goes to Contentful: that one is the original file, unchanged.
-  # The decode here is still the check that the upload IS a picture, and it runs before the app
+  # The decode here is still the check that the upload is a picture, and it runs before the app
   # sends one byte to Contentful.
   # ⚠️ The same disk rule as `.prepare`: it reads the path, and never a String of the bytes.
-  #
   # @param path [String] The upload, on the disk.
-  # @param edge [Integer] The longest side of the result.
   # @return [Hash] `{ bytes:, width:, height: }`.
   # @raise [NotAnImageError] When libvips cannot read the file.
   def self.thumbnail(path, edge: THUMBNAIL_EDGE)

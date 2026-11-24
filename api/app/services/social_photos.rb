@@ -4,8 +4,7 @@
 # `worker` are different fly machines, thus a temporary file of the request is not there for the
 # job, and a photo is as much as 2MB, which is too large for a Sidekiq argument.
 #
-# It is not an ApplicationService, because that base class is for HTTP integrations and this class
-# makes no network call.
+# It is not an ApplicationService, because it makes no network call.
 #
 # ⚠️ One key for each photo, with a TTL, on purpose. `JsonHashStore` keeps its records in one hash
 # with no TTL, and a photo must go away by itself: a draft that the owner never posts must not
@@ -30,8 +29,6 @@ class SocialPhotos
   #
   # ⚠️ It is on the PUBLIC API host, because Meta cannot pass the bot protection of the admin host.
   # The signature is the permission, and the TTL of the photo ends the URL.
-  # @param id [String]
-  # @return [String]
   # @raise [ApplicationJob::PermanentError] When `API_HOST` is blank. Meta cannot GET a local URL.
   def self.public_url(id)
     host = ENV["API_HOST"].presence
@@ -40,15 +37,12 @@ class SocialPhotos
     "https://#{host}/api/social-photos/#{id}/#{signature(id)}"
   end
 
-  # @param id [String]
   # @return [String] The HMAC of the id, in hex.
   def self.signature(id)
     key = Rails.application.key_generator.generate_key(SIGNATURE_SALT, 32)
     OpenSSL::HMAC.hexdigest("SHA256", key, id.to_s)
   end
 
-  # @param id [String]
-  # @param signature [String]
   # @return [Boolean] True when the signature is the one that `.public_url` gives for that id.
   def self.valid_signature?(id, signature)
     id?(id) && signature.is_a?(String) && signature.match?(SIGNATURE_PATTERN) &&
@@ -57,14 +51,11 @@ class SocialPhotos
 
   # Keeps one prepared photo.
   # @param image [String] The JPEG bytes.
-  # @param width [Integer]
-  # @param height [Integer]
   # @return [String] The id.
   def store(image:, width:, height:)
     write_new(DRAFT_TTL, "image" => image, "width" => width.to_i, "height" => height.to_i)
   end
 
-  # @param id [String]
   # @return [Hash, nil] `{ image:, width:, height: }`, or nil when the photo is absent.
   def fetch(id)
     return nil unless self.class.id?(id)
@@ -78,9 +69,6 @@ class SocialPhotos
   end
 
   # Gives each photo a new TTL, for a post that waits.
-  # @param ids [Array<String>]
-  # @param seconds [Integer]
-  # @return [void]
   def keep(ids, seconds)
     ids.select { |id| self.class.id?(id) }.each { |id| $redis.expire(key_for(id), seconds.to_i) }
   end

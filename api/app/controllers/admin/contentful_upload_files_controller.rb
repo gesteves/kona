@@ -5,10 +5,10 @@ module Admin
   # ⚠️ One file for each request, on purpose. A tile on the page is one upload, thus a 422 names
   # one file.
   #
-  # ⚠️ **The ORIGINAL bytes go to Contentful here**, in the request, and not in the job. `app` and
+  # ⚠️ The original bytes go to Contentful here, in the request, and not in the job. `app` and
   # `worker` are different fly machines, thus the job cannot read the temporary file of this
-  # request, and the other way — Redis — would hold as much as 500MB of camera JPEG. The transfer
-  # happens while the owner writes the alt text, thus it costs no waiting.
+  # request, and Redis would have to hold as much as 500MB of camera JPEG. The transfer occurs
+  # while the owner writes the alt text, thus it costs no wait.
   class ContentfulUploadFilesController < BaseController
     include PictureUpload
 

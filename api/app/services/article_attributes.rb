@@ -9,7 +9,6 @@ module ArticleAttributes
   module_function
 
   # Makes the shared fields of a raw article item.
-  # @param slug [String, nil] The slug of the entry.
   # @param published_version [Object, nil] sys.publishedVersion. A blank value means a draft.
   # @param published [String, nil] The publish date that an editor sets, if there is one.
   # @param first_published_at [String, nil] sys.firstPublishedAt.

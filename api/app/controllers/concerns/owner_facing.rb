@@ -1,6 +1,6 @@
-# The response policy of the HTML pages for the owner: the admin UI, the sign-in page, and the Whoop
-# OAuth round trip. These are the only responses in this app that a browser reads as a document, and
-# the only ones with a session. Thus they are the only ones that need a CSP.
+# The response policy of the HTML pages for the owner: the admin UI and the sign-in page. These are
+# the only responses in this app that a browser reads as a document, and the only ones with a
+# session. Thus they are the only ones that need a CSP.
 #
 # ⚠️ This uses `X-Robots-Tag` and does not depend on the `<meta name="robots">` in
 # layouts/_head.html.erb. public/robots.txt already refuses this full host, thus a crawler never

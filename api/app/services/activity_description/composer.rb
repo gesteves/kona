@@ -56,7 +56,6 @@ module ActivityDescription
     # the same, and a group of blank lines becomes one blank line. It gives nil when only the stat
     # lines stay.
     # @param map [Boolean] True to remove the map line of Zwift too. Refer to #map_line.
-    # @return [String, nil]
     def headline(description, map: false)
       return if description.blank?
 
@@ -86,7 +85,6 @@ module ActivityDescription
     # With some data absent, the line has only the fields that are available. It is nil when the
     # activity is not a bike ride, or when it has no power fields.
     # @param activity [Hash] The raw Intervals.icu activity, with symbol keys.
-    # @return [String, nil]
     def power_block(activity)
       return unless ActivityMatcher.normalize_type(activity[:type]) == "Cycling"
 
@@ -108,7 +106,6 @@ module ActivityDescription
     # The CORE heat line: the heat-adaptation score of the day, when it is more than zero. The
     # code omits it for a swim, because the CORE sensor is not accurate in water. For example,
     # "🌡️ 72% heat adapted".
-    # @return [String, nil]
     def heat_block(heat_adaptation_score:)
       return unless heat_adaptation_score.is_a?(Numeric) && heat_adaptation_score.finite?
       return unless heat_adaptation_score.round.positive?
@@ -117,7 +114,6 @@ module ActivityDescription
     end
 
     # The Whoop strain line, for example "🔥 12.4 Whoop Strain". The code omits it for a swim.
-    # @return [String, nil]
     def whoop_block(strain, swim:)
       return if swim || strain.nil?
 
@@ -130,7 +126,6 @@ module ActivityDescription
     # @param median_temp_celsius [Numeric, nil] The median of the temperature stream of the
     #   activity.
     # @param unit [Symbol] :celsius or :fahrenheit, which the athlete selects.
-    # @return [String, nil]
     def water_temp_block(median_temp_celsius, unit:)
       return if median_temp_celsius.nil?
 
@@ -144,7 +139,6 @@ module ActivityDescription
       "💧 Water temperature #{formatted.sub(/\.0(?=°)/, '')}"
     end
 
-    # @return [Boolean] True when a line starts with one of STAT_EMOJIS.
     # The map line that Zwift writes in the description of its activity. The composer puts it at the
     # top of the stat lines, with no blank line above them.
     # @return [String, nil] The first line that starts with MAP_EMOJI, or nil.
@@ -154,6 +148,7 @@ module ActivityDescription
 
     def map_line?(line) = line.delete(VARIATION_SELECTOR).start_with?(MAP_EMOJI)
 
+    # @return [Boolean] True when a line starts with one of STAT_EMOJIS.
     def stat_line?(line)
       plain = line.delete(VARIATION_SELECTOR)
       STAT_EMOJIS.any? { |emoji| plain.start_with?(emoji) }

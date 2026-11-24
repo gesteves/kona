@@ -1,8 +1,7 @@
 require "graphql/client"
 require "graphql/client/http"
 
-# The GraphQL client of the Font Awesome API. It is the same as
-# lib/data/graphql/font_awesome.rb of the web app. The code makes the HTTP client and the schema at
+# The GraphQL client of the Font Awesome API. The code makes the HTTP client and the schema at
 # the first use. Thus the start of the app, and a test run with a stub for FontAwesome, never use
 # the network.
 module FontAwesomeClient
@@ -57,9 +56,8 @@ module FontAwesomeClient
       # ⚠️ The cache holds the token for less than its true life, as it does for the JWT of
       # WeatherKit. The extra time is for a clock difference and for a request in progress. With
       # the exact time, a request at the end of the window would get a token that expired. That
-      # failure has no message: the GraphQL call gives nil and the view renders a widget with one
-      # icon absent. An expires_in that is absent or zero would make setex raise into that same
-      # rescue, and the token would then stay out of the cache.
+      # failure has no message: the view renders a widget with one icon absent. An expires_in that
+      # is absent or zero would make setex raise into the rescue, thus the code checks `ttl`.
       ttl = data[:expires_in].to_i - TOKEN_EXPIRY_MARGIN
       $redis.setex("font_awesome:access_token", ttl, data[:access_token]) if ttl.positive?
       data[:access_token]

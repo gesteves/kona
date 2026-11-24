@@ -21,7 +21,6 @@ class ContactJobArgsFilter
   # It reads the parent class and not a list of names, thus a new contact job cannot send the data
   # of a sender.
   # @param name [String, nil] The class name in the job payload.
-  # @return [Boolean] True if the class is a ContactJob.
   def self.contact_job?(name)
     klass = name.to_s.safe_constantize
     klass.is_a?(Class) && klass.ancestors.include?(ContactJob)

@@ -1,28 +1,26 @@
 # Applies the SmartyPants typography to the draft of a social post: curly quotation marks, a true
-# ellipsis, and an en or em dash, from the characters that a person types on a keyboard.
+# ellipsis, and an en or em dash, from the characters that a person types on a keyboard. It makes
+# no network call, thus it is not an ApplicationService.
 #
-# It is not an ApplicationService, because that base class is for HTTP integrations and this class
-# makes no network call. Each method is a class method, thus a caller needs no instance.
+# ⚠️ It is the same typography as the blog, through `MarkdownHelper#smartypants`. A post and the
+# article that it links to must not use a different apostrophe. Do not write a second set of
+# rules here.
 #
-# ⚠️ **It is the SAME typography as the blog**, through `MarkdownHelper#smartypants`. The owner
-# writes for one voice, thus a post and the article that it links to must not use a different
-# apostrophe. Do not write a second set of rules here.
-#
-# ⚠️ **A URL goes through with NO change**, and that is the whole reason that this class exists and
-# the helper is not called directly. SmartyPants reads the characters of an address as punctuation:
-# `example.com/a--b` becomes an en dash, `?q="a"` becomes curly quotation marks, and `/a...b`
-# becomes an ellipsis. Each of those gives a link that is dead, and nothing reports it.
+# ⚠️ A URL goes through with no change, and that is the reason that this class exists.
+# SmartyPants reads the characters of an address as punctuation: `example.com/a--b` becomes an en
+# dash, `?q="a"` becomes curly quotation marks, and `/a...b` becomes an ellipsis. Each of those
+# gives a link that is dead, and nothing reports it.
 class Typography
   # ⚠️ It extends the helper, thus this class cannot hold a rule of its own. Refer to the ⚠️ above.
   extend MarkdownHelper
 
   # What each address becomes while SmartyPants reads the text. U+FFFC is OBJECT REPLACEMENT
-  # CHARACTER, which is what it names: one character that stands for something that is not text.
+  # CHARACTER: one character that stands for something that is not text.
   #
-  # ⚠️ **The mask is necessary, and a split at each address is NOT enough.** SmartyPants decides the
+  # ⚠️ The mask is necessary, and a split at each address is not enough. SmartyPants decides the
   # direction of a quotation mark from the characters at each side of it, thus it must read the
   # whole sentence at one time. With a split, `He said "see <link> now"` opens the quotation and
-  # never closes it: the two marks are in different pieces.
+  # never closes it.
   PLACEHOLDER = "\uFFFC".freeze
 
   class << self
@@ -37,7 +35,7 @@ class Typography
       urls = []
       converted = convert(mask(text, urls))
 
-      # ⚠️ **It gives the words back with NO typography when a mask went missing.** A post with a
+      # ⚠️ It gives the words back with no typography when a mask went missing. A post with a
       # straight apostrophe is a small thing, and an address that another address replaced is a
       # link that goes to the wrong page.
       return text unless converted.count(PLACEHOLDER) == urls.length
@@ -49,9 +47,7 @@ class Typography
     private
 
     # Writes the text with one mask in place of each address, and collects those addresses.
-    # @param text [String]
     # @param urls [Array<String>] Filled in, in the order that the addresses appear.
-    # @return [String]
     def mask(text, urls)
       masked = +""
       last = 0
@@ -65,11 +61,9 @@ class Typography
       masked << text[last..].to_s
     end
 
-    # ⚠️ **SmartyPants writes HTML entities**, because it is a renderer of HTML: it gives `&rsquo;`
-    # and not `’`. A post holds characters, thus the decode is necessary and not decoration.
+    # ⚠️ SmartyPants writes HTML entities, because it is a renderer of HTML: it gives `&rsquo;`
+    # and not `’`. A post holds characters, thus the decode is necessary.
     # `MarkdownHelper#markdown_to_plain_text` decodes for the same reason.
-    # @param chunk [String]
-    # @return [String]
     def convert(chunk)
       return chunk if chunk.empty?
 
@@ -79,7 +73,6 @@ class Typography
     # Each address and each mention token, in order. ⚠️ A handle can hold `--` (an IDN handle
     # starts with `xn--`), and SmartyPants would make that an en dash. The mentions go in before
     # the typography, thus a token that is still in the text is a handle, and it must not change.
-    # @param text [String]
     # @return [Array<Range>]
     def masked_ranges(text)
       urls = url_ranges(text)
@@ -91,7 +84,6 @@ class Typography
       (urls + tokens).sort_by(&:begin)
     end
 
-    # @param text [String]
     # @return [Array<Range>] The character ranges of each address, in order.
     def url_ranges(text)
       SocialText.url_ranges(text)

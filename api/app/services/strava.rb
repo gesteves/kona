@@ -15,18 +15,19 @@ class Strava < ApplicationService
 
   # The id of the webhook subscription, which `rake strava:subscribe` writes. The webhook accepts
   # only the events of this subscription.
-  # ⚠️ This is a durable record with no other copy, thus `rake redis:export` names it. After a flush,
-  # run `rake strava:subscribe` again: it finds the subscription that exists and stores its id.
+  # ⚠️ This is a durable record with no other copy, thus `rake redis:export` names it. After a
+  # flush, run `rake strava:subscribe` again: it finds the subscription that exists and stores its
+  # id.
   SUBSCRIPTION_KEY = "strava:subscription_id".freeze
 
   # ⚠️ Strava permits an edit only of an activity that the read scope can see. Thus an activity that
   # only the athlete can see needs `activity:read_all`, and `activity:write` alone is not enough.
   # The athlete can clear a scope on the Strava authorization screen, thus the callback checks the
-  # scopes that came back. `profile:write` lets POST /api/weight and POST /api/ftp change the profile.
+  # scopes that came back. `profile:write` is for POST /api/weight and POST /api/ftp.
   SCOPES = %w[activity:read_all activity:write profile:write].freeze
 
-  # The seconds that each call to Strava can take. ⚠️ `connect!` runs in the OAuth callback, which is
-  # a request with a 20-second rack-timeout.
+  # The seconds that each call to Strava can take. ⚠️ `connect!` runs in the OAuth callback, which
+  # is a request with a 20-second rack-timeout.
   REQUEST_TIMEOUT = 10
 
   # An access token that expires within this time counts as expired. A token lasts 6 hours.
@@ -58,13 +59,10 @@ class Strava < ApplicationService
   # @return [Boolean] True if the Strava app credentials are available.
   def valid_credentials? = @client_id.present? && @client_secret.present?
 
-  # @return [Boolean] True if an athlete is connected now.
   def connected? = valid_credentials? && @credentials.usable?
 
-  # @return [String, nil] The Strava id of the connected athlete.
   def athlete_id = @credentials.athlete_id
 
-  # @return [String, nil] The name of the connected athlete.
   def athlete_name = @credentials.athlete_name
 
   # @return [Hash, nil] `{ code:, at: }` of the last refused refresh, or nil when the token is good.
@@ -73,7 +71,6 @@ class Strava < ApplicationService
   # ⚠️ The redirect URI is not an environment variable, and the caller gives it from the request.
   # Strava checks only its host, against the Authorization Callback Domain of the app.
   # @param state [String] A value with no meaning. The callback compares it.
-  # @param redirect_uri [String] The callback URL of this app.
   # @return [String, nil] The authorization URL, or nil with no app credentials.
   def authorization_url(state, redirect_uri:)
     return unless valid_credentials?
@@ -91,7 +88,6 @@ class Strava < ApplicationService
   end
 
   # Changes the authorization code into tokens, and stores them with the athlete.
-  # @param code [String] The code from the callback.
   # @return [Boolean] True if the athlete is connected now.
   def connect!(code)
     return false unless valid_credentials?
@@ -118,9 +114,8 @@ class Strava < ApplicationService
 
   # Tells Strava to revoke the access, then removes the stored tokens.
   #
-  # ⚠️ It clears the store whether the revoke works or not: Strava can be away, and a disconnect that
-  # the owner asked for must not depend on that.
-  # @return [void]
+  # ⚠️ It clears the store whether the revoke works or not: Strava can be away, and a disconnect
+  # that the owner asked for must not depend on that.
   def disconnect!
     token = @credentials.access_token
     if token.present?
@@ -145,7 +140,6 @@ class Strava < ApplicationService
   # Updates the given fields of one activity. Each other field stays the same.
   # @param id [String, Integer] The Strava activity id.
   # @param fields [Hash] For example `name:` and `description:`.
-  # @return [void]
   # @raise [StandardError] On a failure, thus the job does the work again.
   def update_activity!(id, **fields)
     put_json!(
@@ -157,22 +151,20 @@ class Strava < ApplicationService
     nil
   end
 
-  # Sets the weight of the athlete. This needs the `profile:write` scope.
-  # @param kg [Float] The weight in kilograms.
-  # @return [void]
-  # @raise [ApplicationService::HttpError] On a failure. A 401 or a 403 means that the scope is absent.
+  # Sets the weight of the athlete, in kilograms. This needs the `profile:write` scope.
+  # @raise [ApplicationService::HttpError] On a failure. A 401 or a 403 means that the scope is
+  #   absent.
   def update_athlete_weight!(kg)
     put_json!("#{API_URL}/athlete", body: { weight: kg }, headers: auth_headers, timeout: REQUEST_TIMEOUT)
     nil
   end
 
-  # Sets the FTP of the athlete. This needs the `profile:write` scope.
+  # Sets the FTP of the athlete, in watts. This needs the `profile:write` scope.
   #
   # ⚠️ Strava documents `weight` only for this PUT, but it saves the FTP. The response gives a nil
   # `ftp`, thus do not read the response to check the write.
-  # @param watts [Integer] The FTP in watts.
-  # @return [void]
-  # @raise [ApplicationService::HttpError] On a failure. A 401 or a 403 means that the scope is absent.
+  # @raise [ApplicationService::HttpError] On a failure. A 401 or a 403 means that the scope is
+  #   absent.
   def update_athlete_ftp!(watts)
     put_json!("#{API_URL}/athlete", body: { ftp: watts }, headers: auth_headers, timeout: REQUEST_TIMEOUT)
     nil
@@ -271,7 +263,7 @@ class Strava < ApplicationService
     nil
   end
 
-  # @return [String, nil] The token of the refresh in progress, or nil when it does not come in time.
+  # @return [String, nil] The token of the refresh in progress, or nil if it does not come in time.
   def wait_for_refreshed_token
     REFRESH_WAIT_ATTEMPTS.times do
       sleep(REFRESH_WAIT_INTERVAL)

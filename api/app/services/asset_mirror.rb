@@ -1,16 +1,12 @@
 require "net/http"
 require "tempfile"
 
-# Copies the Contentful image assets into a Cloudflare R2 bucket. The site then serves the images
-# from that bucket, and not from Contentful. Cloudflare Images gets the source of a transformation
-# from the host that the URL names, and a source outside the zone cannot use Tiered Cache or Cache
-# Reserve. Thus each PoP got the full-size originals from Contentful, and got them again after an
-# eviction.
+# Copies the Contentful image assets into a Cloudflare R2 bucket, and the site then serves the
+# images from that bucket. Cloudflare Images gets the source of a transformation from the host
+# that the URL names, and a source outside the zone cannot use Tiered Cache or Cache Reserve.
+# Without the mirror, each PoP gets the full-size original from Contentful after each eviction.
 #
-# ⚠️ This is a contract between the two apps: the Contentful#rewrite_image_urls of web changes only
-# the host and keeps the Contentful path, and this code writes each object at that same path.
-# Neither side checks the other, and a difference makes each image on the site 404 and nothing
-# reports it. Refer to the root CLAUDE.md.
+# ⚠️ The key of each object is a contract with web. Refer to #object_key and the root CLAUDE.md.
 #
 # Contentful webhooks and the `assets:backfill` rake task start this. It does nothing without the
 # R2 credentials.
@@ -34,9 +30,9 @@ class AssetMirror < ApplicationService
   GRAPHQL
 
   # ⚠️ Match each ctfassets host, not only images.ctfassets.net. Contentful serves some image
-  # assets from downloads.ctfassets.net. If you copy only the images host, those assets go to
-  # Contentful for all time. The paths are the same on both hosts, thus one key is sufficient for
-  # both. The Contentful#rewrite_image_urls of web must match the same set.
+  # assets from downloads.ctfassets.net, and without this match those come from Contentful for all
+  # time. The paths are the same on both hosts, thus one key is sufficient for both. The
+  # Contentful#rewrite_image_urls of web must match the same set.
   ASSET_HOST_SUFFIX = ".ctfassets.net".freeze
 
   # A Contentful asset URL contains the address of the content: a new file gives a new token
@@ -111,9 +107,11 @@ class AssetMirror < ApplicationService
     ids.size
   end
 
-  # The R2 object key for an asset URL: its path, with no slash at the start. This is the contract
-  # between the two apps: web changes only the host, thus the path that web writes must be the
-  # path that this code uses.
+  # The R2 object key for an asset URL: its path, with no slash at the start.
+  #
+  # ⚠️ This is a contract between the two apps: the Contentful#rewrite_image_urls of web changes
+  # only the host, thus this key must be the Contentful path with no change. Neither side checks
+  # the other, and a difference makes each image on the site 404 and nothing reports it.
   # @param url [String, nil] The asset URL. Contentful returns it with no protocol.
   # @return [String, nil] The key, or nil for a URL that is not on ctfassets.
   def object_key(url)
@@ -165,13 +163,11 @@ class AssetMirror < ApplicationService
 
   # Downloads the asset into a Tempfile at position 0. The caller must call close! on it.
   #
-  # ⚠️ This uses Net::HTTP#read_body, not HTTParty. Do not change it to the usual style. These
-  # originals are as large as 38MB, and the worker is a 512MB VM at concurrency 5. Thus a buffer
-  # of the full file caused an OOM kill during a backfill. A hard kill is not a failure that
-  # Sidekiq can do again, thus those jobs went away with no message and showed only as 404s on
-  # live pages. HTTParty does not correct this, even with stream_body: a measurement gave +52.3MB
-  # peak RSS against +1.2MB for the loop below. The Tempfile then lets the S3 client upload from
-  # the disk, and not from a second copy in memory.
+  # ⚠️ This uses Net::HTTP#read_body, not HTTParty. Do not change it to the usual style. The
+  # originals are as large as 38MB, and the worker is a 512MB VM at concurrency 5. A buffer of the
+  # full file causes an OOM kill, which Sidekiq cannot do again, thus the job goes away with no
+  # message. HTTParty uses much more memory than the loop below, even with stream_body. The
+  # Tempfile lets the S3 client upload from the disk, and not from a second copy in memory.
   # @raise [ApplicationService::HttpError] If the response is not a success, thus the job runs
   #   again.
   # @raise [ArgumentError] If a redirect goes away from ctfassets. Refer to #fetch_uri.
@@ -188,10 +184,10 @@ class AssetMirror < ApplicationService
                     open_timeout: OPEN_TIMEOUT, read_timeout: READ_TIMEOUT, ignore_eof: false) do |http|
       http.request(Net::HTTP::Get.new(uri)) do |response|
         if response.is_a?(Net::HTTPRedirection) && redirects_left.positive? && response["location"].present?
-          # ⚠️ The code resolves this and checks it against the same list. It does not use it as
-          # it is. The code writes the result to R2 at the ORIGINAL key from ctfassets, and the
-          # public image host serves it. Thus a redirect with no check would publish the target
-          # of that redirect, and that can be something that only this VM can reach.
+          # ⚠️ #fetch_uri resolves the Location and checks it, and the code does not use it as it
+          # is. The result goes to R2 at the original ctfassets key, and the public image host
+          # serves it. Thus a redirect with no check would publish its target, which can be
+          # something that only this VM can reach.
           return download(response["location"], redirects_left: redirects_left - 1, base: uri)
         end
         raise ApplicationService::HttpError.new(response.code.to_i, "", source) unless response.is_a?(Net::HTTPSuccess)
@@ -223,13 +219,10 @@ class AssetMirror < ApplicationService
   OPEN_TIMEOUT = 5
   READ_TIMEOUT = 30
 
-  # Resolves one redirect of #download and makes sure that it is still an HTTPS fetch from
-  # ctfassets.
+  # Resolves one URL of #download and makes sure that it is an HTTPS fetch from ctfassets.
   #
-  # ⚠️ This raises and does not return nil, on purpose. The rule for AssetSyncJob is that an asset
-  # that the code does not copy becomes a broken image on a live page later. Thus a redirect that
-  # fails this check must stop the job with a message, and not copy nothing.
-  #
+  # ⚠️ This raises and does not return nil, on purpose. A redirect that fails this check must
+  # stop the job with a message, and not copy nothing. Refer to #sync.
   # @param url [String] The asset URL, or the Location of a redirect, which can be relative.
   # @param base [URI, nil] The URI that the redirect came from, to resolve a relative Location.
   # @return [URI::HTTPS]

@@ -27,7 +27,6 @@ module AltText
   # ⚠️ One attempt only. Each retry of the SDK gets the full `TIMEOUT_SECONDS` again, thus one
   # retry puts the call past the rack-timeout. That timeout is not a StandardError, and the rescue
   # in .generate does not catch it.
-  # @return [Integer]
   def max_retries = 0
 
   # @param image [String] The bytes of the picture.
@@ -51,10 +50,9 @@ module AltText
     nil
   end
 
-  # ⚠️ The prompt asks for less than 1,000 characters, and the field takes 2000 graphemes. This is
-  # the guard for an answer that ignores the prompt: the action would otherwise refuse the draft.
-  # @param text [String, nil]
-  # @return [String, nil]
+  # ⚠️ The prompt asks for less than 1,000 characters, and the field takes
+  # `SocialPresenter::ALT_LIMIT` graphemes. This is the guard for an answer that ignores the
+  # prompt: the action would otherwise refuse the draft.
   def truncate(text)
     return if text.blank?
 

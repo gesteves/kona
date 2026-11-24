@@ -1,7 +1,7 @@
-# Changes free text — a street address or a place name — into coordinates. It uses the same Google
-# Geocoding API that GoogleMaps uses in the other direction. The Location page of the admin uses it
-# for the address box, where a person types a place in place of a pin on the map. Redis caches each
-# result for a day.
+# Changes free text, for example a street address or a place name, into coordinates. It uses the
+# same Google Geocoding API that GoogleMaps uses in the other direction. The Location page of the
+# admin uses it for the address box, where a person types a place in place of a pin on the map.
+# Redis caches each result for a day.
 class GoogleGeocoder < ApplicationService
   include GoogleApi
 
@@ -17,8 +17,8 @@ class GoogleGeocoder < ApplicationService
   def coordinates
     return if @address.blank? || google_api_key.blank?
 
-    # ⚠️ There is a TTL for an empty result here, and the reverse lookups of GoogleMaps have none. An
-    # address that gives nothing is usually a typing error, and without this TTL each new attempt
+    # ⚠️ There is a TTL for an empty result here, and the reverse lookups of GoogleMaps have none.
+    # An address that gives nothing is usually a typing error, and without this TTL each new attempt
     # with the same error calls an endpoint that costs money. The time is short, because it is a
     # delay and not a cache: the person can correct the address.
     point = cached_json(cache_key, expires_in: 1.day, empty_expires_in: 5.minutes) do

@@ -1,12 +1,11 @@
-<%# One link of the sidebar, as a <wa-button>. The code renders it at the top level and in the panel
-    of a group, and that is the reason for a partial.
-    ⚠️ `data-drawer="close"` is what closes the drawer on a mobile screen after a tap. Without it,
-    the drawer stays open over the page that the link opened. It is on the host element, and the
-    document handler of <wa-drawer> and its handler in the drawer both look there: a click in a
-    shadow root goes to the host before either handler sees it. %>
+<%# One link of the sidebar, as a <wa-button>. The code renders it at the top level and in the
+    panel of a group.
+    ⚠️ `data-drawer="close"` closes the drawer on a mobile screen after a tap. Without it, the
+    drawer stays open over the page that the link opened. It is on the host element, because a
+    click in a shadow root goes to the host before a handler of <wa-drawer> sees it. %>
 <%# An item with :dialog is an action and not a destination: it opens a dialog of the layout. It
     renders as the same <wa-button> with no href.
-    ⚠️ It has NO `data-drawer="close"`. On a mobile screen, the drawer stops the click at that
+    ⚠️ It has no `data-drawer="close"`. On a mobile screen, the drawer stops the click at that
     attribute, thus the click never reaches the `data-dialog` handler on the document. The `dialog`
     controller closes the drawer when the dialog opens. %>
 <% current = item[:path].present? && admin_nav_current?(item[:path]) %>

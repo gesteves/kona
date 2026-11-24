@@ -2,8 +2,6 @@ module TextHelper
   # Puts the degree sign (°) in place of the masculine ordinal indicator (º), which a person often
   # types by error. This is the same as TextHelpers#fix_degrees of the static site: both apps render
   # the same summary text, and it must be the same in the page and in the widget fragment.
-  # @param text [String, nil]
-  # @return [String, nil]
   def fix_degrees(text)
     return if text.blank?
     text.gsub("º", "°")

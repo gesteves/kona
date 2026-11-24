@@ -11,9 +11,8 @@ Bugsnag.configure do |config|
   config.notify_release_stages = %w[production]
 
   # Removes the reports from the Sidekiq fetch loop when the host stops the worker VM for a short
-  # time. Sidekiq recovers from that by itself. Refer to the filter for the three conditions that
-  # keep it from a true failure. It is in a lambda, thus the autoloaded constant resolves at the
-  # first report and not at the start.
+  # time. Sidekiq recovers from that by itself. Refer to the filter for its three conditions. It
+  # is in a lambda, thus the autoloaded constant resolves at the first report and not at the start.
   config.add_on_error(->(report) { SidekiqRedisTimeoutFilter.call(report) })
 
   # Removes the BadRequest that a spam bot causes when it posts a contact-form body that is not

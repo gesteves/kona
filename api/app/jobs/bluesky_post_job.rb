@@ -5,7 +5,6 @@
 # the first job, and `Bluesky#post!` writes with `putRecord` at that key. Thus a retry replaces the
 # same record. The reply reference travels in the arguments, thus it is the same at each attempt.
 class BlueskyPostJob < SocialPostJob
-  # The prefix of each lock key.
   ENQUEUE_LOCK_PREFIX = "bluesky:thread:".freeze
 
   # @param posts [Array<Hash>] `[{ "key" =>, "text" =>, "link" =>, "photos" => }, …]`, the whole
@@ -27,10 +26,9 @@ class BlueskyPostJob < SocialPostJob
     # photos reads nothing either: Bluesky renders one embed, and the photos are it.
     card = OpenGraph.new.fetch(post["link"]) if post["link"].present? && photos.empty?
 
-    # ⚠️ **A page with no og: tags gets NO embed, and its link goes in the words**, as it does at
-    # Mastodon. An embed from such a page is an empty box with a host name in it.
-    # `Admin::SocialController` reads the same `embeddable?` rule, thus the count on the page holds
-    # this link as well.
+    # ⚠️ A page with no og: tags gets no embed, and its link goes in the words, as it does at
+    # Mastodon. An embed from such a page is an empty box with a host name in it. `SocialDraft`
+    # reads the same `embeddable?` rule, thus the count on the page holds this link as well.
     embed = card if card&.embeddable?
     text = Bluesky.compose(text: post["text"], url: (post["link"] if card && embed.nil?))
 
@@ -50,8 +48,8 @@ class BlueskyPostJob < SocialPostJob
 
   private
 
-  # ⚠️ The **root** of a thread is the first post, and the **parent** is the one just above. This
-  # carries the root through the chain and never makes it again.
+  # ⚠️ The root of a thread is the first post, and the parent is the one just above. This carries
+  # the root through the chain and never makes it again.
   # @return [Hash] The reply of the next post.
   def next_reply(reply, written)
     { "root" => reply&.dig("root") || written.slice("uri", "cid"),

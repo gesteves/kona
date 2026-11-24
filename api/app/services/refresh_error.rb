@@ -11,7 +11,6 @@ module RefreshError
     code.to_i.between?(400, 499)
   end
 
-  # @param code [Integer, String]
   # @return [String] The record, as JSON: `{ code:, at: }`.
   def self.encode(code)
     { code: code.to_i, at: Time.current.utc.iso8601 }.to_json

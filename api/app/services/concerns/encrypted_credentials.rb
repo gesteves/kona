@@ -7,7 +7,7 @@
 # Redis also holds the Sidekiq queues, thus the key is at a place that Redis access alone cannot
 # reach, on purpose.
 #
-# ⚠️ **Never change the `ENCRYPTION_SALT` of a store.** The salt is part of the key, thus a new salt
+# ⚠️ Never change the `ENCRYPTION_SALT` of a store. The salt is part of the key, thus a new salt
 # makes each stored secret unreadable, `decrypt` then gives nil, and each page says "not connected"
 # until the owner connects the account again.
 module EncryptedCredentials
@@ -15,7 +15,6 @@ module EncryptedCredentials
 
   class_methods do
     # Removes the full store. The owner must connect the account again.
-    # @return [void]
     def clear
       $redis.del(self::REDIS_KEY)
       nil
@@ -25,7 +24,6 @@ module EncryptedCredentials
     # RefreshError for the rule. ⚠️ It has no TTL: only a token that arrives, or the removal of the
     # store, takes it away, because the problem is real until one of those occurs.
     # @param code [Integer, String] The HTTP status from the token endpoint.
-    # @return [void]
     def record_refresh_error(code)
       return unless RefreshError.refused?(code)
 
@@ -37,7 +35,6 @@ module EncryptedCredentials
 
     # Removes the record of a refused refresh. A store calls this when it writes a token: a token
     # that arrives is the correction.
-    # @return [void]
     def forget_refresh_error
       $redis.hdel(self::REDIS_KEY, "refresh_error")
       nil
@@ -51,7 +48,6 @@ module EncryptedCredentials
       nil
     end
 
-    # @param value [String] A secret.
     # @return [String] The encrypted message.
     def encrypt(value)
       encryptor.encrypt_and_sign(value.to_s)
@@ -61,7 +57,6 @@ module EncryptedCredentials
     # RAILS_MASTER_KEY must give "not connected", which the owner corrects with a new connection in
     # the admin. It must not give an exception on each page that shows the status.
     # @param value [String, nil] The encrypted message.
-    # @return [String, nil]
     def decrypt(value)
       return if value.blank?
       encryptor.decrypt_and_verify(value).presence
@@ -70,7 +65,6 @@ module EncryptedCredentials
       nil
     end
 
-    # @return [ActiveSupport::MessageEncryptor]
     def encryptor
       @encryptor ||= ActiveSupport::MessageEncryptor.new(
         Rails.application.key_generator.generate_key(self::ENCRYPTION_SALT, ActiveSupport::MessageEncryptor.key_len)

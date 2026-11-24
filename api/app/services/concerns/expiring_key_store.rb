@@ -7,7 +7,7 @@ require "securerandom"
 # because the fields of a record are different in each store.
 #
 # ⚠️ The id goes into a Redis key, and it comes back from a form and from a URL. `id?` is the check
-# that keeps each other shape out of a key, thus each method here calls it first.
+# that keeps each other shape out of a key, thus each public method here calls it first.
 module ExpiringKeyStore
   extend ActiveSupport::Concern
 
@@ -15,21 +15,16 @@ module ExpiringKeyStore
   ID_PATTERN = /\A\h{32}\z/
 
   class_methods do
-    # @param value [Object]
     # @return [Boolean] True when the value has the shape of an id.
     def id?(value)
       value.is_a?(String) && value.match?(ID_PATTERN)
     end
   end
 
-  # @param id [String]
-  # @return [Boolean]
   def exists?(id)
     self.class.id?(id) && $redis.exists?(key_for(id))
   end
 
-  # @param ids [Array<String>]
-  # @return [void]
   def discard(ids)
     keys = Array(ids).select { |id| self.class.id?(id) }.map { |id| key_for(id) }
     $redis.del(*keys) if keys.any?

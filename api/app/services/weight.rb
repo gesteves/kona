@@ -51,8 +51,6 @@ class Weight
   # move the weight to the next day.
   # ⚠️ Strava keeps one current weight and no history. Thus a weight for a past day goes to
   # Intervals.icu only, or it would replace the current weight on Strava.
-  # @param kg [Float] The weight in kilograms.
-  # @param date [Date] The day of the weight.
   def self.save(kg, date)
     IntervalsWeightJob.perform_async(kg, date.iso8601)
     StravaWeightJob.perform_async(kg) if date >= today

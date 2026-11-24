@@ -67,7 +67,6 @@ module PhotoCaption
     text unless text.nil? || CAMERA_DEFAULTS.any? { |pattern| pattern.match?(text) }
   end
 
-  # @param text [String, nil]
   # @return [String, nil] The text on one line with single spaces, or nil when it is blank.
   def clean(text)
     text.to_s.gsub(/[[:cntrl:][:space:]]+/, " ").strip.presence

@@ -6,12 +6,11 @@ const DEBOUNCE = 400;
  * Makes the map preview agree with the settings form.
  *
  * ⚠️ This changes the src of the image and does not submit the form. A submit is a Turbo visit,
- * which replaces the body. Thus the field that you edit would lose the focus at each keystroke, and
- * a slider would stop during a move. The form stays a true GET form, thus the path with no
- * JavaScript still works. This code takes control only when it can.
+ * which replaces the body. Thus the field that you edit would lose the focus at each keystroke,
+ * and a slider would stop during a move. The form stays a true GET form, thus the path with no
+ * JavaScript still works.
  *
- * Each new render is one Mapbox Static Images request that Mapbox bills, and that is the purpose of
- * the wait.
+ * Mapbox bills each new render as one Static Images request, and that is the purpose of the wait.
  */
 export default class extends Controller {
   static targets = ["form", "image", "download"];
@@ -42,7 +41,7 @@ export default class extends Controller {
   update() {
     const query = this.query();
     // This changes the preview in the page and the copy in the zoom dialog. They share a URL, thus
-    // the browser gets it one time for each number of copies on the page.
+    // the browser gets it one time.
     this.imageTargets.forEach((img) => {
       img.src = this.withQuery(img.src, query);
     });
@@ -58,7 +57,6 @@ export default class extends Controller {
    * Each Web Awesome control is part of the form, thus its value goes into FormData as a native
    * control does. Both parts of a boolean pair appear: a hidden "0" and the "1" of a switch. Rails
    * takes the last one, and that is what makes the switch win when it is on.
-   * @returns {string}
    */
   query() {
     return new URLSearchParams(new FormData(this.formTarget)).toString();

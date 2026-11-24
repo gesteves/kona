@@ -15,7 +15,6 @@ module Widgets
 
     # The timezone of a location, or the default of the configuration. A geocode that fails gives
     # the default and never a 500.
-    # @param location [Location]
     # @return [String] An IANA timezone id.
     def time_zone_of(location)
       safely("GoogleMaps") { TimeZoneResolver.call(location.latitude, location.longitude) } || TimeZoneResolver.default

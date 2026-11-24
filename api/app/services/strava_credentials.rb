@@ -42,14 +42,12 @@ class StravaCredentials
     )
   end
 
-  # @return [Boolean] True if an athlete is connected now.
   def self.connected? = fetch.usable?
 
   # Stores the athlete at the end of the OAuth round trip.
   # @param athlete_id [String, Integer] The Strava id of the athlete.
   # @param athlete_name [String, nil] The name to show in the admin.
   # @param tokens [Hash] The token fields of the answer. Refer to .store_tokens.
-  # @return [void]
   def self.store_athlete(athlete_id:, athlete_name:, **tokens)
     $redis.hset(REDIS_KEY, "athlete_id", athlete_id.to_s, "athlete_name", athlete_name.to_s)
     store_tokens(**tokens)
@@ -60,10 +58,7 @@ class StravaCredentials
   #
   # ⚠️ Strava can give a NEW refresh token at each refresh, and the old one then stops working.
   # Thus each answer replaces both tokens.
-  # @param access_token [String]
-  # @param refresh_token [String]
   # @param expires_at [Integer] The Unix time of the expiry of the access token.
-  # @return [void]
   def self.store_tokens(access_token:, refresh_token:, expires_at:)
     $redis.hset(
       REDIS_KEY,

@@ -1,9 +1,7 @@
 <%#
   The outer markup of the trending-articles widget. The api serves it as a live-update fragment, and
   the static site puts it in the page. The outer <section> has the live-update attributes, thus it
-  gets new content after the swap and at each visibilitychange. It is still a partial, and the
-  section is still a parameter, because the related-articles widget used it until that section moved
-  into the build.
+  gets new content after the swap and at each visibilitychange.
 %>
 <section class="collection collection--halves" id="<%= section_id %>" aria-labelledby="hed-<%= section_id %>" data-nosnippet <%= live_update_attrs %>>
   <h2 class="collection__heading" id="hed-<%= section_id %>"><%= heading %></h2>
@@ -11,9 +9,8 @@
     <% articles.each do |article| %>
       <li class="collection__item">
         <%# section_id makes the ids of the card different from the ids in each section that the
-            STATIC build renders on the same page. The related articles and the read-next section
-            both have summary cards, and with no section in the id, two cards would have the same id
-            and an aria-labelledby would point at the wrong card. %>
+            static build renders on the same page. Without it, two cards would have the same id and
+            an aria-labelledby would point at the wrong card. %>
         <%= render "summary", article: article, section_id: section_id, tracking_section: local_assigns.fetch(:tracking_section, heading) %>
       </li>
     <% end %>

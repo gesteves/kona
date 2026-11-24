@@ -8,16 +8,14 @@ module ContentfulConsumer
   end
 
   # Gets one item by its entry id, through the read-through cache, in an object with dot access.
-  # @param id [String, nil] The Contentful entry id.
   # @param query [String] A GraphQL query that takes an `$id` variable.
   # @param collection [Symbol] The key of the collection in the response.
   # @param cache_key [String] The start of the Redis key. The id goes at the end.
-  # @param context [String] The context for an error report.
   # @param empty_expires_in [ActiveSupport::Duration] The time that the cache holds a miss.
-  #   ⚠️ This is necessary: rack-attack does not apply to /widgets/*, a visitor can reach those paths
-  #   through the proxy of the site, and the code checks only the format of the id. Thus without
-  #   this value, an unknown id costs one Contentful query for each request, for all time. The time
-  #   is short, thus a new entry appears quickly.
+  #   ⚠️ This is necessary: rack-attack does not apply to /widgets/*, a visitor can reach those
+  #   paths through the proxy of the site, and the code checks only the format of the id. Thus
+  #   without this value, an unknown id costs one Contentful query for each request, for all
+  #   time. The time is short, thus a new entry appears quickly.
   # @return [OpenStruct, nil] The item, or nil on an error.
   def find_cached_item(id, query:, collection:, cache_key:, context:, expires_in: 5.minutes, empty_expires_in: 1.minute)
     return if id.blank?

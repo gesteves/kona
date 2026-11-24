@@ -2,16 +2,13 @@ require "securerandom"
 
 # The contact-form intake: the spam check, the abuse check, and the email, outside the request path.
 # It gives the complete email to ContactDeliveryJob. That is a separate job, thus a Resend failure
-# repeats only the send. The checks and the subject call each run one time, and not one time for
-# each attempt to send.
+# repeats only the send, and the checks and the subject call each run one time.
 class ContactMailJob < ContactJob
   # This goes at the start of each subject, thus the owner can make a filter for it. Do not change
   # it: a change breaks each filter that uses the old text.
   SUBJECT_PREFIX = "[Contact form]".freeze
 
-  # @param name [String] The name of the sender.
   # @param email [String] The email address of the sender, which becomes the Reply-To.
-  # @param message [String] The body of the message.
   # @param context [Hash] The sender data that the web proxy sends: some of "ip", "port",
   #   "user_agent", "city", "region", "country", and "network". Api::ContactController adds
   #   "received_at".
@@ -57,7 +54,6 @@ class ContactMailJob < ContactJob
 
   # Holds a marked message, thus the owner can read it and send it.
   # @param reason [String] The check that marked it: SpamQuarantine::AKISMET or ::ABUSIVE.
-  # @return [void]
   def quarantine(name, email, message, context, reason)
     SpamQuarantine.new.store(name: name, email: email, message: message, context: context, reason: reason)
     Rails.logger.info("Contact form: quarantined a submission (#{reason})")

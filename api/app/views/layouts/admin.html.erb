@@ -1,8 +1,7 @@
 <%# The admin shell for the owner, on the <wa-page> of Web Awesome.
-    ⚠️ The name is NOT `application`, on purpose. That is the default layout of Rails, and this app
-    is for machines by default: each widget controller and each API controller renders with
-    `layout false`. The name `admin` keeps them the same if a person removes one of those
-    declarations. %>
+    ⚠️ The name is not `application`, on purpose. That is the default layout of Rails, and each
+    widget controller and each API controller renders with `layout false`. Thus a controller that
+    loses that declaration still renders with no layout. %>
 <%# `wa-brand-red` changes the brand colors of Web Awesome from its default blue to the red
     family. styles/_tokens.scss then sets the loud step to the exact firebrick of the site. The
     dark-mode script changes only `wa-dark`, thus it never changes this class. %>

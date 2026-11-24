@@ -1,9 +1,8 @@
 module ActivityDescription
   # Makes a weather summary for the full track of an outdoor activity from the WeatherKit hours.
   # It takes a sample of the GPS track each minute, gets the weather of each sample from
-  # TrackWeather, and then aggregates the samples by time.
-  # WeatherSentence writes the words from the Hash that #summary gives. Each decision is here: the
-  # condition, the rounded numbers, the units, and what the line omits.
+  # TrackWeather, and then aggregates the samples by time. Each decision is here: the condition,
+  # the rounded numbers, the units, and what the line omits. WeatherSentence only writes the words.
   #
   # When WeatherKit has no data for the track, for example for an activity older than its history,
   # the summary comes from the weather of the Intervals.icu activity. That weather has no humidity
@@ -24,9 +23,8 @@ module ActivityDescription
     # Composer::STAT_EMOJIS: a weather line with no stat emoji stays at the next run as text of the
     # owner, and the run adds a second weather line.
     FALLBACK_EMOJI = "🌡️".freeze
-    # The emoji of a hot or a cold activity whose condition is not adverse weather. A hot activity
-    # has a feels-like above HOT_FEELS_LIKE_CELSIUS (95°F) at some point, and a cold one has a
-    # feels-like below COLD_FEELS_LIKE_CELSIUS (32°F) at some point. The temperature does not count.
+    # The emoji of a hot or a cold activity whose condition is not adverse weather: a feels-like
+    # above 35°C (95°F), or below 0°C (32°F), at some point. The temperature does not count.
     # ⚠️ These are not the limits of WeatherSummaryPresenter#hot? and #bad_weather?, on purpose:
     # the owner chose them for this emoji.
     HOT_FEELS_LIKE_CELSIUS = 35
@@ -85,7 +83,6 @@ module ActivityDescription
     COMPASS = %w[N NNE NE ENE E ESE SE SSE S SSW SW WSW W WNW NW NNW].freeze
     EARTH_RADIUS_METERS = 6_371_000.0
 
-    # @param activity [Hash] The Intervals.icu activity.
     # @return [Boolean] True for a bike ride and a run, which get the headwind. An indoor activity
     #   gets no weather line at all.
     def self.headwind?(activity) = HEADWIND_TYPES.include?(ActivityMatcher.normalize_type(activity[:type]))
@@ -94,7 +91,7 @@ module ActivityDescription
     # @param streams [Array<Hash>] The `latlng` and `time` streams of Intervals.icu. A `latlng`
     #   stream holds the latitudes in `data` and the longitudes in `data2`.
     # @param unit [Symbol] :celsius or :fahrenheit, from Intervals#temperature_unit. Fahrenheit
-    #   also gives mph and inches.
+    #   also gives mph.
     # @param headwind [Boolean] True to measure the headwind. Refer to .headwind?.
     # @param weather_kit [#hourly] The source of the hours. The specs replace it.
     # @param air_quality [#history] The source of the past AQI. The specs replace it.
@@ -175,9 +172,8 @@ module ActivityDescription
       { summary: summary.compact, emoji: emoji, headwind_share: headwind }
     end
 
-    # The report from the weather of the Intervals.icu activity: its temperatures, its wind range
-    # and highest gust, its prevailing wind, its headwind, its cloud cover, and its highest rain,
-    # showers, and snow. The condition comes from the cloud cover, or from the precipitation.
+    # The report from the weather of the Intervals.icu activity. The condition comes from the cloud
+    # cover, or from the precipitation.
     # @return [Hash, nil] Nil when the activity has no weather in Intervals.icu either.
     def intervals_report(start, weighted)
       return unless @activity[:has_weather] && @activity[:min_weather_temp] && @activity[:max_weather_temp]
@@ -212,11 +208,9 @@ module ActivityDescription
 
     # The emoji of the line: HOT_EMOJI or COLD_EMOJI for a hot or a cold activity with no adverse
     # weather, else the emoji of the condition, with the moon phase in place of NIGHT_EMOJI.
-    # @param emoji [String] The emoji of the main condition.
     # @param adverse [Boolean] True when the condition is adverse weather, or when it rained or
     #   snowed during part of the activity.
     # @param feels_like [Array<Numeric, nil>] Each feels-like, in °C.
-    # @return [String]
     def report_emoji(emoji, adverse:, feels_like:, start:, samples:)
       feels_like = feels_like.compact
       unless adverse || feels_like.empty?
@@ -243,7 +237,6 @@ module ActivityDescription
 
     # The fields of the activity, with the fields of the full weather summary over them. The
     # activity has an average wind and an average gust only, and no showers.
-    # @return [Hash]
     def intervals_weather
       extra = @activity[:id] && @intervals&.activity_weather_summary(@activity[:id])
       @activity.merge(extra.to_h.compact)
@@ -263,8 +256,7 @@ module ActivityDescription
       cloud_condition(data[:average_clouds].to_f)
     end
 
-    # @param percent [Numeric] A cloud cover, in percent.
-    # @return [String] A sky code of CLOUD_CONDITIONS.
+    # @return [String] The code of SKY_CODES for a cloud cover in percent.
     def cloud_condition(percent) = CLOUD_CONDITIONS.find { |limit, _code| percent < limit }&.last || "Cloudy"
 
     # @param mps [Numeric, nil] A speed in m/s, which is the unit of Intervals.icu.
@@ -295,9 +287,8 @@ module ActivityDescription
     end
 
     # Tells if the sun is above the horizon, from the NOAA approximation of the position of the sun.
-    # The fallback has no daylight flag, and the emoji of a clear night is not the emoji of a clear day.
+    # The fallback has no daylight flag, and a clear night does not have the emoji of a clear day.
     # @see https://gml.noaa.gov/grad/solcalc/solareqns.PDF
-    # @return [Boolean]
     def daylight?(time, latitude, longitude)
       time = time.utc
       hour = time.hour + (time.min / 60.0) + (time.sec / 3600.0)
@@ -315,8 +306,8 @@ module ActivityDescription
       elevation > SUNRISE_ELEVATION
     end
 
-    # The highest AQI of three points: the start, the middle, and the end of the activity. Air
-    # quality changes slowly, thus three points are enough. A point that fails loses its reading only.
+    # The highest AQI at the start, the middle, and the end of the activity. Air quality changes
+    # slowly, thus three points are enough. A point that fails loses its reading only.
     # @return [Integer, nil]
     def highest_aqi(start, samples)
       middle = (samples.first[:offset] + samples.last[:offset]) / 2.0
@@ -385,7 +376,6 @@ module ActivityDescription
     # The track in legs of LEG_METERS, for the headwind, as { offset:, bearing:, seconds: }. A leg
     # starts at a point and ends at the first point LEG_METERS from it. Its seconds are the moving
     # time only (refer to MAX_STEP_SECONDS), thus a pause or a stop does not count as wind.
-    # @return [Array<Hash>]
     def track_legs
       points = track_points
       return [] if points.size < 2
@@ -534,8 +524,7 @@ module ActivityDescription
       compass((Math.atan2(x, y) * 180 / Math::PI) % 360)
     end
 
-    # @param degrees [Numeric] A direction.
-    # @return [String] The point of the compass, for example "NNE".
+    # @return [String] The point of the compass of a direction in degrees, for example "NNE".
     def compass(degrees) = COMPASS[((degrees + 11.25) / 22.5).floor % 16]
 
     # The runs of one condition in time order, as { code:, seconds:, night:, first:, last: }. A run
@@ -602,7 +591,6 @@ module ActivityDescription
     # @param total [Numeric] The seconds of all the runs.
     # @yieldparam code [String] The condition code of a run.
     # @yieldreturn [Object, nil] The key of the run, or nil for a run that gives no fact.
-    # @return [Array<Hash>]
     def run_facts(runs, total)
       keyed = runs.map { |run| [ yield(run[:code]), run ] }
       stretches = keyed.slice_when { |(a, _), (b, _)| a.nil? || b.nil? }.flat_map { |chunk| chunk.filter_map(&:first).uniq }.tally

@@ -4,7 +4,7 @@
 # you can do the full operation more than one time, and a second attempt is safe. This is the same
 # as applyLocation of domestique.
 class LocationSync
-  # This goes at the start of each log line from this service, thus you can find them with grep.
+  # The start of each log line of this service, for a grep.
   LOG_PREFIX = "Location sync:".freeze
 
   # The provider of the one forecast that this code sends. Intervals.icu gives the true forecast id,
@@ -19,8 +19,6 @@ class LocationSync
     @intervals = intervals
   end
 
-  # @param latitude [Float]
-  # @param longitude [Float]
   def call(latitude, longitude)
     context = LocationContext.new(latitude, longitude)
 
@@ -53,8 +51,7 @@ class LocationSync
   end
 
   # Puts one forecast at the current location in place of the weather configuration. It does nothing
-  # if the current configuration already has the same values. The comparison ignores the id, which
-  # Intervals.icu gives.
+  # if the current configuration already has the same values. Refer to COMPARED_FIELDS.
   def sync_weather_config(context)
     next_forecasts = [ {
       id: 0,

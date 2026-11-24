@@ -23,10 +23,9 @@ Rack::Attack.cache.store =
   end
 
 # The prefixes of the true routes of the app. Each path outside them is a probe. `/assets` belongs
-# to Propshaft and Rails does not draw it as a route, thus it needs an entry here. Both
-# ActionDispatch::Static and Propshaft::Server are above this middleware (positions 3 and 4 against
-# 29 — read `bin/rails middleware`), thus an asset request must not come here at all. This entry
-# stops a throttle on such a request as a scanner probe, if one ever comes here.
+# to Propshaft and Rails does not draw it as a route, thus it needs an entry here.
+# ActionDispatch::Static and Propshaft::Server are above this middleware, thus an asset request
+# must not come here at all. This entry stops a throttle on one that does.
 RACK_ATTACK_KNOWN_PREFIXES = %w[/up /api /widgets /webhooks /whoop /sidekiq /signin /signout /auth /connected-apps /spam /location /republish /course-maps /social /contentful /assets].freeze
 RACK_ATTACK_KNOWN_ROUTE = lambda do |path|
   path == "/" || RACK_ATTACK_KNOWN_PREFIXES.any? { |prefix| path == prefix || path.start_with?("#{prefix}/") }
@@ -94,8 +93,8 @@ Rack::Attack.throttle("signin/ip", limit: 30, period: 5.minutes) do |req|
   req.client_ip if req.path == "/signin" || req.path.start_with?("/auth/")
 end
 
-# Throttles the two webhook paths, which are outside the known-route throttle above. The limit
-# is high, on purpose: Contentful sends one webhook for each entry of a bulk publish, from a shared
+# Throttles the webhook paths, which are outside the known-route throttle above. The limit is
+# high, on purpose: Contentful sends one webhook for each entry of a bulk publish, from a shared
 # egress, and it never sends a delivery again. Thus a limit near a true burst would lose a publish
 # with no message. This stops a flood only.
 Rack::Attack.throttle("webhooks/ip", limit: 600, period: 1.minute) do |req|

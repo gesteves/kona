@@ -1,14 +1,14 @@
 <%# A value for four sides, that is, the padding or the extra map. It is one field while the four
-    values are the same, and four fields when they are different. The four values are usually the
-    same, and four boxes to change one number are worse than one control.
+    values are the same, and four fields when they are different, because the four values are
+    usually the same.
     Each field is always in the DOM and always has a name, thus the form submits four values while
     three of them are hidden. The controller copies the value of the first field into the other
     three while the four fields are together.
 
-    The controller applies the state with one field, and this template does not render it, thus the
-    controller can read the label of each side from the markup before it makes the change. Nothing
-    appears and then goes away, because <wa-page> stays hidden until the browser upgrades each
-    custom element. %>
+    The controller applies the one-field state, and this template does not render it. Thus the
+    controller can read the label of each side from the markup before it makes the change.
+    Nothing appears and then goes away, because <wa-page> stays hidden until the browser upgrades
+    each custom element. %>
 <div class="sides" data-controller="linked-sides" data-linked-sides-linked-label-value="<%= linked_label %>">
   <div class="sides__grid">
     <% StaticMap::SIDES.each_with_index do |side, index| %>

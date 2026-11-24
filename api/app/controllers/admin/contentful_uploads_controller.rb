@@ -1,13 +1,12 @@
 module Admin
   # The media uploader: it puts one or more images into Contentful as published assets.
   #
-  # The owner picks the files, each one becomes a tile with a thumbnail, a title, and an alt text
-  # field, and a Generate control asks Claude for that text. The submit adds one
+  # Each file becomes a tile with a title and an alt text, and the submit adds one
   # `ContentfulAssetJob` for each tile. The alt text becomes `fields.description` of the asset,
-  # which is the field that `web/` renders as the `alt` of an image.
+  # which `web/` renders as the `alt` of an image.
   #
-  # ⚠️ The tiles have NO order: an asset stands by itself. Thus this page has no grip and no drag,
-  # and it is different from the photo composer of the Social media page in that one way.
+  # ⚠️ The tiles have no order, because an asset stands by itself. Thus this page has no grip and
+  # no drag, and the photo composer of the Social media page has both.
   class ContentfulUploadsController < BaseController
     include WorkerCheck
 
@@ -84,11 +83,11 @@ module Admin
 
     # The tiles of the form, in order.
     #
-    # ⚠️ The form sends THREE flat arrays — `files[ids][]`, `files[titles][]`, and
-    # `files[alts][]` — and they match by POSITION. Thus this pairs them first and drops a whole
-    # triple after that: a tile whose upload is still out sends an empty id, and a drop of the id
-    # alone would move each title and each alt text after it by one.
-    # ⚠️ They are three arrays and NOT `files[][id]`. Rack makes a new hash for that shape only
+    # ⚠️ The form sends three flat arrays, `files[ids][]`, `files[titles][]`, and `files[alts][]`,
+    # and they match by position. Thus this pairs them first and then drops a whole triple: a tile
+    # whose upload is still out sends an empty id, and a drop of the id alone would move each
+    # title and each alt text after it by one.
+    # ⚠️ They are three arrays and not `files[][id]`. Rack makes a new hash for that shape only
     # when a key repeats, thus one field that a browser does not submit would join two tiles into
     # one, and no check would show it.
     # @return [Array<Hash>] `[{ id:, title:, alt: }, …]`

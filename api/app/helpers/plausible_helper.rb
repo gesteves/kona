@@ -13,7 +13,6 @@ module PlausibleHelper
   # parses the class name with /plausible-event-(.+)(=|--)(.+)/.
   # ⚠️ It gives nil for a blank section. The name class on its own sends an event with no section,
   # and nothing shows that error.
-  # @param section [String] The analytics name of the section that holds the link.
   # @return [String, nil] The class names, or nil.
   def article_click_classes(section)
     return if section.blank?
@@ -29,9 +28,7 @@ module PlausibleHelper
     value.tr(" ", "+")
   end
 
-  # Makes the text of the pageview count of an article. It is the same as the article_views helper
-  # that the web app had.
-  # @param pageviews [Integer]
+  # Makes the text of the pageview count of an article.
   # @return [String] For example "Viewed once", "Viewed 1,234 times", or "Never viewed".
   def pageviews_label(pageviews)
     return "Never viewed" if pageviews.zero?

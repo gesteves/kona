@@ -15,16 +15,13 @@ body {
   color: var(--wa-color-text-normal);
 }
 
-// The output of `icon_svg` in a line of text. A Font Awesome SVG has no size of its own: it has a
-// `viewBox` and nothing more. Thus each one needs a height, and `1em` keeps it at the size of the
-// text beside it.
+// The output of `icon_svg` in a line of text. A Font Awesome SVG has a `viewBox` and no size of
+// its own. Thus each one needs a height, and `1em` keeps it at the size of the text beside it.
 //
 // ⚠️ `:not([height])` keeps this rule off an SVG that gives its own size, which today is the map
-// marker of Mapbox GL. That size is a **presentation attribute**, and each CSS rule wins over one.
-// Thus a `height: 1em` with no check makes the pin the size of the 12px font of the map, and GL JS
-// continues to offset it as if it were the full height. The point of the pin then floats above the
-// coordinate. That looks correct at a large zoom and kilometres away at a small zoom, and it is
-// very difficult to debug.
+// marker of Mapbox GL. That size is a presentation attribute, and each CSS rule wins over one.
+// Without the check, the pin gets the size of the 12px font of the map, and GL JS still offsets
+// it for its full height. The point of the pin then floats above the coordinate.
 svg:not([height]) {
   fill: currentColor;
   flex: none;
@@ -32,9 +29,8 @@ svg:not([height]) {
   width: auto;
 }
 
-// The navigation progress bar of Turbo, in the brand color. web/ hides it, because the static site
-// navigates immediately and the bar gave no information. Here each navigation is a true request to
-// the server, thus the bar is useful.
+// The navigation progress bar of Turbo, in the brand color. web/ hides it, because the static
+// site navigates at once. Here each navigation is a true request to the server.
 .turbo-progress-bar {
   background-color: var(--color-firebrick);
 }

@@ -1,15 +1,15 @@
 <%# One picked file: its thumbnail, its title, its alt text, and the remove X.
 
-    ⚠️ **The three fields render in THIS order in every tile.** The names are `files[ids][]`,
-    `files[titles][]`, and `files[alts][]`, and the action reads the three arrays by POSITION. A
+    ⚠️ The three fields render in this order in each tile. The names are `files[ids][]`,
+    `files[titles][]`, and `files[alts][]`, and the action reads the three arrays by position. A
     tile that omits one field would move each value after it by one.
 
-    ⚠️ The tiles have no order that means anything: one asset does not know about another one.
-    Thus this partial has no grip and no drag, and the Social media tile has both.
+    ⚠️ The tiles have no order with a meaning, thus this partial has no grip and no drag. The
+    Social media tile has both.
 
-    ⚠️ Inside a tile the hooks are plain `data-` attributes and NOT Stimulus targets. Only the
-    root is a target. That is what lets the <template> of the page clone this markup without two
-    elements answering to the same target name. %>
+    ⚠️ Inside a tile the hooks are plain `data-` attributes and not Stimulus targets. Only the
+    root is a target. Thus the <template> of the page can clone this markup with no two elements
+    on the same target name. %>
 <%# ⚠️ `data-file-alt-url` is the path of the Generate control of THIS tile. The server writes it
     here, and the answer of the upload writes it for a new tile, thus the JavaScript builds no
     path. The control renders only when Claude has a key, and it is disabled while the tile has

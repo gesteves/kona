@@ -1,18 +1,18 @@
-<%# One person that the draft names, and what they are called at each network.
+<%# One person that the draft names, and the name of that person at each network.
 
-    ⚠️ **All four fields must render for every row, in the same order.** The names are
-    `mentions[][token]` and one for each network key, and Rails starts a new hash when a key
-    repeats. A row that omits one field would move each field below it by one. It is the rule of
-    `posts[][text]`. The loop below reads the same list for every row, thus the order cannot drift.
+    ⚠️ Each row must render the same fields, in the same order. The names are `mentions[][token]`
+    and one for each network key, and Rails starts a new hash when a key repeats. A row that
+    omits one field would move each field below it by one. The loop below reads the same list
+    for each row.
 
-    ⚠️ **A field takes a handle OR plain words.** A person with no account at a network still has a
+    ⚠️ A field takes a handle or plain words. A person with no account at a network still has a
     name, and the post must be able to say it. The action reads the shape and decides. An empty
-    field posts the token with no "@". Thus no value here can ever tag the wrong account.
+    field posts the token with no "@". Thus no value here can tag the wrong account.
 %>
-<%# ⚠️ The row is a group that the token names. The three fields of each row have the same three
-    labels, thus without the group a screen reader hears "Bluesky, edit text" for each person and
-    cannot tell which one. The id comes from the token, and social_controller.js writes the same id
-    when it clones the template. A wrong name here tags a stranger. %>
+<%# ⚠️ The row is a group that the token names. The network fields of each row have the same
+    labels, thus without the group a screen reader hears "Bluesky, edit text" for each person
+    and cannot tell which one. The id comes from the token, and social_controller.js writes the
+    same id when it clones the template. A wrong name here tags a stranger. %>
 <% label_id = "mention-#{mention.token.to_s.delete_prefix('@').downcase}" %>
 <div class="social-mention" data-social-target="mention" role="group" aria-labelledby="<%= label_id %>">
   <%# ⚠️ The token is not editable here: the words of the post are where the owner writes it. The

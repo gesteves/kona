@@ -21,8 +21,8 @@ class StaticMap
   # The Mapbox styles, in a dropdown. A custom style is a text field, and it replaces the style
   # that the user selects here.
   # @see https://docs.mapbox.com/api/maps/styles/#mapbox-styles
-  # ⚠️ The value is the name of a translation and NOT the words on the screen. Each user-facing
-  # word of the admin is in config/locales/en.yml. Use `.style_options` to render the dropdown.
+  # ⚠️ The value is the name of a translation in config/locales/en.yml, and NOT the words on the
+  # screen. Use `.style_options` to render the dropdown.
   STYLE_PRESETS = {
     "mapbox://styles/mapbox/outdoors-v12" => "outdoors",
     "mapbox://styles/mapbox/streets-v12" => "streets",
@@ -82,8 +82,8 @@ class StaticMap
   HTTP_MAX_ATTEMPTS = 3
   RENDER_DEADLINE = 15
 
-  # All the settings, with the value that the Rake task contained. The sport of each track gives
-  # its `start_icon`. Refer to .defaults_for.
+  # The default of each setting. The sport of each track gives its `start_icon`. Refer to
+  # .defaults_for.
   DEFAULTS = {
     "padding_top" => 50,
     "padding_right" => 50,
@@ -112,11 +112,8 @@ class StaticMap
   # and the style from the environment.
   #
   # MAPBOX_STYLE_URL goes into the field that can hold it: the dropdown if it names a Mapbox style,
-  # or the custom field. Thus a style from the configuration appears where you can edit it, and
-  # not as a preset that the form does not select.
-  #
-  # @param start_icon [String] The icon from GpxTrack#start_icon.
-  # @return [Hash]
+  # or the custom field. Thus a style from the configuration appears where you can edit it.
+  # @param start_icon [String, nil] The icon from GpxTrack#start_icon.
   def self.defaults_for(start_icon)
     configured = ENV["MAPBOX_STYLE_URL"].to_s
     preset = STYLE_PRESETS.key?(configured)
@@ -154,8 +151,7 @@ class StaticMap
     url
   end
 
-  # Gets the rendered PNG.
-  # @return [String] The image bytes.
+  # @return [String] The bytes of the rendered PNG.
   # @raise [RenderError] If Mapbox refuses the request or continues to fail.
   def render
     response = get_with_retries(url)
@@ -174,7 +170,6 @@ class StaticMap
   # The Mapbox token. The code finds it only when it is necessary, thus a new instance of this
   # class needs no token. It uses the secret token first, because that is the only token that can
   # read the private tilesets that MTS makes.
-  # @return [String]
   def render_token
     ENV["MAPBOX_SECRET_TOKEN"].presence ||
       ENV["MAPBOX_ACCESS_TOKEN"].presence ||
@@ -226,7 +221,6 @@ class StaticMap
 
   # The code uses a height from the settings only when it is more than the vertical padding. If it
   # is not, there is no space to draw in, thus the code uses the aspect ratio of the track.
-  # @return [Integer]
   def height
     top, _right, bottom, _left = padding
     requested = @settings["height"].to_i
@@ -302,8 +296,7 @@ class StaticMap
   # error, and it does not give nil: the caller shows that error on the page.
   #
   # ⚠️ The deadline counts the timeout of the next attempt, thus RENDER_DEADLINE is the most time
-  # that a render can take. The request has a 20-second rack-timeout, and its exception is not a
-  # StandardError.
+  # that a render can take. Refer to RENDER_DEADLINE for the reason.
   def get_with_retries(url)
     with_retries(max: HTTP_MAX_ATTEMPTS - 1, base_delay: 1, deadline: RENDER_DEADLINE - HTTP_TIMEOUT, on: RETRYABLE_ERRORS) do
       response = HTTParty.get(url, timeout: HTTP_TIMEOUT)

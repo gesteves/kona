@@ -48,9 +48,8 @@ Rails.application.routes.draw do
     # Changes the Font Awesome list that the web build posts into rendered SVGs.
     post "icons" => "icons#create"
 
-    # The nearest neighbors of each entry, from the BM25 index of the article text, the links, and
-    # the concepts. The web build renders them as the static "You May Also Like" section of each
-    # article.
+    # The nearest neighbors of each entry. The web build renders them as the static "You May Also
+    # Like" section of each article.
     get "related" => "related#show"
 
     # A photo of a draft on the Social media page, for Meta to GET. This is public, and the
@@ -102,9 +101,8 @@ Rails.application.routes.draw do
     mount Sidekiq::Web => "/sidekiq"
 
     # The admin UI for the owner. The owner session in Admin::BaseController controls it. Rails
-    # draws it at the ROOT, and not below /admin: these routes exist only on the admin host, where
-    # the prefix would repeat the hostname. `scope module:` keeps the controllers together below
-    # Admin:: and does not put that name in the path.
+    # draws it at the root, and not below /admin: these routes exist only on the admin host, where
+    # the prefix would repeat the hostname.
     #
     # ⚠️ Thus the admin pages use top-level paths on this host. Check a new page against the
     # scanner-noise custom rule of the zone before you add it. That rule blocks full prefix
@@ -122,15 +120,13 @@ Rails.application.routes.draw do
       get    "whoop/callback"       => "whoop#callback",  as: :whoop_callback
       delete "connected-apps/whoop" => "whoop#destroy",   as: :whoop_connection
 
-      # Bluesky connects with a form, and not with an OAuth redirect. Thus it needs its own page,
-      # and all three of its actions are on that controller, and not on connected_apps#.
+      # Bluesky connects with a form, and not with an OAuth redirect, thus it has its own page.
       get    "connected-apps/bluesky" => "bluesky#show",    as: :bluesky_connection
       post   "connected-apps/bluesky" => "bluesky#create",  as: nil
       delete "connected-apps/bluesky" => "bluesky#destroy", as: nil
 
       # Mastodon does an OAuth round trip, and the owner must name an instance first: this app
-      # registers itself on that instance and has no client before that. Thus the form, the
-      # callback, and the disconnect are all on that controller.
+      # registers itself on that instance and has no client before that. Thus it has a form.
       # ⚠️ The callback stays below /connected-apps, and it is not a top-level /mastodon path. Thus
       # it needs no new prefix in RACK_ATTACK_KNOWN_PREFIXES and no new name in the scanner-noise
       # rule of the zone.
@@ -140,8 +136,7 @@ Rails.application.routes.draw do
       get    "connected-apps/mastodon/callback" => "mastodon#callback", as: :mastodon_callback
 
       # Threads does an OAuth round trip with app credentials from the environment, thus it needs
-      # no form: the Connect button of the card goes to the authorize action. The callback stays
-      # below /connected-apps for the same reason as the Mastodon one.
+      # no form. The callback stays below /connected-apps for the same reason as the Mastodon one.
       get    "connected-apps/threads/authorize" => "threads#authorize", as: :threads_authorize
       get    "connected-apps/threads/callback"  => "threads#callback",  as: :threads_callback
       delete "connected-apps/threads"           => "threads#destroy",   as: :threads_connection
@@ -157,10 +152,9 @@ Rails.application.routes.draw do
       post   "connected-apps/trainerroad" => "trainer_road#create",  as: nil
       delete "connected-apps/trainerroad" => "trainer_road#destroy", as: nil
 
-      # The current location, on a map. The POST writes the same Redis key as the
-      # POST /api/location that needs a bearer token, through Location.store. The lookup finds an
-      # address or names a pair of coordinates and writes **nothing**, which is what lets the page
-      # hold a change before the save.
+      # The current location, on a map. The POST writes the same Redis key as the POST /api/location
+      # that needs a bearer token, through Location.store. The lookup finds an address or names a
+      # pair of coordinates. It writes nothing, thus the page can hold a change before the save.
       get  "location"        => "location#show",   as: :location
       get  "location/lookup" => "location#lookup", as: :location_lookup
       post "location"        => "location#create"
@@ -195,8 +189,7 @@ Rails.application.routes.draw do
       # The card of the link that the owner pasted.
       get "social/preview"       => "social#preview",       as: :social_preview
 
-      # The Contentful tools of the admin. Today there is one: the media uploader, which puts an
-      # image into the space as a published asset.
+      # The media uploader of the admin, which puts an image into the space as a published asset.
       # ⚠️ `contentful/uploads/status` and `contentful/uploads/files` are static segments. The `:id`
       # of a record is 32 hex digits, thus that route cannot take either one. Keep that constraint,
       # and keep both static segments above any `:id` route with no constraint.
@@ -215,9 +208,8 @@ Rails.application.routes.draw do
       post "contentful/uploads/files/:id/alt" => "contentful_upload_files#alt",
            as: :contentful_upload_file_alt, constraints: { id: /\h{32}/ }
 
-      # The spam quarantine of the contact form. The name says what it holds. It is not `/contact`,
-      # on purpose, because that is the path of the public form (POST /api/contact), and nothing
-      # here takes a submission.
+      # The spam quarantine of the contact form. It is not `/contact`, on purpose, because that is
+      # the path of the public form (POST /api/contact), and nothing here takes a submission.
       get    "spam"              => "spam#index",    as: :spam
       post   "spam/:id/not-spam" => "spam#not_spam", as: :spam_not_spam
       delete "spam/:id"          => "spam#destroy",  as: :spam_message
@@ -239,9 +231,8 @@ Rails.application.routes.draw do
   end
 
   # The public API host has no UI, thus this sends a browser that comes to it to the true site.
-  # Rails draws it after the block above. Thus on the admin host the home page takes "/" first,
-  # and only the public host uses this route. Rails evaluates it for each request, thus it follows
-  # SITE_URL and does not contain a host.
+  # Rails draws it after the block above, thus on the admin host the home page takes "/" first.
+  # Rails evaluates the block for each request, thus it follows SITE_URL and contains no host.
   get "/" => redirect(status: 301) { "#{ENV['SITE_URL'].to_s.chomp('/')}/" }
 
   # The catch-all, mostly for vulnerability scanners. A controller answers them, and the code does

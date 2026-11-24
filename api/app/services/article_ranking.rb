@@ -16,8 +16,7 @@ module ArticleRanking
     totals.each_with_object(Hash.new(0)) { |(path, values), acc| acc[path] = values[:visitors].to_i }
   end
 
-  # The published articles that are not a Short and that have a path. This does not include a draft
-  # and a Short, and web does the same.
+  # The published articles that are not a Short and that have a path. web uses the same filter.
   def candidates
     @articles.list.reject { |a| a.draft || a.entry_type == "Short" || a.path.blank? }
   end
@@ -43,7 +42,6 @@ module ArticleRanking
   # ⚠️ It holds no transformation URL, on purpose. The payload stays in the cache for an hour, and
   # a URL that this code makes would hide a change to IMAGES_URL or to IMAGE_HOST for that full
   # hour. ImagesHelper makes the URL when the view renders.
-  # @param article [OpenStruct] The article.
   # @return [Hash, nil] The cover image fields, or nil when the article has no cover image.
   def cover_image_payload(article)
     cover = article.cover_image

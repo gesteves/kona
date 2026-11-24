@@ -22,9 +22,8 @@ class Whoop < ApplicationService
   # @return [Hash, nil] The most recent scored :physiological_cycle, :sleep, and :recovery, or
   #   nil if one of them is absent. The widget then renders nothing.
   def stats
-    # Only the *filter* below makes a chain: a sleep goes with a cycle, and a recovery goes with
-    # a sleep. The three collection fetches do not depend on each other, thus they run at the
-    # same time, and not as three requests in sequence on a cold cache.
+    # The three collections do not depend on each other, thus they run at the same time. Only the
+    # filter below is a chain: a sleep goes with a cycle, and a recovery goes with a sleep.
     collections = in_parallel(
       cycles: -> { rescue_with(context: "Whoop cycles") { get_cycles } },
       sleeps: -> { rescue_with(context: "Whoop sleeps") { get_sleeps } },
@@ -37,9 +36,9 @@ class Whoop < ApplicationService
 
     return if cycle.blank? || sleep.blank? || recovery.blank?
 
-    # ⚠️ A record can be SCORED and still have no value for the one sub-score that the widget
-    # renders. The presenter rounds all three values, and at that point the render_empty of the
-    # controller is behind us. Thus the check must be here, where "no data" is still possible.
+    # ⚠️ A record can be SCORED and still have no value for the sub-score that the widget renders.
+    # The presenter rounds all three values, and the controller cannot use `render_empty` at that
+    # point. Thus the check must be here.
     return if cycle.dig(:score, :strain).nil? ||
               sleep.dig(:score, :sleep_performance_percentage).nil? ||
               recovery.dig(:score, :recovery_score).nil?
@@ -69,8 +68,6 @@ class Whoop < ApplicationService
 
   # Gets the scored workouts that started in a time range. A workout with no score has no strain,
   # thus the code leaves it out.
-  # @param from [Time] The start of the range.
-  # @param to [Time] The end of the range.
   # @return [Array<Hash>] The workouts in the standard shape. Refer to #normalize_workout.
   # @raise [StandardError] On a failure, as #get_workout does. The description generator catches it.
   def workouts_between(from, to)
@@ -80,9 +77,8 @@ class Whoop < ApplicationService
       .map { |workout| normalize_workout(workout) }
   end
 
-  # Gets one workout by UUID.
-  # @return [Hash, nil] The workout in the standard shape, or nil if it is absent or has no
-  #   score. A workout with no score has no strain.
+  # @return [Hash, nil] One workout by UUID, in the standard shape, or nil if it is absent or has
+  #   no score.
   def get_workout(uuid)
     workout = authed_get_or_nil("activity/workout/#{uuid}")
     return if workout.nil? || workout[:score_state] != "SCORED" || workout[:score].nil?
@@ -162,7 +158,6 @@ class Whoop < ApplicationService
   end
 
   # Changes an authorization code into tokens and stores them in Redis.
-  # @param authorization_code [String] The code from the OAuth callback.
   # @return [Hash, nil] The token data, or nil if the exchange failed.
   def connect!(authorization_code)
     return unless valid_credentials?
@@ -193,20 +188,18 @@ class Whoop < ApplicationService
     nil
   end
 
-  # The email address of the authorized athlete. The Connected apps page names the account with
-  # it.
+  # The email address of the authorized athlete, for the Connected apps page.
   #
-  # ⚠️ This reads Redis and makes no request, on purpose. That page shows the state of each
-  # integration on each load, thus a fetch here would put an upstream failure in the path of the
-  # admin navigation. `store_account_email!` is what writes the value.
+  # ⚠️ This reads Redis and makes no request, on purpose. That page renders at each load, thus a
+  # fetch here would put an upstream failure in the path of the admin navigation.
+  # `store_account_email!` writes the value.
   # @return [String, nil] The address, or nil before the app stored one.
   def account_email
     $redis.get(account_email_key).presence
   end
 
-  # Gets the profile of the athlete and stores the email address. `connect!` calls
-  # this, and `WhoopTokenRefreshJob` calls it for a connection that this app made before this code
-  # existed.
+  # Gets the profile of the athlete and stores the email address. `connect!` calls this, and
+  # `WhoopTokenRefreshJob` calls it for a connection with no stored address.
   #
   # ⚠️ It fails soft. The address is a label for the admin, thus a Whoop that is not available must
   # never stop an authorization or a token refresh.
@@ -219,8 +212,7 @@ class Whoop < ApplicationService
     email
   end
 
-  # @return [Boolean] True if an account is connected now. The refresh token is the only
-  #   permanent credential, because there is no database. Thus the token *is* the connection.
+  # @return [Boolean] True if an account is connected now. The refresh token *is* the connection.
   def connected?
     return false unless valid_credentials?
 
@@ -263,10 +255,8 @@ class Whoop < ApplicationService
   # Removes the stored credentials and disconnects the account.
   #
   # ⚠️ The cached user_id also goes away. Webhooks::WhoopController checks the user_id of each
-  # payload against it. Thus a copy that stays would continue to authorize webhooks for an
-  # account with no tokens. The app would accept such a webhook, then fail later, because it has
-  # no access token for the fetch.
-  # @return [void]
+  # payload against it, thus a copy that stays would authorize webhooks for an account with no
+  # tokens.
   def disconnect!
     $redis.del(access_token_key, refresh_token_key, user_id_key, refresh_lock_key, refresh_error_key,
                account_email_key)
@@ -291,8 +281,6 @@ class Whoop < ApplicationService
 
   # Changes a workout with a score into the fields that the webhook flow uses. start_time stays
   # an instant, and each call site renders it in the timezone of the athlete.
-  # @param workout [Hash] The raw workout.
-  # @return [Hash]
   def normalize_workout(workout)
     sport = SPORT_NAME_MAP[workout[:sport_name].to_s.downcase] || workout[:sport_name]
 
@@ -328,7 +316,6 @@ class Whoop < ApplicationService
     nil
   end
 
-  # @return [Hash, nil] The most recent cycle with a score, or nil if it is not available.
   # @param cycles [Hash, nil] The cycle collection.
   # @return [Hash, nil] The most recent cycle with a score, or nil if it is not available.
   def most_recent_scored_cycle(cycles)
@@ -336,9 +323,8 @@ class Whoop < ApplicationService
   end
 
   # @param sleeps [Hash, nil] The sleep collection.
-  # @param cycle_id [String, nil] The id of the cycle.
-  # @return [Hash, nil] Its most recent sleep with a score that is not a nap, or nil if it is not
-  #   available.
+  # @return [Hash, nil] The most recent sleep of the cycle with a score, and not a nap, or nil if
+  #   it is not available.
   def sleep_for_cycle(sleeps, cycle_id)
     return if cycle_id.blank?
 
@@ -346,8 +332,8 @@ class Whoop < ApplicationService
   end
 
   # @param recoveries [Hash, nil] The recovery collection.
-  # @param sleep_id [String, nil] The id of the sleep.
-  # @return [Hash, nil] Its most recent recovery with a score, or nil if it is not available.
+  # @return [Hash, nil] The most recent recovery of the sleep with a score, or nil if it is not
+  #   available.
   def recovery_for_sleep(recoveries, sleep_id)
     return if sleep_id.blank?
 
@@ -355,31 +341,27 @@ class Whoop < ApplicationService
   end
 
   # @see https://developer.whoop.com/api#tag/Sleep/operation/getSleepCollection
-  # @return [Hash, nil] The recent sleep collection, or nil if it is not available.
   def get_sleeps
     fetch_collection("activity/sleep", "sleeps", 5.minutes)
   end
 
   # @see https://developer.whoop.com/api#tag/Recovery/operation/getRecoveryCollection
-  # @return [Hash, nil] The recent recovery collection, or nil if it is not available.
   def get_recoveries
     fetch_collection("recovery", "recoveries", 5.minutes)
   end
 
   # @see https://developer.whoop.com/api/#tag/Cycle/operation/getCycleCollection
-  # @return [Hash, nil] The recent cycle collection, or nil if it is not available.
   def get_cycles
     fetch_collection("cycle", "cycles", 1.minute)
   end
 
   # Gets a collection endpoint and caches the response in Redis.
-  # @param path [String] The API path below WHOOP_API_URL.
-  # @param cache_name [String] The end of the Redis key.
-  # @param ttl [ActiveSupport::Duration] The time to keep it in the cache.
-  # @return [Hash, nil] The parsed response, or nil if it is not available.
   #
   # ⚠️ The token read is INSIDE the cache block. Thus a warm cache touches no token, and a token
   # that expired refreshes only when a call to Whoop needs it.
+  # @param path [String] The API path below WHOOP_API_URL.
+  # @param cache_name [String] The end of the Redis key.
+  # @return [Hash, nil] The parsed response, or nil if it is not available.
   def fetch_collection(path, cache_name, ttl)
     cached_json("whoop:#{@client_id}:#{cache_name}", expires_in: ttl) do
       access_token = get_access_token
@@ -467,7 +449,7 @@ class Whoop < ApplicationService
   # ⚠️ The wait covers a full refresh call: the open timeout and the read timeout of
   # config/initializers/http_timeouts.rb, which is 15 seconds. The three collection reads of
   # #stats run at the same time, thus on a cold cache two of them wait here for the third. A
-  # shorter wait gave those two nil, and the widget then rendered nothing at each token expiry.
+  # shorter wait gives those two nil, and the widget then renders nothing at each token expiry.
   # @return [String, nil] The token, or nil if it does not come in time.
   def wait_for_refreshed_token(attempts: 30, interval: 0.5)
     attempts.times do
@@ -482,7 +464,6 @@ class Whoop < ApplicationService
 
   # Stores the tokens in Redis. The access token expires one minute before the Whoop expiry
   # time. The refresh token has no expiry time.
-  # @param token_data [Hash] The OAuth token response.
   def store_tokens(token_data)
     access_token = token_data[:access_token]
     refresh_token = token_data[:refresh_token]
@@ -490,7 +471,7 @@ class Whoop < ApplicationService
 
     # ⚠️ This is a check, and it does not set the TTL to 0. Redis refuses a TTL of 0, and the
     # rescue of the caller hides the raise. Thus an expires_in that is absent or less than 60s
-    # stopped the integration with no message. The code stores the refresh token in all
+    # would stop the integration with no message. The code stores the refresh token in all
     # conditions, which lets the next attempt recover.
     # ⚠️ Both tokens are encrypted at rest, as each other credential is. Refer to WhoopCredentials.
     access_cache_duration = expires_in - 60
@@ -514,7 +495,6 @@ class Whoop < ApplicationService
   # Reads an encrypted token. A value from before the encryption reads as it is, and the next
   # refresh stores it encrypted. Whoop rotates the refresh token at each refresh, thus such a value
   # goes away by itself.
-  # @param key [String] The Redis key.
   # @return [String, nil]
   def read_secret(key)
     raw = $redis.get(key)

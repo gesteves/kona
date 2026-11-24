@@ -38,7 +38,7 @@ module ContentfulRequestVerification
   end
 
   # @param timestamp [String] The milliseconds after the epoch.
-  # @return [Boolean] True if it is in the replay window, and not more than CLOCK_SKEW in the future.
+  # @return [Boolean] True if it is in the replay window, and at most CLOCK_SKEW in the future.
   def fresh_timestamp?(timestamp)
     age = (Time.now.to_f * 1000) - timestamp.to_i
     age >= -CLOCK_SKEW && age <= TIMESTAMP_TTL
@@ -48,7 +48,6 @@ module ContentfulRequestVerification
   # and the raw body, with a newline between them. It uses the bytes of the request, and never the
   # params after a second serialization. Thus the digest agrees.
   # @param signed_headers [String] The header names to include, with a comma between them.
-  # @return [String]
   def canonical_request(signed_headers)
     headers = signed_header_names(signed_headers).map do |name|
       "#{name}:#{request.headers[name]}"

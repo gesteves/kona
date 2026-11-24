@@ -12,7 +12,6 @@ module JsonRecordLibrary
     records.read_all.values.sort_by { |record| record["uploaded_at"].to_s }.reverse
   end
 
-  # @param id [String]
   # @return [Hash, nil]
   def find(id)
     records.read(id)
@@ -26,7 +25,6 @@ module JsonRecordLibrary
   end
 
   # Changes one record in place.
-  # @param id [String]
   # @param changes [Hash] The changes to put on top of the stored record.
   # @return [Hash, nil] The new record, or nil if the record is gone.
   def update(id, changes)
@@ -36,13 +34,11 @@ module JsonRecordLibrary
     write(id, record.merge(changes.transform_keys(&:to_s)))
   end
 
-  # @param id [String]
   # @return [Boolean] True if the code removed a record.
   def delete(id)
     records.delete(id).positive?
   end
 
-  # @return [Integer]
   def count
     records.count
   end

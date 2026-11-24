@@ -2,9 +2,9 @@
 // rows, and the preview. The form controls come from Web Awesome.
 .social {
   &__schedule {
-    // ⚠️ This rule is what makes the `hidden` attribute need a rule of its own. `[hidden]` of the
-    // browser is `display: none` at the same specificity as this class, and our stylesheet comes
-    // after it. Thus without the line below the date and the time show while the switch is off.
+    // ⚠️ `[hidden]` needs this rule. The `display: none` of the browser has the specificity of
+    // this class, and our stylesheet comes after it. Without it, the fields show while the switch
+    // is off.
     &[hidden] {
       display: none;
     }
@@ -16,26 +16,20 @@
     align-items: start;
   }
 
-  // ⚠️ This rule is what makes the `hidden` attribute work here, for the reason that
-  // `.social__schedule` above gives: `[hidden]` of the browser is at the same specificity as this
-  // class, and our stylesheet comes after it.
   // The topic field, below the row of its own network inside the "Post to" group.
   &__topic {
-    // ⚠️ This rule is what makes the `hidden` attribute work here, for the reason that
-    // `.social__schedule` above gives.
+    // ⚠️ `[hidden]` needs this rule, for the reason that `.social__schedule` above gives.
     &[hidden] {
       display: none;
     }
 
-    // ⚠️ `align-items: start` on the group sizes each row to its content, on purpose: it keeps the
-    // clickable label of a checkbox off the full width. Thus this field needs to stretch itself,
-    // or the input collapses to the width of its own label.
+    // ⚠️ `align-items: start` on the group keeps the clickable label of a checkbox off the full
+    // width. Thus this field must stretch itself, or the input collapses to the width of its label.
     align-self: stretch;
     max-width: 24rem;
-    // ⚠️ It lines up with the LABEL of the checkbox above it, and not with the box. The two values
-    // are the ones that <wa-checkbox> gives its own control: the size of the box, and the
-    // `margin-inline-end: 0.5em` that separates it from the label. Thus the field follows the
-    // tokens of the theme and this file holds no measurement of its own.
+    // ⚠️ It aligns with the label of the checkbox above it, and not with the box. The two values
+    // are the ones of <wa-checkbox>: the size of the box, and its `margin-inline-end: 0.5em`.
+    // Thus the field follows the tokens of the theme.
     margin-inline-start: calc(var(--wa-form-control-toggle-size) + 0.5em);
   }
 
@@ -48,26 +42,23 @@
     width: 100%;
   }
 
-  // ⚠️ A rule of Web Awesome gives <wa-spinner> a display, and an author rule beats the
-  // `[hidden] { display: none }` of the browser whatever its layer. Thus the attribute alone hides
-  // nothing, and this rule is what makes it work. `.social__schedule` above needs the same.
+  // ⚠️ Web Awesome gives <wa-spinner> a display, and an author rule beats the `[hidden]` rule of
+  // the browser in each layer. Thus the attribute alone hides nothing.
   &__spinner[hidden] {
     display: none;
   }
 
-  // ⚠️ The two lines of a "Post to" hint, of which one shows at a time. A rule of Web Awesome can
-  // give slotted content a display, and an author rule beats the `[hidden]` of the browser
-  // whatever its layer. Thus the attribute alone hides nothing, and this rule is what makes it
-  // work. `.social__schedule` above has the same note.
+  // The two lines of a "Post to" hint, of which one shows at a time. ⚠️ Web Awesome can give
+  // slotted content a display, thus `[hidden]` needs this rule, as for the spinner above.
   &__hint-line[hidden] {
     display: none;
   }
 
   // The count below the words of a post, at the end of its line with its ring.
   //
-  // ⚠️ **`margin-inline-start: auto` and NOT `space-between` on the row above.** The link button is
-  // hidden in two of the three states, and with `space-between` the count would move to the left
-  // edge each time that button goes away.
+  // ⚠️ Use `margin-inline-start: auto`, and not `space-between` on the row above. The link button
+  // is hidden in two of the three states, and `space-between` would then move the count to the
+  // left edge.
   &__count {
     display: flex;
     align-items: center;
@@ -77,9 +68,8 @@
     margin: 0 0 0 auto;
   }
 
-  // ⚠️ The ring is sized in `em`, thus it follows the words beside it and not a fixed number of
-  // pixels. Both counts use this one class, and in both it comes LAST: at the end of a line that
-  // is itself at the end of its row, thus it stays still while the number gains a digit.
+  // ⚠️ The ring is sized in `em`, thus it follows the words beside it. In both counts it comes
+  // last on a line at the end of its row, thus it stays still while the number gains a digit.
   &__ring {
     --size: 1.15em;
     --track-width: 2px;
@@ -115,9 +105,8 @@
   margin-block-start: var(--wa-space-s);
   max-width: 32rem;
 
-  // ⚠️ The footer of the component takes the same `--spacing` as its body, and that is too much
-  // room around two icon buttons. The card of the Preview panel has no footer, thus this reaches
-  // the card of the composer alone.
+  // ⚠️ The footer of the component takes the `--spacing` of its body, which is too much room for
+  // two icon buttons. Only the card of the composer has a footer.
   &::part(footer) {
     padding: var(--wa-space-xs) var(--wa-space-s);
   }
@@ -163,7 +152,7 @@
 
   // The two controls of the footer. <wa-card> draws the line above them and the room around them.
   //
-  // ⚠️ They go in ONE element, in the `footer` slot. Refer to the ⚠️ in _post.html.erb: the
+  // ⚠️ They go in one element, in the `footer` slot. Refer to the ⚠️ in _post.html.erb: the
   // `footer-actions` slot of the component renders nothing by itself.
   &__actions {
     display: flex;
@@ -172,7 +161,7 @@
   }
 
   // ⚠️ <wa-button> makes a square icon button only for a <wa-icon> child, and this app never uses
-  // that element. Thus the square is here, as it is for each other icon button of this page.
+  // that element. Thus each icon button of this page gets its square from a rule such as this one.
   &__action::part(button) {
     aspect-ratio: 1;
     padding: 0;
@@ -204,24 +193,20 @@
     margin-block: var(--wa-space-l);
   }
 
-  // ⚠️ THREE columns: a gutter for the handle, the fields, and a gutter for the remove control.
-  // Both controls are in the flow and in a gutter of their own, thus neither can sit on top of a
-  // field. The remove control was absolute before, at the right edge of this block, and it covered
-  // the corner of the first field.
+  // ⚠️ Three columns: a gutter for the handle, the fields, and a gutter for the remove control.
+  // Each control is in the flow and in its own gutter, thus neither can cover a field.
   &__body {
     align-items: start;
     display: grid;
     grid-template-columns: auto 1fr auto;
     row-gap: var(--wa-space-xs);
 
-    // ⚠️ There is NO `column-gap`, and the space beside each control is a margin on that control
-    // instead. A gap stays behind when a track is empty: with one post both controls are hidden,
-    // the two gutter tracks collapse to nothing, and two gaps would still inset the fields by a
-    // few pixels away from every other row of this form.
+    // ⚠️ There is no `column-gap`: the space beside each control is a margin on that control. A
+    // gap stays when a track is empty. With one post both controls are hidden, and two gaps would
+    // still inset the fields.
 
-    // ⚠️ Each field goes in the middle column, one to a row, and the rule NAMES the two controls
-    // that it leaves out. A plain `> *` would take them as well, and each would then win or lose on
-    // source order alone, because the selectors have the same weight.
+    // ⚠️ Each field goes in the middle column, and the rule names the two controls that it leaves
+    // out. A plain `> *` has the same weight as their rules, thus the source order would decide.
     > :not(.social-post__handle):not(.social-post__remove) {
       grid-column: 2;
     }
@@ -237,12 +222,10 @@
     margin-inline-end: auto;
   }
 
-  // ⚠️ <wa-button> makes a square icon button only for a <wa-icon> child, and this app never uses
-  // that element. Thus the square is here: the height of a form control, and an equal width.
   &__handle {
-    // ⚠️ The gutter, beside the label of the first field. `align-items: start` on the grid keeps it
-    // level with that label, and the negative margin takes the height of a form control off the
-    // top so the grip itself lines up with the words and not with the box below them.
+    // The left gutter, level with the label of the first field. ⚠️ The negative margin keeps this
+    // control from setting the height of its row: it is taller than that label, and it would push
+    // the fields down.
     grid-column: 1;
     grid-row: 1;
     margin-block-start: calc((1lh - var(--wa-form-control-height)) / 2);
@@ -261,7 +244,7 @@
   }
 
   &__handle::part(button) {
-    // The same square as the remove control. Refer to the note there.
+    // ⚠️ The square of an icon button. Refer to `.social-card__action` above.
     aspect-ratio: 1;
     padding: 0;
     width: var(--wa-form-control-height);
@@ -273,10 +256,7 @@
   }
 
   &__remove {
-    // The right gutter, level with the label of the first field. ⚠️ The negative margin is what
-    // keeps this button from setting the height of its row: it is a form control and it is much
-    // taller than that label, thus in a row of its own height it would push the fields down. The
-    // handle above carries the same offset for the same reason.
+    // The right gutter. ⚠️ It has the offset of the handle above, for the same reason.
     grid-column: 3;
     grid-row: 1;
     margin-block-start: calc((1lh - var(--wa-form-control-height)) / 2);
@@ -294,7 +274,7 @@
     display: none;
   }
 
-  // The controls below the words, with the count at the end of the same line. ⚠️ It is a ROW and
+  // The controls below the words, with the count at the end of the same line. ⚠️ It is a row and
   // not one button: a control for a photo, and each other kind of attachment, goes beside the link
   // button.
   &__toolbar {
@@ -304,8 +284,7 @@
     margin-block-start: var(--wa-space-2xs);
   }
 
-  // ⚠️ <wa-button> makes a square icon button only for a <wa-icon> child, and this app never uses
-  // that element. Thus the square is here, as it is for the handle and the remove control above.
+  // ⚠️ The square of an icon button. Refer to `.social-card__action` above.
   &__tool::part(button) {
     aspect-ratio: 1;
     padding: 0;
@@ -369,7 +348,7 @@
   // The X inside the link field, which takes the owner back to the button of the toolbar.
   //
   // ⚠️ It is sized in `em` and not with `--wa-form-control-height`, which is the height of the
-  // FIELD that holds it. A control of that height fills the box from edge to edge.
+  // field that holds it. A control of that height fills the box from edge to edge.
   &__link-remove::part(button) {
     aspect-ratio: 1;
     padding: 0;
@@ -377,7 +356,7 @@
   }
 }
 
-// One photo of a post, as a ROW: the grip, the thumbnail, the alt text, and the remove control.
+// One photo of a post, as a row: the grip, the thumbnail, the alt text, and the remove control.
 // It reads as a post of the thread reads, with the same two controls at the same two edges.
 .social-photo {
   align-items: start;
@@ -400,8 +379,7 @@
     }
   }
 
-  // ⚠️ <wa-button> makes a square icon button only for a <wa-icon> child, and this app never uses
-  // that element. Thus the square is here, as it is for the handle and the remove control of a post.
+  // ⚠️ The square of an icon button. Refer to `.social-card__action` above.
   &__grip::part(button),
   &__remove::part(button) {
     aspect-ratio: 1;
@@ -434,8 +412,7 @@
     inset-inline-start: calc(50% - 0.5em);
     position: absolute;
 
-    // ⚠️ The same rule as the spinner of a link: a rule of Web Awesome gives <wa-spinner> a
-    // display, and an author rule beats the `[hidden]` of the browser whatever its layer.
+    // ⚠️ The same rule as `.social__spinner`: Web Awesome gives <wa-spinner> a display.
     &[hidden] {
       display: none;
     }
@@ -478,8 +455,7 @@
   gap: var(--wa-space-s);
 
   &[hidden] {
-    // ⚠️ The same rule as the spinner and the remove button above: this block sets a `display`,
-    // thus an author rule beats the `[hidden]` of the browser whatever its layer.
+    // ⚠️ This block sets a display, thus `[hidden]` needs this rule, as for `.social__schedule`.
     display: none;
   }
 
@@ -521,8 +497,7 @@
   gap: var(--wa-space-l);
 
   &__spinner[hidden] {
-    // ⚠️ The same rule as the spinner of a link: an author rule beats the `[hidden]` of the
-    // browser whatever its layer.
+    // ⚠️ The same rule as `.social__spinner`: an author rule beats the `[hidden]` of the browser.
     display: none;
   }
 
@@ -553,8 +528,8 @@
     color: var(--wa-color-text-quiet);
   }
 
-  // ⚠️ The modifier is on the LINE and not on the number, thus one rule colors the words and the
-  // ring together whatever their order.
+  // ⚠️ The modifier is on the line and not on the number, thus one rule colors the words and the
+  // ring together in each order.
   &__meta--over {
     color: var(--wa-color-danger-on-quiet);
     font-weight: var(--wa-font-weight-semibold);
@@ -566,9 +541,8 @@
 
   // ⚠️ The text keeps its line breaks and it wraps a long word. A post can hold a newline and a
   // link with no space in it.
-  // ⚠️ The <a> of a link in this text needs NO rule of its own. Web Awesome styles a bare anchor
-  // with the brand color and an underline, and a measurement in a browser gave the same color for
-  // the two. A rule here would only make the underline of the theme more solid.
+  // ⚠️ The <a> of a link in this text needs no rule of its own. Web Awesome already styles a
+  // bare anchor with the brand color and an underline.
   &__text {
     margin: 0;
     overflow-wrap: anywhere;
@@ -609,15 +583,10 @@
     }
   }
 
-  // ⚠️ **Each of these needs a rule of its own**, and the `hidden` attribute alone does nothing for
-  // them. `[hidden] { display: none }` of the browser is at the same specificity as a class, and
-  // our stylesheet comes after it. `&__group` sets a display above, thus `social#filterPreview`
-  // would mark a network as hidden and the owner would still see it. `.social__schedule` carries
-  // the same note.
-  // ⚠️ **Each of these needs a rule of its own.** `[hidden] { display: none }` of the browser is at
-  // the same specificity as a class and our stylesheet comes after it, and <wa-badge> gives its own
-  // host a display as well. Without them `social#previewCard` would mark an element as hidden and
-  // the owner would still see it.
+  // ⚠️ Each of these needs a rule of its own. The `[hidden]` rule of the browser has the
+  // specificity of a class, and our stylesheet comes after it. `&__group` sets a display, and
+  // <wa-badge> gives its own host a display. Without these rules, `social#filterPreview` and
+  // `social#previewCard` mark an element as hidden and the owner still sees it.
   &__group[hidden],
   &__empty[hidden],
   &__topic[hidden],

@@ -1,13 +1,13 @@
 module Admin
-  # The Social media page: the owner pastes a link, drafts one body, and the action adds one post job
-  # for each network that they ticked.
+  # The Social media page: the owner pastes a link, drafts one body, and the action adds one post
+  # job for each network that they ticked.
   #
   # ⚠️ There is one job for each network, and not one job for all of them. Thus a failure at one
   # service retries that service alone, and a network that already posted is never sent again.
   #
   # `SocialDraft` reads the form and makes the text of each network, `SocialDraftValidator` refuses
-  # a draft that cannot go out, and `SocialPreview` makes the JSON of the preview. ⚠️ **Each action
-  # gives them ONE draft**, thus the check, the preview, and the jobs all read the same text.
+  # a draft that cannot go out, and `SocialPreview` makes the JSON of the preview. ⚠️ Each action
+  # gives them one draft, thus the check, the preview, and the jobs all read the same text.
   class SocialController < BaseController
     # How much longer than its schedule a photo stays in Redis: the 24-hour retry window of the
     # job and an hour more. ⚠️ Without this a post that waits more than a day would find its
@@ -23,10 +23,6 @@ module Admin
     end
 
     # POST /social
-    #
-    # It checks the draft, then adds the jobs. ⚠️ It makes the record key **here** and gives it to
-    # each job. `Bluesky#post!` writes with `putRecord` at that key, thus a Sidekiq retry replaces
-    # the same post and does not add a second one.
     def create
       error = SocialDraftValidator.new(draft).error
 
@@ -40,17 +36,16 @@ module Admin
         return render :show, status: :unprocessable_content
       end
 
-      # ⚠️ One key for each POST, made ONE time and OUTSIDE the loop below. The three networks get
-      # a different TEXT now, because a mention reads differently at each one, and they must still
-      # share one key for each post: Bluesky writes at that record key, Mastodon sends it as its
-      # Idempotency-Key, and Threads keeps its media container below it. Each attempt of each job
-      # carries the key of its own post, and that is what makes a retry safe.
+      # ⚠️ One key for each post, made one time and outside the loop below. Each network gets its
+      # own text, and all three must share the key of a post: Bluesky writes at that record key,
+      # Mastodon sends it as its Idempotency-Key, and Threads keeps its media container below it.
+      # Thus a Sidekiq retry replaces the same post and does not add a second one.
       keys = draft.posts.map { Bluesky.new_tid }
       at = draft.scheduled_at
       keep_photos(at)
 
-      # ⚠️ Only the FIRST post of each network is scheduled. That job adds the job of the post below
-      # it when it succeeds, thus the rest of a thread goes out with it and needs no time of its own.
+      # ⚠️ Only the first post of each network is scheduled. That job adds the job of the post
+      # below it when it succeeds, thus the rest of a thread needs no time of its own.
       draft.selected_networks.each do |network|
         payload = draft.payload(network, keys)
         job = SocialDraft::NETWORKS.fetch(network)[:job]
@@ -91,14 +86,12 @@ module Admin
     #
     # Proxies the picture of a card.
     #
-    # ⚠️ **The browser cannot load the og:image directly**: the CSP of the admin has
-    # `img-src :self`. Thus this action reads it and sends it from this host, exactly as the Course
-    # maps page does for a Mapbox render.
+    # ⚠️ The browser cannot load the og:image directly, because the CSP of the admin has
+    # `img-src :self`. Thus this action reads it and sends it from this host.
     #
-    # ⚠️ The parameter is the URL of the **page**, and not of the picture. Thus a caller cannot name
+    # ⚠️ The parameter is the URL of the page, and not of the picture. Thus a caller cannot name
     # any URL for this app to get: the picture is always the one that the og: tags of that page
-    # name. `Bluesky#card_image` then gives the **same bytes that go up as the blob**, thus the
-    # preview shows what the card will hold and not the original file.
+    # name. `Bluesky#card_image` gives the same bytes that go up as the blob.
     def preview_image
       url = params[:url].to_s.strip
       return head :unprocessable_content unless OpenGraph.http_url?(url)
@@ -114,13 +107,11 @@ module Admin
 
     private
 
-    # The draft of this request. ⚠️ It is ONE object for the request: refer to the ⚠️ at the top.
-    # @return [SocialDraft]
+    # The draft of this request. ⚠️ It is one object for the request: refer to the ⚠️ at the top.
     def draft
       @draft ||= SocialDraft.new(params, networks: social_networks)
     end
 
-    # @return [SocialPreview]
     def social_preview
       @social_preview ||= SocialPreview.new(
         draft: draft,
@@ -148,13 +139,11 @@ module Admin
     # Each `*_status` method gives `[connected, account, notice]`: whether the row can take a post,
     # the name of the account, and the reason for a row that cannot. A nil notice gives the default
     # "Not connected." of the view.
-    # @return [Array]
     def bluesky_status
       service = StandardSite.new
       [ service.connected?, ("@#{service.handle}" if service.handle.present?), nil ]
     end
 
-    # @return [Array]
     def mastodon_status
       service = Mastodon.new
       [ service.connected?, service.handle, nil ]
@@ -162,14 +151,12 @@ module Admin
 
     # ⚠️ A Threads account with an expired token is connected and cannot post: `usable?` is the
     # check, and not `connected?`. Without that the job would raise for 24 hours.
-    # @return [Array]
     def threads_status
       service = Threads.new
       notice = t("admin.social.status.threads_expired") if service.expired?
       [ service.usable?, ("@#{service.username}" if service.username.present?), notice ]
     end
 
-    # @return [SocialPresenter]
     # ⚠️ `alt_text:` is one env read, and no HTTP request, for the reason that #social_networks
     # gives.
     def presenter(**overrides)
@@ -178,7 +165,6 @@ module Admin
 
     # Gives each photo of the draft a TTL that outlasts the post and its retries.
     # @param at [ActiveSupport::TimeWithZone, nil] The moment of the post, or nil for now.
-    # @return [void]
     def keep_photos(at)
       ids = draft.photo_ids
       return if ids.empty?
@@ -188,7 +174,6 @@ module Admin
     end
 
     # @param at [ActiveSupport::TimeWithZone, nil] The moment, or nil to post now.
-    # @return [String]
     def queued_notice(at)
       names = draft.names_of(draft.selected_networks)
       return t("admin.social.flash.scheduled", networks: names, at: format_schedule(at)) if at
@@ -196,10 +181,8 @@ module Admin
       t("admin.social.flash.sent", networks: names)
     end
 
-    # The moment in the words of the owner, in the zone that they picked it in. To answer in the
-    # zone of the server would read as the wrong time.
-    # @param at [ActiveSupport::TimeWithZone]
-    # @return [String]
+    # The moment in the zone that the owner picked it in. The zone of the server would read as the
+    # wrong time.
     def format_schedule(at)
       Time.use_zone(draft.schedule_zone) { at.in_time_zone.strftime("%B %-e at %-I:%M %p %Z") }
     end

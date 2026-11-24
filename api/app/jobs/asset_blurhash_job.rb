@@ -2,8 +2,8 @@
 # can do it more than one time, because BlurhashPlaceholder does no work for an asset that already
 # has an entry.
 #
-# ⚠️ This is separate from AssetSyncJob, on purpose. A placeholder is decoration and the R2 mirror
-# is load-bearing. A failure here must never stop the mirror.
+# ⚠️ This is separate from AssetSyncJob, on purpose. A placeholder is decoration, and each image
+# on the site needs the R2 mirror. A failure here must never stop the mirror.
 class AssetBlurhashJob < ApplicationJob
   # @param asset_id [String] The sys.id of the Contentful asset.
   def perform(asset_id)

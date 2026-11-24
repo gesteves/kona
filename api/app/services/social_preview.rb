@@ -1,16 +1,14 @@
 require "uri"
 
 # The draft of the Social media page as each connected network will receive it, for the preview
-# dialog of the page, and the website card of one link.
+# dialog of the page, and the website card of one link. It writes nothing and it adds no job.
 #
-# ⚠️ **It reads the same `SocialDraft` as the action that posts.** Thus the preview cannot show a
-# text that the post does not send, and a change to the substitution reaches both. It writes
-# nothing and it adds no job.
+# ⚠️ It reads the same `SocialDraft` as the action that posts. Thus the preview cannot show a
+# text that the post does not send.
 #
-# The caller gives each path as a callable, and this class does not make one. Thus it uses no
-# route helper.
+# The caller gives each path as a callable, thus this class uses no route helper.
 class SocialPreview
-  # The network whose preview shows the LINK below the words.
+  # The network whose preview shows the link below the words.
   #
   # ⚠️ Bluesky is absent because the panel draws its card, and Mastodon is absent because
   # `Mastodon.compose` puts the link in the text, thus it is already a segment there. Threads
@@ -18,7 +16,6 @@ class SocialPreview
   # address itself.
   LINK_SHOWN = "threads".freeze
 
-  # @param draft [SocialDraft]
   # @param photo_path [#call] Gives the path of a stored photo from its id.
   # @param image_path [#call] Gives the path of the proxy of a card picture from the URL of the
   #   page.
@@ -30,12 +27,11 @@ class SocialPreview
 
   # Each network that can take the draft, with its posts.
   #
-  # ⚠️ A draft with a Markdown link shows BLUESKY alone, and a draft with photos shows only the
-  # networks that take that many. To render another network would show a text that this app
-  # refuses to post. The composer turns the checkboxes off by the same rules, thus the page and
-  # the dialog agree.
+  # ⚠️ A draft with a Markdown link shows Bluesky alone, and a draft with photos shows only the
+  # networks that take that many. Another network would show a text that this app refuses to
+  # post. The composer turns the checkboxes off by the same rules.
   #
-  # ⚠️ It groups by NETWORK and not by post, thus the panel reads as the thread reads: each
+  # ⚠️ It groups by network and not by post, thus the panel reads as the thread reads: each
   # network in turn, and its posts in the order that they go out.
   # @return [Array<Hash>] `[{ key:, name:, posts: [...] }, …]`
   def networks
@@ -49,16 +45,12 @@ class SocialPreview
     end
   end
 
-  # One website card, as JSON.
-  #
-  # ⚠️ **The card below a link field and the card in the preview panel read this same method**,
-  # thus the two cannot describe one page differently.
+  # One website card, as JSON. ⚠️ The card below a link field and the card in the preview panel
+  # both read this method, thus the two cannot describe one page differently.
   #
   # ⚠️ It is memoized by URL: a thread that names one link in two posts reads that page one time.
   # `OpenGraph#fetch` also caches for 15 minutes, thus a preview warms the cache that the post job
   # reads a moment later.
-  # @param url [String]
-  # @return [Hash]
   def card_json(url)
     @card_json ||= {}
     @card_json[url] ||= begin
@@ -72,7 +64,7 @@ class SocialPreview
         # `Admin::SocialController#preview_image`.
         image_path: (@image_path.call(url) if card.image_url.present?),
         standard_site: card.document_uri.present?,
-        # ⚠️ False means that Bluesky renders NO card and the link goes in the words. The browser
+        # ⚠️ False means that Bluesky renders no card and the link goes in the words. The browser
         # reads this to add the link to its count.
         embeddable: card.embeddable?
       }
@@ -83,8 +75,6 @@ class SocialPreview
 
   # One post of one network.
   # @param network [String] A network key.
-  # @param post [Hash]
-  # @return [Hash]
   def post_json(network, post)
     limit = @draft.limit_of(network)
     length = @draft.length_for(network, post)
@@ -98,10 +88,9 @@ class SocialPreview
 
   # The text in pieces, so that the dialog can render each link as a link.
   #
-  # ⚠️ **A `url` is always http or https**, because `MarkdownLinks::URL_PATTERN` and
+  # ⚠️ A `url` is always http or https, because `MarkdownLinks::URL_PATTERN` and
   # `Bluesky::URL_PATTERN` both start with that scheme. Thus the browser can write one into an
   # `href` with no check of its own, and no draft can make a `javascript:` link in the admin.
-  # @param text [String]
   # @param links [Array<MarkdownLinks::Link>] In order, and with no overlap.
   # @return [Array<Hash>] `[{ text: }, { text:, url: }, …]`, in order and with no gap.
   def segments(text, links)
@@ -118,7 +107,7 @@ class SocialPreview
     pieces
   end
 
-  # ⚠️ It is the topic ITSELF and not a sentence about it: the panel renders it as a badge above
+  # ⚠️ It is the topic itself and not a sentence about it: the panel renders it as a badge above
   # the words, which is where the Threads app shows it. Each post carries it, exactly as
   # `SocialDraft#payload` sends it.
   # @return [String, nil]
@@ -128,7 +117,7 @@ class SocialPreview
     @draft.topic
   end
 
-  # ⚠️ It is NOT part of the text and it uses none of the characters of that network: Threads
+  # ⚠️ It is not part of the text and it uses none of the characters of that network: Threads
   # makes an attachment of it. The panel shows it below the words, because a post with a link
   # that nothing shows reads as a post with no link.
   # @return [String, nil]
@@ -140,7 +129,7 @@ class SocialPreview
 
   # The website card that Bluesky will render for the link of a post.
   #
-  # ⚠️ **Bluesky alone**, because this app BUILDS that card: `Bluesky#build_card` makes an
+  # ⚠️ Bluesky alone, because this app makes that card: `Bluesky#build_card` makes an
   # `app.bsky.embed.external` from these same og: tags. Threads gets a `link_attachment` and Meta
   # renders a preview of its own, thus this app has nothing to show for it.
   # @return [Hash, nil]
@@ -162,7 +151,6 @@ class SocialPreview
     post[:photos].map { |photo| { path: @photo_path.call(photo[:id]), alt: photo[:alt] } }
   end
 
-  # @param url [String, nil]
   # @return [String, nil] The host of a URL, for the line below the title of the card.
   def host_of(url)
     URI.parse(url.to_s).host

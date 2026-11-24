@@ -33,10 +33,9 @@ class ThreadsPostJob < SocialPostJob
                                topic: post["topic"], photos: photos)
     Rails.logger.info("ThreadsPostJob: posted #{index + 1}/#{posts.length} as #{posted}")
 
-    # ⚠️ It adds the next post at once. A delay of 30 seconds went in here for a `500` on a reply
-    # container, on the reasoning that Meta was not ready for the parent. **That was wrong**: the
-    # delay changed nothing, and the token in the query string was the difference. Do not add a
-    # wait here again without evidence for it.
+    # ⚠️ It adds the next post at once. A `500` on a reply container does not mean that Meta needs
+    # time for the parent, and a delay here changes nothing: refer to `Threads#make_container`. Do
+    # not add a wait here without evidence for it.
     enqueue_next(posts, index + 1, posted)
   end
 end

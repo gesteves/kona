@@ -1,8 +1,7 @@
 # Controls the race-day weather of a featured upcoming event: the geocode, then the forecast for a
 # race in the next 10 days, then the AQI for a race in the next 4 days, then the SF Bay conditions.
 # Each upstream call is separate, thus one failure gives a card with some data and does not remove
-# the widget. It puts the result in an EventWeatherPresenter. This code came from the
-# WeatherController#event of the past, through EventsController#event_weather_for.
+# the widget. It puts the result in an EventWeatherPresenter.
 class RaceDayWeather < ApplicationService
   include LocationHelper # in_san_francisco?, which gates the bay-conditions fetch
 
@@ -12,15 +11,13 @@ class RaceDayWeather < ApplicationService
     @event = event
   end
 
-  # @param event [OpenStruct] A Contentful event object.
-  # @return [EventWeatherPresenter, nil]
+  # @return [EventWeatherPresenter, nil] Refer to #presenter.
   def self.for(event)
     new(event).presenter
   end
 
-  # Makes the race-day weather presenter of the event, or nil when the coordinates are not
-  # available.
-  # @return [EventWeatherPresenter, nil]
+  # @return [EventWeatherPresenter, nil] The race-day weather of the event, or nil when the
+  #   coordinates or the date are not available.
   def presenter
     lat = @event&.coordinates&.lat
     lon = @event&.coordinates&.lon

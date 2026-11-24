@@ -1,9 +1,8 @@
 module Admin
   # Connects a Mastodon account with the OAuth2 authorization code flow.
   #
-  # Whoop is different: its client comes from a dashboard and from env vars, thus its flow starts
-  # at /whoop/auth with no form. Here the owner must name an instance first, because the app
-  # registers itself on that instance. Thus all four actions are here and not on
+  # The owner must name an instance first, because the app registers itself on that instance.
+  # Thus this controller has a form, and all four actions are here and not on
   # ConnectedAppsController.
   #
   # ⚠️ The callback is an admin page, thus the owner session controls it, and the one-time state
@@ -61,14 +60,12 @@ module Admin
     private
 
     # Renders the form again with the cause. The owner keeps what they typed.
-    # @param message [String]
     def connection_failed(message)
       flash.now[:alert] = message
       render :show, status: :unprocessable_content
     end
 
     # Sends the owner back to the form with the cause. The callback has no form of its own.
-    # @param message [String]
     def connection_denied(message)
       redirect_to mastodon_connection_path, status: :see_other, alert: message
     end

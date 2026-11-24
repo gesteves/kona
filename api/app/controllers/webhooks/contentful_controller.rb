@@ -2,11 +2,11 @@ module Webhooks
   # Takes the Contentful webhooks and syncs each copy of the content: the standard.site PDS
   # records, the R2 image mirror, and the static site.
   # The request only adds jobs to the queue and returns 204. Thus slow work cannot reach the 30s
-  # webhook timeout of Contentful, and Sidekiq does a failed job again and does not remove it.
-  # Contentful does not send a delivery again, thus the two backfill rake tasks are the
-  # reconciliation net.
+  # webhook timeout of Contentful, and Sidekiq does a failed job again.
+  # Contentful does not send a delivery again, thus the backfill rake tasks are the
+  # reconciliation path.
   #
-  # The X-Contentful-Topic header, with the content type and the id in the payload, decide the
+  # The X-Contentful-Topic header, with the content type and the id in the payload, decides the
   # route. The code never uses the body as the content of the entry: each job gets that from the
   # CDA.
   class ContentfulController < BaseController
@@ -49,8 +49,7 @@ module Webhooks
       # ⚠️ This is for a publish only. An unpublish and a delete do not remove the object, on
       # purpose: the web build reads Contentful with a preview token, thus a page from the build
       # still points at an unpublished asset, and a delete would break a live image. Each key is
-      # immutable, thus there is nothing to invalidate. An object that nothing uses is cheap, and a
-      # person removes it.
+      # immutable, thus there is nothing to invalidate.
       if entity == ASSET_ENTITY && action == "publish" && entry_id.present?
         AssetSyncJob.perform_async(entry_id)
         # The blurhash placeholder of the card. It is a separate job, thus a failure here cannot
@@ -58,11 +57,10 @@ module Webhooks
         AssetBlurhashJob.perform_async(entry_id)
       end
 
-      # Builds the static site again at each change to the published content. Only these three
-      # actions change the site from the build: an automatic save of a draft must not start a
-      # deploy.
+      # Makes the static site again at each change to the published content. Only these three
+      # actions change the site, and an automatic save of a draft must not start a deploy.
       #
-      # ⚠️ An ASSET event joins a 60-second window, and an entry event does not. The media uploader
+      # ⚠️ An asset event joins a 60-second window, and an entry event does not. The media uploader
       # of the admin publishes one asset for each image, and a bulk publish in Contentful does the
       # same. Each one would otherwise start its own workflow run. An entry publish is the thing
       # that the owner waits for, thus it still builds at once.
@@ -74,10 +72,9 @@ module Webhooks
       head :no_content
     rescue StandardError => e
       # The code answers with a success, because Contentful does not send the webhook again in
-      # either condition. The backfill tasks correct a temporary failure to add a job to the queue.
-      # ⚠️ The code reports this and does not only write a log line: nothing here does the work
-      # again. Thus a failure with no report means no new build and no PDS sync, and
-      # a log line is the only record.
+      # either condition. The backfill tasks correct a failure to add a job to the queue.
+      # ⚠️ The code reports this and does not only write a log line, because nothing here does the
+      # work again. With no report, a failure means no new build and no PDS sync.
       Rails.logger.error("Contentful webhook error: #{e.message}")
       ErrorReporter.report_upstream(e, service: "ContentfulWebhook", context: "contentType=#{content_type} entry=#{entry_id} action=#{action}")
       head :no_content

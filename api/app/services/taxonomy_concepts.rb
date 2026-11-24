@@ -35,15 +35,14 @@ class TaxonomyConcepts < ApplicationService
   # endless loop, because the code stops at an id that it saw before.
   #
   # ⚠️ The name is not `ancestors`. That name is a method of Module, and Rails and RSpec both call
-  # it on a class. To override it broke each of those callers.
-  # @param id [String] The concept id.
+  # it on a class. An override breaks each of those callers.
   # @param tree [Hash] The output of #tree.
-  # @return [Array<String>] The ancestor ids.
+  # @return [Array<String>]
   def self.ancestor_ids(id, tree)
     seen = []
-    # ⚠️ The copy is necessary. Array() gives the same object back for an array, thus shift and
-    # concat below changed the tree of the caller. The first article then removed the ancestors
-    # for each article after it.
+    # ⚠️ The copy is necessary. Array() gives the same object back for an array. Without the copy,
+    # the shift and the concat below change the tree of the caller, and each subsequent article
+    # loses its ancestors.
     queue = Array(tree.dig(id.to_s, :broader)).dup
 
     while (current = queue.shift)

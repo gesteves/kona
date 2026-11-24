@@ -6,14 +6,13 @@ import { csrfHeader } from "./csrf";
  * The tiles of the pictures that a page uploads, one request for each picture. The Social media
  * composer and the media uploader both use it.
  *
- * ⚠️ **Each picture uploads at the moment the owner picks it**, and the form then carries the id
- * and not the bytes. A file input cannot be refilled by the server, thus a page that renders again
- * after a refusal would lose every picture.
+ * ⚠️ Each picture uploads at the moment the owner picks it, and the form then carries the id and
+ * not the bytes. The server cannot fill a file input again, thus a page that renders again after
+ * a refusal would lose each picture.
  *
- * Each page has its own markup, thus the hooks of a tile are `data-<name>-*` attributes and the
- * caller gives the name: `photo` for the composer and `file` for the uploader. A tile has
- * `-id`, `-image`, `-spinner`, and `-alt`, an optional `-generate` control, and its own
- * `data-<name>-alt-url`.
+ * The hooks of a tile are `data-<name>-*` attributes, and the caller gives the name: `photo` for
+ * the composer and `file` for the uploader. A tile has `-id`, `-image`, `-spinner`, and `-alt`,
+ * an optional `-generate` control, and its own `data-<name>-alt-url`.
  *
  * The words come from the table of the caller: `upload_failed`, `upload_unreachable`,
  * `alt_failed`, and `alt_unreachable`.
@@ -49,10 +48,7 @@ export class PictureTiles {
     return this.uploads.size > 0;
   }
 
-  /**
-   * @param {string} part The last part of the name of a hook, for example "image".
-   * @returns {string} The selector of that hook.
-   */
+  /** @returns {string} The selector of one hook of a tile, for example of "image". */
   hook(part) {
     return `[data-${this.name}-${part}]`;
   }
@@ -60,9 +56,8 @@ export class PictureTiles {
   /**
    * Stops each request that is out, and frees each object URL.
    *
-   * ⚠️ A Turbo visit disconnects the controller, and an answer that lands after it would write
-   * into a page that is gone. The browser keeps the bytes of an object URL until the page revokes
-   * it.
+   * ⚠️ A Turbo visit disconnects the controller, and a late answer would write into a page that
+   * is gone. The browser keeps the bytes of an object URL until the page revokes it.
    */
   stop() {
     this.uploads.forEach((aborter) => aborter.abort());
@@ -75,13 +70,11 @@ export class PictureTiles {
   /**
    * Adds a tile for one file and uploads it.
    *
-   * ⚠️ The tile is on the page from the first moment, with the file itself as its picture: the CSP
-   * of the admin permits `blob:` in `img-src` for this. Its id stays empty until the server
-   * answers, and the caller keeps its submit off while a tile is in that state.
+   * ⚠️ The tile is on the page at once, with the file itself as its picture: the CSP of the admin
+   * permits `blob:` in `img-src` for this. Its id stays empty until the server answers, and the
+   * caller keeps its submit off while a tile is in that state.
    *
-   * ⚠️ A refusal takes the tile away and says why in a toast. The server names the reason, and the
-   * toast shows those words.
-   * @param {File} file
+   * ⚠️ A refusal removes the tile, and a toast shows the reason that the server names.
    */
   async upload(file) {
     const tile = this.build(file);
@@ -125,10 +118,8 @@ export class PictureTiles {
   }
 
   /**
-   * Makes the tile of a file that is still going up, from the template. It shows the picture from
-   * the browser, thus the tile is complete before the server answers.
-   * @param {File} file
-   * @returns {HTMLElement}
+   * Makes the tile of a file that is still out, from the template. It shows the picture from the
+   * browser, thus the tile is complete before the server answers.
    */
   build(file) {
     const tile = this.template().content.cloneNode(true).querySelector(this.selector);
@@ -145,9 +136,8 @@ export class PictureTiles {
   /**
    * Writes the answer of the server into the tile.
    *
-   * ⚠️ The picture changes to the path of our own store only after that copy has loaded, thus the
-   * tile never shows an empty box between the two. The object URL goes at that moment.
-   * @param {HTMLElement} tile
+   * ⚠️ The picture changes to the path of our own store only after that copy loads, thus the tile
+   * never shows an empty box. The code revokes the object URL at that moment.
    * @param {object} answer `{ id, path, alt_path, caption }`
    */
   fill(tile, answer) {
@@ -185,7 +175,6 @@ export class PictureTiles {
    *
    * ⚠️ It sends no DELETE. The stored record has a TTL, and a request from the browser is not
    * reliable, because a navigation cancels it.
-   * @param {HTMLElement} tile
    */
   drop(tile) {
     this.uploads.get(tile)?.abort();
@@ -209,10 +198,7 @@ export class PictureTiles {
     return unfinished.length;
   }
 
-  /**
-   * Gives the browser back the bytes of the picture of a tile.
-   * @param {HTMLElement} tile
-   */
+  /** Gives the browser back the bytes of the picture of a tile. */
   revokePreview(tile) {
     const image = tile.querySelector(this.hook("image"));
     if (!image?.dataset.objectUrl) return;
@@ -224,22 +210,17 @@ export class PictureTiles {
   /**
    * Asks Claude for the alt text of the picture of a tile, and writes the answer into its field.
    *
-   * ⚠️ **The button is `loading` AND `disabled` while the request is out.** The `loading`
-   * attribute draws the busy state and keeps the width of the button, and the docs do not say
-   * that it stops a click, thus `disabled` does. The check at the top stops a second request
-   * for the moment between a click and the render.
+   * ⚠️ The button is `loading` and `disabled` while the request is out. `loading` draws the busy
+   * state, and the docs do not say that it stops a click, thus `disabled` does. The
+   * `button.loading` check stops a second request before the render.
    *
-   * ⚠️ A click REPLACES the field, because the owner asked for new words. The automatic request
-   * writes into an EMPTY field only: the owner can type while the upload or the request is out,
-   * and those words win. The caption of the file also fills the field first, thus a file with a
-   * caption gets no automatic request. A value that code writes fires no event, thus this
-   * dispatches `input` on the field, exactly as a keystroke would. A refusal leaves the field as
-   * it was and says why in a toast.
+   * ⚠️ A click replaces the field, because the owner asked for new words. The automatic request
+   * writes into an empty field only: the words of the owner and the caption of the file win. A
+   * value that code writes fires no event, thus this dispatches `input` on the field. A refusal
+   * leaves the field as it was and says why in a toast.
    *
    * ⚠️ It runs only when the tile has the Generate control. The server renders that control only
    * with a Claude key, thus with no key the upload asks for nothing.
-   * @param {HTMLElement} tile
-   * @param {object} [options]
    * @param {boolean} [options.auto] True for the request that the upload starts.
    */
   async requestAlt(tile, { auto = false } = {}) {

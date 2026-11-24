@@ -16,7 +16,6 @@ class TrainerRoad < ApplicationService
     @calendar_url = calendar_url
   end
 
-  # @return [Boolean] True if a feed is connected.
   def connected? = @calendar_url.present?
 
   # Checks the feed of this instance and stores its URL.
@@ -34,7 +33,6 @@ class TrainerRoad < ApplicationService
   end
 
   # Removes the stored feed.
-  # @return [void]
   def disconnect! = TrainerRoadCredentials.clear
 
   # The workouts of today, for the rest-day check of the widgets. The cache holds them for 5
@@ -66,7 +64,6 @@ class TrainerRoad < ApplicationService
   #
   # ⚠️ A race leg does NOT count here. The planned line of an activity description is for a
   # structured workout alone.
-  # @param date [Date] The calendar date.
   # @param timezone [String] The IANA timezone for a timed event.
   # @return [Array<Hash>] Hashes with :name, :sport, :description, and :duration_minutes.
   def planned_workouts(date, timezone: @timezone)
@@ -84,7 +81,6 @@ class TrainerRoad < ApplicationService
   # ⚠️ A race is an all-day event with no duration that has at least one leg on that date: an
   # all-day event "H:MM - <same name>". The leg is what separates a race from an annotation, for
   # example "Rest Week", which is also an all-day event with no duration.
-  # @param date [Date] The calendar date.
   # @param timezone [String] The IANA timezone for a timed event.
   # @return [String, nil] The name, or nil with no race, or with more than one race on that date.
   def race_name(date, timezone: @timezone)
@@ -110,10 +106,7 @@ class TrainerRoad < ApplicationService
   # duration at the start, and an entry with a duration and the same name on that day is a leg of
   # it. The widgets count a leg, and the activity description does not.
   # @param events [Array<Icalendar::Event>]
-  # @param date [Date]
-  # @param timezone [String]
   # @param races [Boolean] True to count a race leg as a workout.
-  # @return [Array<Hash>]
   def scheduled_workouts(events, date, timezone, races:)
     events_on_date = events.select { |event| event_on_date?(event, date, timezone) }
     race_names = races ? Set.new : race_names_of(events_on_date)
@@ -131,10 +124,9 @@ class TrainerRoad < ApplicationService
   end
 
   # ⚠️ This is a digest, and not the URL. A TrainerRoad iCal URL ends with a GUID that *is* the
-  # credential, and `parameterize` keeps it. That put the full token in key names that
-  # `redis-cli KEYS`, the Redis stats of the Sidekiq UI, and each slowlog or error report with a
-  # key can show. A digest also changes the cache when the URL changes.
-  # @return [String] An 8-character digest of the calendar URL.
+  # credential, and a key name shows in `redis-cli KEYS`, in the Redis stats of the Sidekiq UI,
+  # and in each slowlog or error report. A digest also changes the cache when the URL changes.
+  # @return [String] A 16-character digest of the calendar URL.
   def calendar_version
     cache_version(@calendar_url)
   end
@@ -207,8 +199,7 @@ class TrainerRoad < ApplicationService
     end
   end
 
-  # @return [Hash] The :name, the :sport, the :description, and the :duration_minutes of the
-  #   planned workout.
+  # @return [Hash] One planned workout, in the shape of #planned_workouts.
   def normalize_planned_workout(event)
     summary = event.summary.to_s.strip
 
@@ -242,7 +233,6 @@ class TrainerRoad < ApplicationService
   DURATION_PREFIX = /\A(\d{1,2}):(\d{2})\s*[-–—]\s*(.+)\z/m
 
   # Splits a summary into its duration and its name.
-  # @param summary [String, nil]
   # @return [Array(String, String), nil] The "H:MM" duration and the name, or nil for a summary
   #   with no duration at its start.
   def split_duration_prefix(summary)
@@ -269,16 +259,16 @@ class TrainerRoad < ApplicationService
   end
 
   # Removes the TrainerRoad "Description:" label from an event description.
-  # @return [String, nil]
   def clean_description(description)
     description&.sub(/\s*Description:/i, "")&.strip.presence
   end
 
-  # Finds the sport of a workout, in this order: "Endless Pool" means swimming, then the code
-  # corrects the full name, then it looks for keywords, then a description with "TSS…" means
-  # cycling. The default is cycling, because TrainerRoad is a cycling platform.
+  # The words that name a sport in the name of a workout.
   SPORT_KEYWORDS = %w[run running swim swimming ride cycling bike hike hiking ski skiing row rowing].freeze
 
+  # Finds the sport of a workout, in this order: "Endless Pool" means swimming, then
+  # ActivityMatcher reads the full name, then the code looks for a keyword. The default is
+  # cycling, because TrainerRoad is a cycling platform.
   def detect_sport(name, description)
     return "Swimming" if name.match?(/\bendless pool\b/i)
 

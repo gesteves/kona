@@ -1,7 +1,7 @@
 require "securerandom"
 
-# The one-time `state` of an OAuth round trip. The Whoop, Mastodon, Threads, and Strava flows all use
-# it.
+# The one-time `state` of an OAuth round trip. The Whoop, Mastodon, Threads, and Strava flows
+# all use it.
 #
 # ⚠️ The state is in the session, and not in Redis. Thus only the browser that started the flow
 # can complete it, and a second flow in another browser cannot cancel the first.
@@ -16,15 +16,12 @@ module OauthState
   private
 
   # Makes a new state for a provider and keeps it in the session.
-  # @param provider [Symbol, String] The name of the provider.
-  # @return [String]
   def issue_oauth_state(provider)
     state = SecureRandom.hex(16)
     session[oauth_state_key(provider)] = { "value" => state, "expires_at" => STATE_TTL.from_now.to_i }
     state
   end
 
-  # @param provider [Symbol, String] The name of the provider.
   # @param state [String, nil] The value that came back from the provider.
   # @return [Boolean] True when the value is the one in the session and it is not too old.
   def valid_oauth_state?(provider, state)
@@ -38,8 +35,6 @@ module OauthState
   end
 
   # Removes the state after a successful exchange. A replay then cannot connect again.
-  # @param provider [Symbol, String] The name of the provider.
-  # @return [void]
   def consume_oauth_state(provider)
     session.delete(oauth_state_key(provider))
   end

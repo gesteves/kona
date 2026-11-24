@@ -71,8 +71,7 @@ class Articles < ApplicationService
     return @list if defined?(@list)
 
     items = rescue_with([], context: "Error fetching articles") do
-      # A digest of the query goes at the end. Thus a change to its fields makes a new cache key,
-      # and no person needs to remember to increase a version number.
+      # A digest of the query goes at the end, thus a change to its fields makes a new cache key.
       # ⚠️ The cached value also holds what ArticleAttributes.derive makes from each item, thus
       # that class is part of the digest through its version.
       cached_json("contentful:articles:list:#{cache_version(LIST_QUERY, ArticleAttributes::VERSION)}", expires_in: 5.minutes) do
@@ -98,7 +97,6 @@ class Articles < ApplicationService
   # @see #corpus
   def read_corpus
     items = rescue_with([], context: "Error fetching the article corpus") do
-      # A digest of the query goes at the end, thus a change to its fields makes a new cache key.
       cached_json("contentful:articles:corpus:#{cache_version(CORPUS_QUERY)}", expires_in: 5.minutes) do
         fetch_corpus.map { |item| underscore_keys(item) }
       end
@@ -112,8 +110,7 @@ class Articles < ApplicationService
 
   private
 
-  # Reads the full articleCollection, one page at a time. After a page fails, it keeps the pages
-  # that it already got.
+  # Reads the full articleCollection, one page at a time. A page that fails gives an empty list.
   def fetch_all
     # This is strict. Without that, a page that fails would give an incomplete set of articles, and
     # `list` would keep that set in the cache for five minutes. The related list and the trending

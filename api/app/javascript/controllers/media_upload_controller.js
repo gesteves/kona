@@ -11,7 +11,7 @@ const FILE = "[data-media-upload-target='file']";
  * each one, and collects the words that go with it. `PictureTiles` does the upload and the alt
  * text of each tile.
  *
- * ⚠️ The tiles have NO order. Thus there is no drag code here, and the Social media composer has
+ * ⚠️ The tiles have no order. Thus there is no drag code here, and the Social media composer has
  * it.
  */
 export default class extends Controller {
@@ -89,18 +89,13 @@ export default class extends Controller {
   /**
    * Fills the title of a tile with the name of the file and no extension, which is what the
    * server answers as well. The owner can then change it while the upload is still out.
-   * @param {HTMLElement} tile
-   * @param {File} file
    */
   nameTile(tile, file) {
     const title = tile.querySelector("[data-file-title]");
     if (title) title.value = file.name.replace(/\.[^.]+$/, "");
   }
 
-  /**
-   * Takes one file off the page. It asks nothing: a file is quick to add again.
-   * @param {Event} event
-   */
+  /** Takes one file off the page. It asks nothing: a file is quick to add again. */
   removeFile(event) {
     event.preventDefault();
     const tile = event.target.closest(FILE);
@@ -111,10 +106,7 @@ export default class extends Controller {
     this.fileInputTarget.focus();
   }
 
-  /**
-   * Asks Claude again for the alt text of a tile, at a click of its Generate control.
-   * @param {Event} event
-   */
+  /** Asks Claude again for the alt text of a tile, at a click of its Generate control. */
   generateAlt(event) {
     event.preventDefault();
     const tile = event.currentTarget.closest(FILE);

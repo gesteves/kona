@@ -9,10 +9,8 @@ require "time"
 # makes no network call.
 #
 # ⚠️ It uses Nokogiri::XML::Reader on a stream and does not make a DOM. A true Garmin export is
-# several megabytes and has approximately 9,000 track points. This parse occurs in a Puma thread on
-# a 512MB VM, and an OOM kill already stopped that VM one time because the code held full files in
-# memory (refer to AssetMirror#download). The reader keeps the peak memory low and the request in
-# its 20-second budget.
+# several megabytes, with approximately 9,000 track points, and this parse occurs in a Puma thread
+# on a 512MB VM. The reader keeps the peak memory low and the request in its 20-second budget.
 class GpxTrack
   # The code rounds each coordinate first. Garmin writes 26 significant digits for each value
   # ("43.52206997573375701904296875"). That makes the Redis payload and the Mapbox upload three
@@ -65,7 +63,6 @@ class GpxTrack
 
   # The title of the activity, with its year at the start and its sport at the end. It does not add
   # the sport if the name already names one.
-  # @return [String]
   def title
     year = @activity_start&.strftime("%Y")
     # Use squish, not strip. A year in the middle of a name would leave two spaces.
@@ -76,7 +73,6 @@ class GpxTrack
   end
 
   # A tileset id for Mapbox, from the title: 32 characters maximum, with letters, digits, and `_`.
-  # @return [String]
   def id
     slug = title.parameterize.tr("-", "_").first(SLUG_LENGTH).gsub(/_+$/, "")
     "#{slug}_#{Digest::MD5.hexdigest(title).first(DIGEST_LENGTH)}"
@@ -98,7 +94,6 @@ class GpxTrack
   def end_coord = @coordinates.last
 
   # The icon for the sport of this track. It gives the first value of the start-marker setting.
-  # @return [String]
   def start_icon
     SPORT_ICONS.find { |pattern, _icon| @activity_type.match?(pattern) }&.last || "pitch"
   end

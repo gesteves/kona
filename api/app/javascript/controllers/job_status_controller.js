@@ -6,15 +6,14 @@ const INTERVAL = 5000;
 /**
  * Gets a list again while a background job still works on one of its rows.
  *
- * The Maps page and the media uploader both use it: Mapbox and Contentful each publish
+ * The Course maps page and the media uploader both use it: Mapbox and Contentful each publish
  * asynchronously, and the origin can send nothing to the page. Thus the page asks. It reads a
- * status-only endpoint and does not load the page again, and it renders again only when a status
- * changes. A publish takes one or two minutes, thus most reads find no change.
+ * status-only endpoint, and it renders again only when a status changes.
  *
  * A row carries `data-job-status-id` and `data-job-status-state`, and the endpoint answers
  * `{ id: state }`.
- * ⚠️ **The in-progress state is the word `processing`**, in this file and in each store that
- * feeds it. A store that uses another word polls for all time.
+ * ⚠️ The in-progress state is the word `processing`, in this file and in each store that feeds
+ * it. A store that uses another word polls for all time.
  */
 export default class extends Controller {
   static values = { url: String };
@@ -33,7 +32,7 @@ export default class extends Controller {
     this.aborter?.abort();
   }
 
-  /** Starts the timer for the next check, or stops if no upload is in progress. */
+  /** Starts the timer for the next check, or stops if no row is in progress. */
   poll() {
     this.stop();
     if (!this.element.isConnected || !this.pendingIds().length) return;
@@ -54,8 +53,7 @@ export default class extends Controller {
 
       const statuses = await response.json();
       if (this.changed(statuses)) {
-        // Replace the history entry and do not add one, thus these reads do not fill the
-        // history.
+        // It replaces the history entry, thus these reads do not fill the history.
         visit(window.location.href, { action: "replace" });
         return;
       }
@@ -66,7 +64,7 @@ export default class extends Controller {
     this.poll();
   }
 
-  /** @returns {string[]} The ids of the rows that the server last rendered in the in-progress state. */
+  /** @returns {string[]} The ids of the rows that the server rendered in the in-progress state. */
   pendingIds() {
     return this.rows()
       .filter((row) => row.dataset.jobStatusState === "processing")
@@ -74,9 +72,8 @@ export default class extends Controller {
   }
 
   /**
-   * Tells if a row that the server rendered in the in-progress state changed. This includes a row that
-   * a person deleted in another tab, which is then absent from the response.
-   * @returns {boolean}
+   * @returns {boolean} True if a row that the server rendered in the in-progress state changed.
+   *   This includes a row that a person deleted in another tab, which the response does not hold.
    */
   changed(statuses) {
     return this.rows().some((row) => {

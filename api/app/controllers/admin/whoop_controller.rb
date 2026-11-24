@@ -45,7 +45,6 @@ module Admin
     private
 
     # Sends the owner back to the Connected apps page with the cause.
-    # @param message [String]
     def connection_denied(message)
       redirect_to connected_apps_path, status: :see_other, alert: message
     end

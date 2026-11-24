@@ -1,8 +1,7 @@
 # A Bugsnag callback that removes the Redis read timeouts that Sidekiq raises from its own fetch
-# loop. Sidekiq already acts on those correctly: it reports one time, waits, and tries again. Thus no
-# job goes away. The only problem is the number of alerts: the flag belongs to each Processor and the
-# concurrency is 5, thus one short period of CPU competition on the worker VM makes five identical
-# reports that nobody can act on.
+# loop. Sidekiq waits and tries again, thus no job goes away. But each of the 5 Processors reports,
+# thus one short period of CPU competition on the worker VM makes five identical reports that
+# nobody can act on.
 #
 # ⚠️ This is narrow, on purpose. All three conditions are necessary. Never change this into "ignore
 # each RedisClient error":

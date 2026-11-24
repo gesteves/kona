@@ -54,10 +54,8 @@ Rails.application.configure do
   # Refuse a request with a false `Host` header or with an IP address in it. Those are DNS
   # rebinding attacks and Host-header attacks, and they are most of the scanner traffic that goes
   # directly to the origin. ALLOWED_HOSTS gives the list of permitted hosts, with a comma between
-  # them. Never write a hostname in the code. There is a check here, thus the app accepts each host
-  # until the variable has a value: the deploy is safe, and you then set the fly secret to make this
-  # operate. The /up health check is not in this rule, thus the checks of fly, which use the
-  # internal host, continue to pass.
+  # them. Never write a hostname in the code. With no value, the app accepts each host. The /up
+  # health check is not in this rule, because the checks of fly use the internal host.
   if ENV["ALLOWED_HOSTS"].present?
     config.hosts.concat(ENV["ALLOWED_HOSTS"].split(",").map(&:strip).reject(&:empty?))
     config.host_authorization = { exclude: ->(request) { request.path == "/up" } }

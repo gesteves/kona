@@ -9,7 +9,7 @@
 }
 
 .admin-card {
-  // This stops a long name with no space from a move of the badge off the card.
+  // A long name with no space would move the badge off the card.
   &__title {
     overflow-wrap: anywhere;
   }

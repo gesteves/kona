@@ -48,9 +48,6 @@ class Intervals < ApplicationService
 
   # Gets the raw activity list for a date range, and the range includes both dates. No cache
   # holds it, because the caller compares it with a workout that just ended.
-  # @param oldest [Date, String] The start of the range.
-  # @param newest [Date, String] The end of the range.
-  # @return [Array<Hash>]
   # @raise [ApplicationService::HttpError] If it fails, thus the job runs again.
   def activities!(oldest:, newest:)
     get_json!(
@@ -107,7 +104,6 @@ class Intervals < ApplicationService
   # Gets the GPX file that Intervals.icu makes for an activity. Intervals.icu refuses an activity
   # that came from Strava, and an activity with no GPS data.
   # ⚠️ It follows no redirect, because each hop would get the API key.
-  # @param activity_id [String] The Intervals.icu activity id.
   # @return [String, nil] The GPX document, or nil on a failure or for a file past GPX_MAX_BYTES.
   def activity_gpx(activity_id)
     download("#{INTERVALS_ICU_API_URL}/activity/#{activity_id}/gpx-file", max_bytes: GPX_MAX_BYTES, limit: 0, basic_auth: auth)&.dig(:body)
@@ -126,7 +122,6 @@ class Intervals < ApplicationService
 
   # Updates part of the wellness record of a date. Only the given fields change.
   # @param date [Date, String] The id of the record, as YYYY-MM-DD.
-  # @param fields [Hash] The fields to set.
   # @raise [ApplicationService::HttpError] If it fails. A 422 means that a custom field is absent.
   def update_wellness!(date, fields)
     put_json!(
@@ -138,7 +133,6 @@ class Intervals < ApplicationService
   end
 
   # Updates part of an activity. Only the given fields change.
-  # @param fields [Hash] The fields to set.
   # @raise [ApplicationService::HttpError] If it fails. A 422 means that a custom field is absent.
   def update_activity!(activity_id, fields)
     put_json!(
@@ -152,7 +146,6 @@ class Intervals < ApplicationService
   # Updates part of the sport settings of one activity type. Only the given fields change.
   # @param type [String] An activity type, for example "Ride". Intervals.icu finds the settings that
   #   include it.
-  # @param fields [Hash] The fields to set.
   # @raise [ApplicationService::HttpError] If it fails.
   def update_sport_settings!(type, fields)
     put_json!(
@@ -165,8 +158,7 @@ class Intervals < ApplicationService
 
   # The profile of the athlete, read new each time. The location sync reads it to decide if a
   # write is necessary, thus no cache must hold it.
-  # @return [Hash]
-  # @raise [ApplicationService::HttpError] on failure, so the sync job retries.
+  # @raise [ApplicationService::HttpError] If it fails, thus the sync job runs again.
   def athlete_profile
     get_json!("#{INTERVALS_ICU_API_URL}/athlete/#{@athlete_id}", basic_auth: auth)
   end
@@ -194,7 +186,6 @@ class Intervals < ApplicationService
   end
 
   # Replaces the weather-forecast locations of the athlete.
-  # @param forecasts [Array<Hash>] The locations to set.
   # @raise [ApplicationService::HttpError] If it fails.
   def update_weather_config(forecasts)
     put_json!(
@@ -233,8 +224,7 @@ class Intervals < ApplicationService
     end
   end
 
-  # @param activities [Array<Hash>] The activities for the summary.
-  # @return [Hash] Their swim_distance, bike_distance, run_distance, and total_activities.
+  # @return [Hash] The summary that #stats gives.
   def summarize_activities(activities)
     distances = Hash.new(0)
     total_activities = 0

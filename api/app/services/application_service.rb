@@ -27,23 +27,17 @@ class ApplicationService
 
   private
 
-  # A read-through JSON cache. In development it does not use the cache, thus you see a change
-  # and do not wait for a TTL.
-  #
-  # It uses the shared $redis, and not Rails.cache. The keyspace is older than this app and keeps
-  # key names that you can find with grep, and the behavior is different from Rails.cache.fetch.
+  # A read-through JSON cache. Development does not use the cache, thus a change shows with no
+  # wait for a TTL. It uses the shared $redis and not Rails.cache: grep finds each key name, and
+  # the behavior is different from Rails.cache.fetch.
   #
   # ⚠️ The cache holds a blank result only when you give `empty_expires_in`, and a caller of an
-  # upstream with a rate limit **must** give it. `parse_json` returns nil for each non-2xx. Thus
-  # with no negative TTL, a 429 puts nothing in the cache and each subsequent request asks again
-  # with no delay. That is, the one condition that causes a rate-limit failure is also the one
-  # that removes all the control. Keep the negative TTL short: it is a delay, not a cache.
-  # @param key [String] The Redis key.
+  # upstream with a rate limit must give it. `parse_json` returns nil for each non-2xx, thus
+  # without it each request after a 429 asks again with no delay. Keep that TTL short.
   # @param expires_in [ActiveSupport::Duration, Integer, nil] The TTL in seconds. Only a positive
-  #   TTL puts a value in the cache. Nothing stays in the cache for all time.
+  #   TTL puts a value in the cache.
   # @param empty_expires_in [ActiveSupport::Duration, Integer, nil] The TTL for a blank result.
   #   Nil, the default, does not put a blank result in the cache.
-  # @param symbolize [Boolean] True to parse with symbol keys.
   # @yieldreturn [Object] The new value, which must be JSON-serializable.
   # @return [Object, nil] Nil for a blank value in the cache, or the value from the block. Thus a
   #   caller that must know nil from [] has to correct the result.
@@ -68,17 +62,13 @@ class ApplicationService
     value
   end
 
-  # A short digest of the things that decide the *shape* of a cached value, which is usually the
-  # query that made it. Put it at the end of a cache key.
+  # A short digest of the things that decide the shape of a cached value, which is usually the
+  # query that made it. Put it at the end of a cache key. A suffix that a person increases by hand
+  # works only if each edit of a query also increases it, and a digest changes by itself.
   #
-  # This replaces a `:v2` suffix that a person increases by hand. Such a suffix works only if the
-  # person who edits a query also increases it in the same commit. If they do not, the cache
-  # gives values with no data for the fields that the new code reads, and the result is a nil
-  # dereference at some other place. A digest changes by itself.
-  # ⚠️ A NUL joins the inputs, and the code writes it as the `\x00` escape and not as a zero byte.
-  # NUL is the separator because no input can contain it, thus ["ab", "c"] and ["a", "bc"] cannot
-  # give the same digest. The escape is necessary because git counts a file with a raw zero byte
-  # as binary, and that stops each line diff, each blame, and each PR review in the file.
+  # ⚠️ A NUL joins the inputs, because no input can contain it: thus ["ab", "c"] and ["a", "bc"]
+  # give different digests. Keep the `\x00` escape: git counts a file with a raw zero byte as
+  # binary, and that stops each diff, each blame, and each PR review of the file.
   # @param inputs [Array<#to_s>] The things that must invalidate the cache when they change.
   # @return [String] A 16-character hex digest. GoogleGeocoder keys free text with it, thus it is
   #   wider than a version number needs.
@@ -87,7 +77,6 @@ class ApplicationService
   end
 
   # GETs a URL.
-  # @param symbolize [Boolean] True to parse with symbol keys.
   # @param options [Hash] The options that go to HTTParty.
   # @return [Object, nil] The parsed body, or nil if the response is not a success.
   def get_json(url, symbolize: true, **options)
@@ -95,7 +84,6 @@ class ApplicationService
   end
 
   # POSTs to a URL.
-  # @param symbolize [Boolean] True to parse with symbol keys.
   # @param options [Hash] The options that go to HTTParty.
   # @return [Object, nil] The parsed body, or nil if the response is not a success.
   def post_json(url, symbolize: true, **options)
@@ -110,7 +98,6 @@ class ApplicationService
   end
 
   # The same as post_json, but it raises and does not return nil on a failure.
-  # @see #get_json!
   # @raise [HttpError] If the response is not a success.
   def post_json!(url, symbolize: true, **options)
     parse_json!(HTTParty.post(url, **options), symbolize: symbolize)
@@ -118,14 +105,12 @@ class ApplicationService
 
   # Downloads a URL, and reads at most `max_bytes` of it.
   #
-  # ⚠️ The worker is a 512MB VM at concurrency 5, and a body that goes into memory with no limit
-  # has killed it before (refer to AssetMirror). This method reads the body in fragments and stops
-  # at the limit, thus a page or a picture of any size costs at most `max_bytes` of memory.
+  # ⚠️ The worker is a 512MB VM at concurrency 5, and a body with no limit in memory can kill it
+  # (refer to AssetMirror). This method reads the body in fragments and stops at the limit, thus a
+  # body of any size costs at most `max_bytes` of memory.
   #
   # ⚠️ It follows each redirect itself, and it checks each hop with PublicAddress. Another site
   # names the URL, thus a public page can send this code to a private address.
-  # @param url [String]
-  # @param max_bytes [Integer] The most bytes to keep.
   # @param keep_head [Boolean] True to return the first `max_bytes` of a body that is longer. False,
   #   the default, returns nil for such a body.
   # @param limit [Integer] The most redirects to follow.
@@ -186,14 +171,13 @@ class ApplicationService
   # PUTs to a URL. There is no method that returns nil on a failure, on purpose. A PUT is a
   # write, and a caller needs the failure status to select between another attempt and a smaller
   # result.
-  # @param symbolize [Boolean] True to parse with symbol keys.
   # @param options [Hash] The options that go to HTTParty.
   # @raise [HttpError] If the response is not a success.
   def put_json!(url, symbolize: true, **options)
     parse_json!(HTTParty.put(url, **options), symbolize: symbolize)
   end
 
-  # @param response [HTTParty::Response] The response to parse.
+  # @param response [HTTParty::Response]
   # @return [Object, nil] The parsed body, or nil if the body is empty.
   # @raise [HttpError] If the response is not a success.
   def parse_json!(response, symbolize: true)
@@ -202,7 +186,7 @@ class ApplicationService
     JSON.parse(response.body, symbolize_names: symbolize) if response.body.present?
   end
 
-  # @param response [HTTParty::Response] The response to parse.
+  # @param response [HTTParty::Response]
   # @return [Object, nil] The parsed body, or nil if the response is not a success or is empty.
   def parse_json(response, symbolize: true)
     unless response.success?
@@ -210,15 +194,13 @@ class ApplicationService
       return
     end
 
-    # ⚠️ The same check as in parse_json!. The documentation says that this method always gives a
-    # result: get_json and post_json return "the parsed body, or nil" and never raise. Thus a 204,
-    # or a 200 with an empty body, must not become a JSON::ParserError in a caller that has no
-    # rescue.
+    # ⚠️ The same check as in parse_json!. get_json and post_json never raise, thus a 204, or a
+    # 200 with an empty body, must not become a JSON::ParserError in the caller.
     JSON.parse(response.body, symbolize_names: symbolize) if response.body.present?
   end
 
   # Changes each camelCase key into a snake_case symbol, at each level.
-  # @param object [Hash, Array, nil] The object to change.
+  # @param object [Hash, Array, nil]
   def underscore_keys(object)
     object&.deep_transform_keys { |key| key.to_s.underscore.to_sym }
   end
@@ -241,7 +223,7 @@ class ApplicationService
 
   # Does a block again after a failure. Refer to Retryable. This gives nil, and reports the error,
   # after the attempts or the deadline end: a service gives a smaller result and does not raise.
-  # @return [Object, nil] The value from the block, or nil after the attempts or the deadline end.
+  # @return [Object, nil]
   def with_retries(**options, &block)
     super
   rescue StandardError => e

@@ -14,7 +14,6 @@ class Akismet < ApplicationService
   # the message and the visitor IP in it, to another host. A key outside this shape raises.
   API_KEY_FORMAT = /\A[a-z0-9-]+\z/i
 
-  # @param api_key [String] The Akismet API key.
   # @param blog [String] The home URL of the site, which Akismet needs.
   def initialize(api_key: ENV["AKISMET_API_KEY"], blog: ENV["SITE_URL"])
     @api_key = api_key
@@ -27,16 +26,12 @@ class Akismet < ApplicationService
   end
 
   # Does a comment-check with Akismet.
-  # @param content [String] The body of the message.
-  # @param author [String, nil] The name of the sender.
-  # @param author_email [String, nil] The email address of the sender.
   # @param user_ip [String, nil] The true visitor IP, which the web proxy sends. Akismet needs it.
   #   A blank value makes the answer less accurate.
   # @param user_agent [String, nil] The true visitor User-Agent, which the proxy also sends.
   # @return [Boolean] True if the submission is spam. It is false with no configuration.
   # @raise [ApplicationService::HttpError] If there is a configuration but Akismet gives no clear
-  #   answer. Thus the next attempt of the caller does the check again and does not deliver a
-  #   message with no check.
+  #   answer. Refer to the ⚠️ of the class.
   def spam?(content:, author: nil, author_email: nil, user_ip: nil, user_agent: nil)
     return false unless configured?
 
@@ -60,7 +55,6 @@ class Akismet < ApplicationService
   # that the filter continues to catch. ContactHamJob calls this when the owner sends a message from
   # the spam quarantine. That job is separate from the delivery, thus a failure here retries and
   # never stops the message.
-  #
   # @param (see #spam?)
   # @return [Boolean] True if Akismet accepted the submission. It is false with no configuration.
   # @raise [ApplicationService::HttpError] If Akismet gives a non-2xx.
@@ -91,7 +85,6 @@ class Akismet < ApplicationService
   end
 
   # The comment fields that both endpoints take. The code removes each blank field.
-  # @return [Hash]
   def comment_params(content, author, author_email, user_ip, user_agent)
     {
       blog: @blog,

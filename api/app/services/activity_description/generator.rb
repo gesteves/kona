@@ -3,12 +3,11 @@ module ActivityDescription
   # both to the Strava copy of the activity. It controls the collection of the data, the two lines
   # that Anthropic writes, and the block functions of Composer.
   #
-  # ⚠️ It reads only the name and the description from Strava, to keep the words that the owner wrote
-  # there. Each line comes from Intervals.icu, TrainerRoad, WeatherKit, or Whoop, and no Strava data
-  # goes to the LLM.
+  # ⚠️ It reads only the name and the description from Strava, to keep the words that the owner
+  # wrote there. Each line comes from Intervals.icu, TrainerRoad, WeatherKit, or Whoop, and no
+  # Strava data goes to the LLM.
   class Generator
-    # This goes at the start of each log line from this generator, thus you can find them with
-    # grep.
+    # The start of each log line of this generator, for a grep.
     LOG_PREFIX = "Description:"
 
     # The activity types that can get a description: a swim, a bike ride, or a run only.
@@ -55,16 +54,13 @@ module ActivityDescription
     end
 
     # An activity is indoor when it has the trainer flag, a "virtual" activity type, or a Zwift
-    # source. An indoor activity gets no weather line. `rake activity_weather:inspect` also reads it.
-    # @param activity [Hash] The Intervals.icu activity.
-    # @return [Boolean]
+    # source. An indoor activity gets no weather line. `rake activity_weather:inspect` reads this.
     def self.indoor?(activity)
       activity[:trainer] == true ||
         activity[:type].to_s.downcase.include?("virtual") ||
         zwift?(activity)
     end
 
-    # @param activity [Hash] The Intervals.icu activity.
     # @return [Boolean] True for an activity that Zwift uploaded.
     def self.zwift?(activity) = activity[:source].to_s.casecmp("zwift").zero?
 
@@ -141,7 +137,8 @@ module ActivityDescription
 
     # The race name of an activity on race day. Refer to RaceLeg. A triathlon comes from
     # TrainerRoad, for example "<race> – T1", and a running race comes from the Intervals.icu
-    # calendar, as the race name alone. The code lists the activities of the date only on a race day.
+    # calendar, as the race name alone. The code lists the activities of the date on a race day
+    # only.
     # @return [RaceLeg::Leg, nil] Nil on each other day, and when a source fails.
     def find_race_leg(activity)
       date = activity_date(activity)
@@ -215,7 +212,6 @@ module ActivityDescription
     # is no headline. This applies to a bike ride and to a run only.
     # ⚠️ It reads the Strava name and the Intervals.icu name. Intervals.icu keeps the name of the
     # first upload that it gets, thus the two names can be different.
-    # @param strava_name [String, nil] The name of the Strava copy.
     # @return [String, nil]
     def planned_summary_line(activity, sport, strava_name)
       return unless HEADLINE_SPORTS.include?(sport)
@@ -252,7 +248,6 @@ module ActivityDescription
     # Tells if the activity is long enough to be the full planned workout. An activity that is
     # longer is fine: the athlete continued after the workout ended. It gives true when either
     # duration is absent, thus a workout with no duration keeps its headline.
-    # @return [Boolean]
     def completed?(activity, workout)
       planned_minutes = workout[:duration_minutes]
       actual_seconds = activity[:moving_time] || activity[:elapsed_time]
@@ -275,7 +270,6 @@ module ActivityDescription
       end
     end
 
-    # @return [TrainerRoad]
     def trainer_road
       @trainer_road ||= TrainerRoad.new(@location.time_zone)
     end
@@ -345,9 +339,8 @@ module ActivityDescription
     # The local calendar date of the activity. start_date_local is already in the time of the
     # athlete.
     #
-    # ⚠️ This accepts nil, on purpose. heat_line calls this outside the `swallow` methods that the
-    # other steps use. Thus an activity with no start_date_local stopped the full run. That failure
-    # always occurs, thus the 24-hour window of ApplicationJob then ran the job again all day.
+    # ⚠️ This accepts nil, on purpose. heat_line calls this outside `swallow`. Thus a raise for an
+    # activity with no start_date_local would stop the full run, at each retry of the job.
     # @return [Date, nil]
     def activity_date(activity)
       local = activity[:start_date_local]
@@ -359,8 +352,7 @@ module ActivityDescription
     end
 
     # Runs a step that can fail, and it catches each failure. Thus one source with a problem
-    # removes only its own line, and not the full description. It writes the failure to the log
-    # with LOG_PREFIX and sends it to Bugsnag.
+    # removes only its own line, and not the full description.
     # @param label [String] The name of the step, for the log line and for Bugsnag.
     # @param fallback [Object] The value to return when the block raises: nil for a line that goes
     #   away, or [] for a collection.
@@ -374,8 +366,8 @@ module ActivityDescription
 
     # Runs the block when no other run holds the lock of this activity.
     #
-    # ⚠️ A second run gives :busy, and it does not skip. The Strava webhook and the Whoop webhook can
-    # arrive close together, and the run that comes second can be the one with the Whoop strain.
+    # ⚠️ A second run gives :busy, and it does not skip. The Strava webhook and the Whoop webhook
+    # can arrive close together, and the run that comes second can be the one with the Whoop strain.
     # ⚠️ The token lets a RETRY of the same job enter its own lock. A process that dies leaves
     # the lock for LOCK_TTL, and the retry comes some seconds later: without the token it would
     # read the lock as another run.

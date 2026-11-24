@@ -42,11 +42,9 @@ module Api
     # autoload of lib/ is active.
     config.exceptions_app = ->(env) { PlainTextExceptions.call(env) }
 
-    # Refuses a body that is too large before rack-attack and before the routing. Refer to
-    # lib/middleware/request_body_limit.rb. The railtie of rack-attack adds its own middleware
-    # after this one, from an initializer. That middleware blocks a bad request that goes directly
-    # to the origin, and limits its rate. Its configuration is in
-    # config/initializers/rack_attack.rb, and it does nothing in the test environment.
+    # Refuses a body that is too large, before rack-attack and before the routing. The railtie of
+    # rack-attack adds its own middleware after this one, from an initializer. Refer to
+    # config/initializers/rack_attack.rb for its rules.
     config.middleware.use RequestBodyLimit
   end
 end

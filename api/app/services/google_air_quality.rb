@@ -1,6 +1,6 @@
-# Gets the air quality from the Google Air Quality API. The app uses it when PurpleAir has no sensor
-# near the location, for example outside the USA. `aqi` returns { aqi:, category:, description: }, or
-# nil.
+# Gets the air quality from the Google Air Quality API. The app uses it when PurpleAir has no
+# sensor near the location, for example outside the USA. `aqi` returns
+# { aqi:, category:, description: }, or nil.
 class GoogleAirQuality < ApplicationService
   include GoogleApi
 
@@ -15,9 +15,6 @@ class GoogleAirQuality < ApplicationService
 
   # The AQI of a past hour at a location, for the weather line of an activity description. A time
   # in the current hour gets the current conditions. Refer to #history_aqi.
-  # @param latitude [Float]
-  # @param longitude [Float]
-  # @param time [Time]
   # @return [Integer, nil] The US EPA AQI, or nil with no data, for an hour older than 30 days, or
   #   for a location with no country.
   def self.history(latitude, longitude, time)
@@ -38,13 +35,12 @@ class GoogleAirQuality < ApplicationService
     @aqi = get_aqi
   end
 
-  # Refer to GoogleAirQuality.history. A past hour does not change, thus the cache holds it for a day.
+  # Refer to GoogleAirQuality.history. A past hour does not change, thus the cache holds it for a
+  # day.
   # ⚠️ The history endpoint gives a 400 for the CURRENT hour, thus a time in it gets the current
   # conditions. The description job runs some seconds after an activity ends, thus the end of each
   # activity, and often all of a short one, is in the current hour.
   # @see https://developers.google.com/maps/documentation/air-quality/reference/rest/v1/history/lookup
-  # @param time [Time]
-  # @return [Integer, nil]
   def history_aqi(time)
     return unless coordinates?
     return if @country_code.blank?
@@ -81,11 +77,9 @@ class GoogleAirQuality < ApplicationService
 
     data = data[:hourlyForecasts].first if data[:hourlyForecasts].present?
 
-    # Use the local index only, which is the US EPA NowCast. The Universal AQI of Google (uaqi) uses
-    # a 0 to 100 scale in the other direction: 0 is the worst and 100 is the best, which is the
-    # opposite of the US EPA scale. With our EPA icon and label, that number would be incorrect. If
-    # the response has no local index, return nil, thus the widget removes the AQI line and shows no
-    # incorrect number.
+    # Use the local index only, which is the US EPA NowCast. The Universal AQI of Google (uaqi) is
+    # 0 to 100 in the other direction, with 100 as the best, thus it is incorrect with our EPA icon
+    # and label. With no local index, the widget removes the AQI line.
     result = data[:indexes]&.find { |i| i[:code] == @aqi_code }
     return if result.blank?
 

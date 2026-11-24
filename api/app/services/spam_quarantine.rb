@@ -3,14 +3,12 @@ require "time"
 
 # Holds each contact-form submission that Akismet marks as spam or that ContactModeration marks as
 # abusive. Thus the owner can read a correct message that a check marked and send it, and the
-# message does not go away. One Redis hash holds them (refer to JsonHashStore), with a message id as
-# the key of each field.
+# message does not go away. One Redis hash holds them (refer to JsonHashStore).
 #
-# It is not an ApplicationService, because that base class is for HTTP integrations and this class
-# makes no network call.
+# It is not an ApplicationService, because it makes no network call.
 #
 # ⚠️ Ruby applies the 30-day retention, and not a Redis TTL. Thus #store also removes old messages,
-# as #all does: the removal on the write path is what limits the growth when nobody opens the page.
+# as #all does: the removal on the write path limits the growth when nobody opens the page.
 class SpamQuarantine
   # The Redis hash: the field is the message id, and the value is the JSON payload.
   REDIS_KEY = "contact:spam".freeze
@@ -32,9 +30,6 @@ class SpamQuarantine
   end
 
   # Holds one marked submission.
-  # @param name [String] The name of the sender.
-  # @param email [String] The email address of the sender.
-  # @param message [String] The body of the message.
   # @param context [Hash] The sender data, as ContactMailJob got it. Its "received_at" is the
   #   arrival time of the request.
   # @param reason [String] AKISMET or ABUSIVE.
@@ -66,10 +61,8 @@ class SpamQuarantine
   # Removes a message and returns it. Thus the caller can act on it one time only.
   #
   # ⚠️ The return value of the HDEL is the check, and not the HGET. Turbo, two clicks, or a bfcache
-  # replay can send "Not spam" two times. An action on the read alone would send the email two
+  # replay can send "Not spam" two times, and an action on the read alone would send the email two
   # times. Only the caller whose delete removed the field gets the payload.
-  #
-  # @param id [String] The message id.
   # @return [Hash, nil] The payload, or nil if the message was already gone.
   def take(id)
     payload = records.read(id)
@@ -79,7 +72,6 @@ class SpamQuarantine
     payload
   end
 
-  # @param id [String] The message id.
   # @return [Boolean] True if the code removed a message.
   def delete(id)
     records.delete(id).positive?

@@ -48,8 +48,6 @@ class TrendingArticles < ApplicationService
   # The cache key contains the hour, thus the list changes to a new one by itself.
   RESULT_TTL = 1.hour
 
-  # @param articles [Articles] The source of the articles. A test can supply its own.
-  # @param plausible [Plausible] The source of the analytics. A test can supply its own.
   def initialize(articles: Articles.new, plausible: Plausible.new)
     @articles = articles
     @plausible = plausible
@@ -65,8 +63,8 @@ class TrendingArticles < ApplicationService
   # @param today [Date] The last day of the windows.
   # @param series [Hash, nil] A series from Plausible#daily_visitors_by_path that reaches `today`.
   #   With no value, the code gets one.
-  # @return [Array<Hash>] { article:, status:, trend:, windows:, recent:, popularity: }. The
-  #   status is :trend, :fill, or :recent, and the :recent rows are at the end.
+  # @return [Array<Hash>] { article:, status:, trend:, peak:, windows:, recent:, popularity:,
+  #   published: }. The status is :trend, :fill, or :recent, and the :recent rows are at the end.
   def evaluate(today: @plausible.site_today, series: nil)
     articles = candidates
     return [] if articles.blank?
@@ -76,8 +74,8 @@ class TrendingArticles < ApplicationService
     excluded = newest_ids(articles)
     popularity = all_time_visitors
 
-    # ⚠️ The parse is in its own rescue for each article. One bad date made the full widget empty
-    # for a full hour.
+    # ⚠️ #published_on has its own rescue for each article. Without it, one bad date makes the
+    # full widget empty for an hour.
     rows = articles.filter_map do |article|
       published = published_on(article)
       next if published.nil?
@@ -106,10 +104,8 @@ class TrendingArticles < ApplicationService
 
   # Each thing that decides the content of the list, as a digest in the cache key.
   #
-  # ⚠️ The settings are in here, on purpose. You can change them with an env var. With a version
-  # number that a person writes, a change to a TRENDING_* var left the previous list in the cache
-  # for its full hour, under a key that looked correct.
-  # @return [String]
+  # ⚠️ The settings are in here, on purpose, because an env var can change them. Without them, a
+  # change to a TRENDING_* var leaves the previous list in the cache for its full hour.
   def ranking_version
     @ranking_version ||= cache_version(
       PAYLOAD_VERSION, WINDOWS.join(","), BASELINE_DAYS, MIN_BASELINE_DAYS, MIN_VISITORS, ALPHA,

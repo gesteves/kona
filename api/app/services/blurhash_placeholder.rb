@@ -81,11 +81,11 @@ class BlurhashPlaceholder < ApplicationService
   #
   # ⚠️ It gets the thumbnail from the Contentful Images API, and not through the R2 mirror. A
   # mirror fetch would make this job wait for AssetSyncJob first. Each fetch is about 2 kB.
-  # @param asset_id [String] The sys.id of the asset.
-  # @return [Symbol] :stored, :present, or :skipped.
   #
   # ⚠️ It fails soft: a placeholder is an improvement, and a failure here must not put the job into
   # the retry set for a day. `rake blurhash:backfill` is the reconciliation path.
+  # @param asset_id [String] The sys.id of the asset.
+  # @return [Symbol] :stored, :present, or :skipped.
   def generate(asset_id)
     return log_skip(asset_id, "no asset id") if asset_id.blank?
 
@@ -134,9 +134,6 @@ class BlurhashPlaceholder < ApplicationService
   private
 
   # Adds the job that makes the placeholder, unless a read of the last day did that already.
-  # @param asset_id [String]
-  # @param published_version [Integer, String]
-  # @return [void]
   def request_generation(asset_id, published_version)
     return unless $redis.set(request_key(asset_id, published_version), "1", nx: true, ex: REQUEST_TTL)
 
@@ -148,27 +145,21 @@ class BlurhashPlaceholder < ApplicationService
     "blurhash:requested:#{asset_id}:#{published_version}"
   end
 
-  # @param asset_id [String] The sys.id of the asset.
-  # @param published_version [Integer, String] The sys.publishedVersion of the asset.
-  # @return [String] The Redis key.
+  # @return [String] The Redis key of the placeholder.
   def cache_key(asset_id, published_version)
     "blurhash:svg:#{asset_id}:#{published_version}"
   end
 
-  # @param asset [Hash] The asset from Contentful.
-  # @return [Boolean] True when the asset has a width and a height.
   def dimensions?(asset)
     asset[:width].to_i.positive? && asset[:height].to_i.positive?
   end
 
-  # @param asset_id [String] The sys.id of the asset.
   # @return [Hash, nil] The asset fields, or nil.
   def fetch_asset(asset_id)
     contentful.items(ASSET_QUERY, { id: asset_id }, collection: :assets)&.first
   end
 
   # Encodes the thumbnail, decodes the blurhash, and wraps the result in the blur SVG.
-  # @param asset [Hash] The asset from Contentful.
   # @return [String, nil] The data URI, or nil when a step fails.
   def build(asset)
     width = THUMBNAIL_WIDTH
@@ -189,9 +180,6 @@ class BlurhashPlaceholder < ApplicationService
   # ⚠️ `fm=jpg` is necessary. With no format, Contentful returns the source format, and a libvips
   # with no loader for that format fails the decode into the rescue. There is then no placeholder
   # and no message.
-  # @param url [String] The Contentful URL of the asset.
-  # @param width [Integer] The width of the thumbnail.
-  # @param height [Integer] The height of the thumbnail.
   # @return [String, nil] The blurhash, or nil on a failure.
   def encode(url, width, height)
     thumbnail_url = images_api_url(url, width, height)
@@ -206,9 +194,6 @@ class BlurhashPlaceholder < ApplicationService
     nil
   end
 
-  # @param url [String] The Contentful URL of the asset.
-  # @param width [Integer] The width of the thumbnail.
-  # @param height [Integer] The height of the thumbnail.
   # @return [String, nil] The Images API URL, or nil for an asset that is not on that host.
   def images_api_url(url, width, height)
     uri = URI.parse(url.to_s.start_with?("//") ? "https:#{url}" : url.to_s)
@@ -220,9 +205,6 @@ class BlurhashPlaceholder < ApplicationService
     nil
   end
 
-  # @param blurhash [String] The blurhash.
-  # @param width [Integer] The width of the thumbnail.
-  # @param height [Integer] The height of the thumbnail.
   # @return [String, nil] A JPEG data URI, or nil on a failure.
   def decode_to_jpeg(blurhash, width, height)
     # Blurhash.decode gives a nested [row][col][r,g,b,a] array, and Array#pack raises on it. Thus
@@ -232,7 +214,7 @@ class BlurhashPlaceholder < ApplicationService
                        .copy(interpretation: :srgb)
                        .extract_band(0, n: 3)
 
-    # `strip` removes the Exif block, which was a fifth of each placeholder.
+    # `strip` removes the Exif block, which adds bytes to each placeholder.
     "data:image/jpeg;base64,#{Base64.strict_encode64(image.jpegsave_buffer(strip: true))}"
   rescue StandardError => e
     Rails.logger.warn("blurhash: decode failed (#{e.message})")
@@ -241,7 +223,6 @@ class BlurhashPlaceholder < ApplicationService
 
   # Wraps the JPEG in an SVG that blurs it to the shape of the asset.
   # @see https://css-tricks.com/the-blur-up-technique-for-loading-background-images/#recreating-the-blur-filter-with-svg
-  # @param jpeg_data_uri [String] The JPEG data URI.
   # @param width [Integer] The width of the asset.
   # @param height [Integer] The height of the asset.
   # @return [String] The SVG data URI.
@@ -261,14 +242,12 @@ class BlurhashPlaceholder < ApplicationService
     "data:image/svg+xml;charset=utf-8,#{escape_svg_for_url(svg.gsub(/\s+/, ' ').strip)}"
   end
 
-  # Escapes the few characters that an SVG in a `url()` cannot hold. This is a copy of the method of
-  # the web build. `url_encode` escapes `/` and `+` as well, and those are legal there.
+  # Escapes the few characters that an SVG in a `url()` cannot hold. This is a copy of the method
+  # of the web build. `url_encode` escapes `/` and `+` as well, and those are legal there.
   #
   # ⚠️ The two quote characters must stay in this set. The SVG writes each attribute with `'`, and
-  # ImagesHelper puts the result in `url('...')`. A raw `'` closes that CSS string, and the card then
-  # gets no placeholder and gives no message.
-  # @param svg [String]
-  # @return [String]
+  # ImagesHelper puts the result in `url('...')`. A raw `'` closes that CSS string, and the card
+  # then gets no placeholder and gives no message.
   def escape_svg_for_url(svg)
     svg.gsub(/[#%"'<> ]/) { |char| format("%%%02X", char.ord) }
   end

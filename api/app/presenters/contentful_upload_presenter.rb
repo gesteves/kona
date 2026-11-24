@@ -35,13 +35,12 @@ class ContentfulUploadPresenter
   # @return [Boolean] True when the publish stopped after the last attempt.
   def failed? = status == "failed"
 
-  # @return [String] The label of the badge for the current status.
   def status_label
     I18n.t("admin.contentful_uploads.status.#{status}")
   end
 
   # @return [String] The Web Awesome badge variant for the current status. ⚠️ A variant is a
-  #   component value and not a word: it stays here, beside #status_label, which left.
+  #   component value and not a word, thus it stays here and not in the locale file.
   def status_variant
     { "processing" => "neutral", "published" => "success", "failed" => "danger" }.fetch(status)
   end

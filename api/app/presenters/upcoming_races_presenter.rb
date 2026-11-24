@@ -17,7 +17,6 @@ class UpcomingRacesPresenter
   attr_reader :time_zone
 
   # @param events [Array<OpenStruct>] The raw Contentful events.
-  # @param time_zone [String] An IANA timezone id.
   # @param weather_for [#call] Gives the EventWeatherPresenter of an event, or nil. The caller
   #   gives it, thus this class makes no upstream request of its own and a spec needs no stub.
   def initialize(events:, time_zone:, weather_for: RaceDayWeather.method(:for))
@@ -30,11 +29,10 @@ class UpcomingRacesPresenter
 
     @todays_race = @featured if @featured && today?(@featured, time_zone)
 
-    # A featured event that is not today gets the large card only when there is race-day weather for
-    # it. The code makes the featured window in the timezone of the owner, and the weather-fetch
-    # window in the timezone of the event. Thus the two can be different at the 10-day limit, and a
-    # featured card could have an empty weather block. The race of today keeps its section in each
-    # condition.
+    # A featured event that is not today gets the large card only when it has race-day weather. The
+    # featured window is in the timezone of the owner, and the weather window is in the timezone of
+    # the event. Thus the two can be different at the 10-day limit, and a featured card could have
+    # an empty weather block. The race of today keeps its section in each condition.
     if @featured && !@todays_race && @event_weather&.forecast.blank?
       @featured = nil
       @event_weather = nil
@@ -48,7 +46,6 @@ class UpcomingRacesPresenter
     @races.drop(1) if @todays_race
   end
 
-  # Tells if an event in the list is the featured event.
   def featured_event?(event)
     event.sys&.id == featured&.sys&.id
   end

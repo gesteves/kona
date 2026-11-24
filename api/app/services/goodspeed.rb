@@ -1,7 +1,6 @@
-# Gets the conditions of San Francisco Bay — the water temperature and the tidal current — from the
-# Goodspeed API, which uses the NOAA SFBOFS model at station SFB1204. It needs no authentication.
-# Redis caches the response for 5 minutes. `data` gives the timeseries in an object with dot access,
-# or nil.
+# Gets the water temperature and the tidal current of San Francisco Bay from the Goodspeed API,
+# which uses the NOAA SFBOFS model at station SFB1204. It needs no authentication. Redis caches
+# the response for 5 minutes. `data` gives the timeseries in an object with dot access, or nil.
 #
 # This service is optional: with no value in `GOODSPEED_API_URL` it does nothing and returns nil.
 # Each caller already reads that as "no bay data", thus the water-temperature sentence and the

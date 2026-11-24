@@ -6,19 +6,18 @@
 # It reads CONTENT_LENGTH only. Puma reads a chunked body to its end and sets that header, thus
 # no body reaches this code with no length.
 class RequestBodyLimit
-  # The most bytes for each path prefix. The first match wins. The course-map upload permits
-  # MAX_FILES GPX files of MAX_BYTES in total, and the other paths take a form or a small JSON.
   # ⚠️ Plain integers: this file loads before ActiveSupport adds `megabytes` to Integer.
   MEGABYTE = 1024 * 1024
-  # ⚠️ `/social/photos` is ABOVE `/social`: the first match wins, and a photo upload is one file of
-  # as much as `PictureUpload::MAX_BYTES` where the draft itself is a small form.
-  # That limit is 50MB, and this number is above it for the envelope of the multipart body.
+  # The most bytes for each path prefix. The first match wins. The course-map upload permits
+  # MAX_FILES GPX files of MAX_BYTES in total, and the other paths take a form or a small JSON.
+  # ⚠️ `/social/photos` is above `/social`, because the first match wins. A photo upload is one
+  # file of as much as `PictureUpload::MAX_BYTES`, which is 50MB, and the draft is a small form.
+  # This number is above that limit for the envelope of the multipart body.
   LIMITS = [
     [ "/course-maps", 32 * MEGABYTE ],
     [ "/social/photos", 64 * MEGABYTE ],
-    # ⚠️ `/contentful/uploads/files` is ABOVE `/contentful` for the same reason: one picked file is
-    # as much as `PictureUpload::MAX_BYTES`, and the page itself is a
-    # small form of ids and text.
+    # ⚠️ `/contentful/uploads/files` is above `/contentful` for the same reason: one picked file is
+    # as much as `PictureUpload::MAX_BYTES`, and the page itself is a small form of ids and text.
     [ "/contentful/uploads/files", 64 * MEGABYTE ],
     [ "/contentful", MEGABYTE / 4 ],
     [ "/api/icons", MEGABYTE / 4 ],
@@ -42,7 +41,6 @@ class RequestBodyLimit
     [ 413, { "content-type" => "text/plain; charset=utf-8" }, [ "413 Content Too Large\n" ] ]
   end
 
-  # @param path [String] The request path.
   # @return [Integer] The most bytes that the path permits.
   def limit_for(path)
     LIMITS.find { |prefix, _limit| path.start_with?(prefix) }&.last || DEFAULT_LIMIT

@@ -3,23 +3,22 @@ require "sidekiq/api"
 # Builds the web site again and deploys it. It sends a GitHub `repository_dispatch`, and
 # .github/workflows/web.yml waits for that event. There are three callers, and each one has its own
 # event type: the Contentful webhook, POST /api/build, and the Republish dialog of the admin. They
-# build in the same way, and they are different only to let the Slack notification of the deploy
-# name the cause.
-#
-# ⚠️ The `repository_dispatch.types` of that workflow must contain all three event types. If not,
-# GitHub accepts the event with a 204 and runs nothing, and it gives no message. The event type is
-# always a constant from the caller, and never a request parameter.
+# build in the same way. The types let the Slack notification of the deploy name the cause.
 #
 # A publish of many entries sends more than one event, and the cancel-in-progress concurrency of the
 # workflow makes them one build. This job does nothing when there is no configuration, and it raises
 # on a non-2xx, thus Sidekiq does it again.
 class SiteBuildJob < ApplicationJob
   DISPATCH_URL = "https://api.github.com/repos/%<repo>s/dispatches".freeze
-  # All three of these are in `repository_dispatch.types` in .github/workflows/web.yml.
+  # ⚠️ The `repository_dispatch.types` of .github/workflows/web.yml must contain all three. If
+  # not, GitHub accepts the event with a 204 and runs nothing, and it gives no message. The event
+  # type is always a constant from the caller, and never a request parameter.
   CONTENTFUL_EVENT_TYPE = "contentful-publish".freeze
   MANUAL_EVENT_TYPE = "api-build".freeze
   ADMIN_EVENT_TYPE = "admin-republish".freeze
-  # The GitHub answers that no retry can correct.
+  # The GitHub answers that no retry can correct: a token that expired or that cannot reach the
+  # repo gives a 401 or a 404. ⚠️ A 403 is not here, because GitHub also gives a 403 for a rate
+  # limit.
   PERMANENT_STATUSES = [ 401, 404, 422 ].freeze
 
   # The window that stops a second "build now" from a person. The code never removes the lock: it
@@ -36,14 +35,13 @@ class SiteBuildJob < ApplicationJob
   #
   # ⚠️ The Contentful webhook must never call this. A publish inside the window would go away with
   # no message, and the site would stay old.
-  # @return [Boolean] true when this caller took the lock, and false while it belongs to another
-  #   one.
+  # @return [Boolean] true when this caller took the lock.
   def self.claim_trigger_lock
     !!$redis.set(TRIGGER_LOCK_KEY, "1", nx: true, ex: TRIGGER_LOCK_TTL.to_i)
   end
 
-  # The window that makes a burst of asset publishes ONE build. A publish of many assets — the
-  # media uploader sends one for each image — otherwise starts a workflow run for each one, and
+  # The window that makes a burst of asset publishes one build. The media uploader sends one
+  # publish for each image. Without the window, each one starts a workflow run, and
   # `cancel-in-progress` in web.yml then stops all but the last. Those runs cost Actions minutes
   # and write a Slack line each.
   ASSET_WINDOW_KEY = "build:asset_window".freeze
@@ -51,13 +49,13 @@ class SiteBuildJob < ApplicationJob
 
   # Schedules a build for an asset publish, unless a window is open already.
   #
-  # ⚠️ This is NOT `claim_trigger_lock` and NOT `schedule_in`. The trigger lock makes a publish
+  # ⚠️ This is not `claim_trigger_lock` and not `schedule_in`. The trigger lock makes a publish
   # inside its window go away with no message, which this caller must never do. `schedule_in` owns
   # the one scheduled slot of the Republish dialog, and an asset publish must not cancel a
   # republish that the owner asked for.
-  # ⚠️ It cancels nothing, thus no publish is lost: the build always runs AFTER the publish that
-  # opened the window and after each publish that joined it, and a steady stream of publishes
-  # cannot push the build back for all time.
+  # ⚠️ It cancels nothing, thus no publish is lost: the build runs after the publish that opened
+  # the window and after each publish that joined it. A steady stream of publishes cannot push the
+  # build back for all time.
   # @return [Boolean] true when this call scheduled the build.
   def self.coalesce_asset_build
     return false unless $redis.set(ASSET_WINDOW_KEY, "1", nx: true, ex: ASSET_WINDOW.to_i)
@@ -97,9 +95,7 @@ class SiteBuildJob < ApplicationJob
     !!Sidekiq::ScheduledSet.new.find_job(jid)&.delete
   end
 
-  # This has a default value and it is not necessary. Thus the Contentful caller stays a plain
-  # `perform_async`, and a job that goes into the queue with no arguments before a deploy still runs
-  # after that deploy.
+  # The event type has a default, thus the Contentful caller stays a plain `perform_async`.
   def perform(event_type = CONTENTFUL_EVENT_TYPE)
     token = ENV["GITHUB_DISPATCH_TOKEN"]
     repo = ENV["GITHUB_REPOSITORY"]
@@ -122,8 +118,6 @@ class SiteBuildJob < ApplicationJob
 
     unless response.success?
       message = "SiteBuildJob: GitHub repository_dispatch failed (HTTP #{response.code})"
-      # A token that expired or that cannot reach the repo gives a 401 or a 404, and a retry for 24
-      # hours cannot correct it. ⚠️ A 403 is NOT here: GitHub also gives a 403 for a rate limit.
       raise PermanentError, message if PERMANENT_STATUSES.include?(response.code.to_i)
 
       raise message

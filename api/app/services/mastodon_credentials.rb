@@ -1,8 +1,8 @@
 # The Mastodon client registration and the access token of the connected account. Redis holds
 # them, and the OAuth round trip on the Connected apps page of the admin writes them.
 #
-# This is not an ApplicationService, because that base class is for HTTP integrations and this
-# class makes no network call. Mastodon is the class that talks to the instance.
+# This is not an ApplicationService, because it makes no network call. Mastodon is the class that
+# talks to the instance.
 #
 # ⚠️ The client secret and the access token are encrypted in the store (refer to
 # EncryptedCredentials). The token posts as the owner.
@@ -47,11 +47,8 @@ class MastodonCredentials
   # instance keeps the token of the first one, and the page then shows "Connected" for an account
   # that the new client cannot reach.
   # @param instance [String] The bare hostname of the instance.
-  # @param client_id [String]
-  # @param client_secret [String]
   # @param redirect_uri [String] The callback URL that the registration named. The token exchange
   #   must send the same value.
-  # @return [void]
   def self.store_client(instance:, client_id:, client_secret:, redirect_uri:)
     $redis.hdel(REDIS_KEY, "access_token", "handle")
     $redis.hset(
@@ -65,9 +62,7 @@ class MastodonCredentials
   end
 
   # Stores the access token at the end of the flow.
-  # @param access_token [String]
   # @param handle [String] The "@user@instance" name of the account, for the admin to show.
-  # @return [void]
   def self.store_token(access_token:, handle:)
     $redis.hset(
       REDIS_KEY,

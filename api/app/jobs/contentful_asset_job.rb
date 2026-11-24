@@ -1,8 +1,6 @@
 # Makes one published Contentful asset from a file that the owner picked on the media uploader.
-#
-# The bytes already went to Contentful in the request, as an Upload. This job does the three steps
-# that stay: it creates the asset with its title and its description, it processes the file, and it
-# publishes the result.
+# The bytes already went to Contentful in the request, as an Upload. This job creates the asset
+# with its title and its description, processes the file, and publishes the result.
 #
 # Contentful processes a file asynchronously, thus this job can hold a worker thread for as long as
 # ContentfulManagement::POLL_TIMEOUT. That is the reason that the submit does not do this work

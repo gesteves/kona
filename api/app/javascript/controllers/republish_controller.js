@@ -19,8 +19,8 @@ export default class extends Controller {
     // ⚠️ The attribute, and not the property: it is the value that the server rendered, thus a
     // submit can put it back after the owner picked another delay.
     this.defaultMinutes = this.minutesTarget.getAttribute("value");
-    // ⚠️ It waits for the definition. Before the upgrade, `value` of the field is undefined, and the
-    // label would then stay at the plain word for a value that is correct.
+    // ⚠️ It waits for the definition. Before the upgrade, the `value` of the field is undefined,
+    // and the label would then stay at the plain word for a value that is correct.
     customElements.whenDefined("wa-number-input").then(() => this.relabel());
   }
 
@@ -47,7 +47,6 @@ export default class extends Controller {
    *
    * ⚠️ It stops the default action first. Thus one Enter gives one submit, and it does that whether
    * or not the browser finds the button through its `form` attribute.
-   * @param {KeyboardEvent} event
    */
   submitOnEnter(event) {
     if (event.key !== "Enter") return;
@@ -59,12 +58,11 @@ export default class extends Controller {
   /**
    * Starts the republish with fetch, closes the dialog, and puts the answer in a toast.
    *
-   * ⚠️ **It stops the native submit.** A submit that goes through navigates the admin, and the page
-   * below the dialog renders again. The owner opens this dialog from each admin page, thus that
-   * navigation would take away a draft of the Social media page that nothing has saved.
+   * ⚠️ It stops the native submit. A native submit navigates the admin, and the owner opens this
+   * dialog from each admin page. Thus that navigation would remove an unsaved draft of the Social
+   * media page.
    *
    * ⚠️ It sends the CSRF token in a header. The admin does not skip the forgery protection.
-   * @param {SubmitEvent} event
    */
   async submit(event) {
     event.preventDefault();

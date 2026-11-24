@@ -1,7 +1,5 @@
 # Presents a Whoop stats payload for the widget view: the rounded scores, the labels, and the
-# "Today's", "Yesterday's", or "Latest Metrics" heading. This replaces the WhoopHelper mixin, which
-# read the @whoop, @workouts, and @time_zone instance variables of the controller. This presenter
-# takes the same data as constructor arguments.
+# "Today's", "Yesterday's", or "Latest Metrics" heading.
 class WhoopPresenter
   include WorkoutsHelper # rest_day?, for the strain label
 
@@ -29,27 +27,23 @@ class WhoopPresenter
     "Latest"
   end
 
-  # The Whoop sleep score, rounded.
   # @return [Integer] The sleep score, rounded to the nearest integer.
   def sleep_score
     @stats.dig(:sleep, :score, :sleep_performance_percentage).round
   end
 
-  # The Whoop recovery score, rounded.
   # @return [Integer] The recovery score, rounded to the nearest integer.
   def recovery_score
     @stats.dig(:recovery, :score, :recovery_score).round
   end
 
-  # The Whoop strain score, with one decimal. It removes a ".0" at the end.
-  # @return [String] The strain score.
+  # @return [String] The strain score, with one decimal and with no ".0" at the end.
   def strain_score
     rounded = @stats.dig(:physiological_cycle, :score, :strain).round(1)
     rounded % 1 == 0 ? rounded.to_i.to_s : rounded.to_s
   end
 
-  # The label for the current strain level.
-  # @return [String] The strain label: Light, Moderate, High, All Out, or another one.
+  # @return [String] Nothing, Rest Day, Light, Moderate, High, or All Out.
   def strain_label
     strain = @stats.dig(:physiological_cycle, :score, :strain)
     return "Nothing" if strain.blank? || strain.zero?
@@ -66,8 +60,7 @@ class WhoopPresenter
     end
   end
 
-  # The label for the current sleep score.
-  # @return [String] The sleep label: Poor, Sufficient, or Optimal.
+  # @return [String] None, Poor, Sufficient, or Optimal.
   def sleep_label
     score = sleep_score
     return "None" if score.blank? || score.zero?
@@ -82,8 +75,7 @@ class WhoopPresenter
     end
   end
 
-  # The label for the current recovery score.
-  # @return [String] The recovery label: Poor, Adequate, or Sufficient.
+  # @return [String] None, Poor, Adequate, or Sufficient, and "Nice." for 69.
   def recovery_label
     recovery = recovery_score
     return "None" if recovery.blank? || recovery.zero?
@@ -99,9 +91,8 @@ class WhoopPresenter
     end
   end
 
-  # The Font Awesome icon for the current recovery level.
-  # @return [String] The name of the icon: skull for a low recovery, and person-meditating for each
-  #   other level.
+  # @return [String] The Font Awesome icon id: skull for a low recovery, and person-meditating for
+  #   each other level.
   def recovery_icon
     recovery = recovery_score
     return "person-meditating" if recovery.blank?
@@ -123,8 +114,7 @@ class WhoopPresenter
 
   private
 
-  # The time of the last wakeup, that is, the end of the last sleep.
-  # @return [ActiveSupport::TimeWithZone, nil] The wakeup time.
+  # @return [ActiveSupport::TimeWithZone, nil] The end of the last sleep.
   def last_wakeup_time
     return if @stats.dig(:sleep, :end).blank?
     DateTime.parse(@stats.dig(:sleep, :end)).in_time_zone(@time_zone)

@@ -8,9 +8,9 @@
   padding: var(--wa-space-m);
 
   // Each link is a <wa-button>, thus the hover state, the active state, the focus ring, the corner
-  // radius, and the spacing all come from the component. ⚠️ Only two rules are ours: the host is
-  // `inline-block`, thus it becomes as wide as its content in the <li> and needs no width; and the
-  // button puts its content at the center, which looks incorrect in a column of links of different
+  // radius, and the spacing all come from the component. ⚠️ Only two rules are ours. The host is
+  // `inline-block` and only as wide as its content, thus it needs a width to fill the <li>. And
+  // the button centers its content, which looks incorrect in a column of links of different
   // lengths.
   &__link {
     width: 100%;
@@ -20,11 +20,10 @@
     }
   }
 
-  // ⚠️ This is a fixed square box, and it replaces the `width: auto` that each inline SVG gets in
-  // _base.scss. The viewBox values of Font Awesome are not all square: `house` is 576×512 and
-  // `location-dot` is 384×512. Thus at an automatic width, no two labels in the column start at the
-  // same x position. The default of `preserveAspectRatio` puts the glyph in the box with no change
-  // to its shape, and <wa-icon> does the same with the same 1em.
+  // ⚠️ A fixed square box, in place of the `width: auto` that each inline SVG gets in _base.scss.
+  // The viewBox values of Font Awesome are not all square: `house` is 576×512 and `location-dot`
+  // is 384×512. Thus at an automatic width, the labels in the column start at different x
+  // positions. The default of `preserveAspectRatio` keeps the shape of the glyph in the box.
   &__link svg[slot="start"] {
     height: 1em;
     width: 1em;

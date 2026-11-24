@@ -9,10 +9,9 @@ module MarkupHelper
   end
 
   # Renders the Markdown body of a card into HTML. This is a small part of the render_body of the
-  # static site, on purpose. The body of a card is short text, thus this code does not do the asset,
-  # figure, srcset, and blurhash steps, which need the asset index from the build. It does only the
-  # two transforms that these bodies need. A Markdown image or table becomes a plain element.
-  # @param text [String, nil] The Markdown.
+  # static site, on purpose. The body of a card is short text, thus this code omits the asset,
+  # figure, srcset, and blurhash steps, which need the asset index from the build. A Markdown image
+  # or table becomes a plain element.
   # @return [String, nil] The HTML, or nil for a blank input.
   def render_summary_body(text)
     html = markdown_to_html(fix_degrees(text))
@@ -43,8 +42,6 @@ module MarkupHelper
 
   # ⚠️ This matches the domain by the end of the host name, and it does not use PublicSuffix. The
   # web app uses PublicSuffix, but this app does not have that dependency. Keep the two the same.
-  # @param url [String, nil]
-  # @return [Boolean] True if the URL is an Amazon Associates link.
   def amazon_associates_link?(url)
     uri = URI.parse(url.to_s)
     host = uri.host.to_s.downcase

@@ -15,16 +15,13 @@ class TrainerRoadCredentials
   # ⚠️ Never change this value. Refer to EncryptedCredentials.
   ENCRYPTION_SALT = "trainerroad credentials".freeze
 
-  # The feed that the owner connected.
-  # @return [String, nil] The URL, or nil when the store has none.
+  # @return [String, nil] The feed URL that the owner connected, or nil when the store has none.
   def self.fetch = decrypt($redis.hget(REDIS_KEY, "calendar_url"))
 
   # @return [Boolean] True if the owner connected a feed in the admin.
   def self.stored? = fetch.present?
 
   # Replaces the stored URL. A caller must get the feed first: no code here reads it.
-  # @param calendar_url [String]
-  # @return [void]
   def self.store(calendar_url:)
     $redis.hset(REDIS_KEY, "calendar_url", encrypt(calendar_url.to_s.strip))
     nil

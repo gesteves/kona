@@ -1,9 +1,6 @@
 module IconsHelper
-  # The SVG markup of a Font Awesome icon.
-  # @param family [String] The family of the icon, for example "classic".
-  # @param style [String] The style of the icon in that family, for example "light".
-  # @param icon_id [String] The identifier of the icon, for example "person-running".
-  # @return [String, nil] The SVG markup of the icon.
+  # The SVG markup of a Font Awesome icon, for example `icon_svg("classic", "light", "house")`.
+  # @return [String, nil] The markup, or nil if the code cannot find the icon.
   def icon_svg(family, style, icon_id)
     # The code keeps the value for each request, in the helper context. A fragment uses the same
     # icon id more than one time, for example arrow-down for each stat, and each lookup with no
@@ -20,12 +17,7 @@ module IconsHelper
 
   # The SVG markup of a Font Awesome icon, with a `slot` attribute. This is for a Web Awesome
   # component that takes its icon in a named slot: `start` or `end` on <wa-button>, and `icon` on
-  # <wa-callout>. It returns a safe buffer, thus a view needs no `raw`. Without `raw`, a plain String
-  # renders as text on the page.
-  # @param family [String] The family of the icon, for example "classic".
-  # @param style [String] The style of the icon in that family, for example "light".
-  # @param icon_id [String] The identifier of the icon, for example "trash".
-  # @param slot [String] The slot of the component for the icon.
+  # <wa-callout>. It returns a safe buffer, thus a view needs no `raw`.
   # @return [ActiveSupport::SafeBuffer, nil] The SVG markup, or nil if the code cannot find the
   #   icon.
   def slotted_icon_svg(family, style, icon_id, slot: "start")
@@ -41,7 +33,6 @@ module IconsHelper
   # clock_icon_svg of the static site. The number words are in this file, thus the app needs no
   # humanize gem.
   # @param datetime [DateTime, Time]
-  # @return [String, nil]
   def clock_icon_svg(datetime, family = "classic", style = "light")
     hours = datetime.hour % 12
     hours = 12 if hours.zero?

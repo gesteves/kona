@@ -50,9 +50,7 @@ module ActivityMatcher
 
   module_function
 
-  # Changes a raw activity type string into one of the shared type names.
-  # @param type [String, nil]
-  # @return [String] The standard type, or "Other".
+  # @return [String] The standard type of a raw activity type string, or "Other".
   def normalize_type(type)
     return "Other" if type.blank?
 

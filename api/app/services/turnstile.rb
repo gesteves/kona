@@ -10,7 +10,6 @@
 class Turnstile < ApplicationService
   SITEVERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
 
-  # @param secret [String] The Turnstile secret key.
   def initialize(secret: ENV["TURNSTILE_SECRET"])
     @secret = secret
   end
@@ -20,7 +19,6 @@ class Turnstile < ApplicationService
     @secret.present?
   end
 
-  # Checks a Turnstile response token.
   # @param token [String, nil] The token from the widget in the browser.
   # @param remoteip [String, nil] The true visitor IP. It makes the result more accurate.
   # @return [Boolean] True if the token is correct. It is also true when there is no configuration

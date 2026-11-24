@@ -4,11 +4,10 @@ module Admin
   class ConnectedAppsController < BaseController
     # GET /connected-apps
     #
-    # ⚠️ A card is on the page only when its integration can operate. Whoop, Threads, and Strava need
-    # credentials in the environment, thus without those the page hides the card and does not offer
-    # an action that cannot work. Bluesky, Mastodon, and TrainerRoad have no such configuration —
-    # their credentials *are* the connection — thus they are always here and the list is never
-    # empty.
+    # ⚠️ A card is on the page only when its integration can operate. Whoop, Threads, and Strava
+    # need credentials in the environment, thus without those the page hides the card and offers
+    # no action that cannot work. For Bluesky, Mastodon, and TrainerRoad the credentials are the
+    # connection, thus those cards are always here and the list is never empty.
     def show
       @apps = [ bluesky_app, mastodon_app, strava_app, threads_app, trainer_road_app, whoop_app ].compact
     end
@@ -18,8 +17,6 @@ module Admin
     def bluesky_app
       service = StandardSite.new
 
-      # There is no deploy configuration to make incorrect: the credentials are the connection,
-      # thus this card is always on the page.
       ConnectedAppPresenter.new(
         name: t("admin.networks.bluesky"),
         description: card_description(
@@ -36,8 +33,6 @@ module Admin
     def mastodon_app
       service = Mastodon.new
 
-      # The registration and the token are the connection, and each one comes from the round trip.
-      # Thus there is no deploy configuration and this card is always on the page.
       ConnectedAppPresenter.new(
         name: t("admin.networks.mastodon"),
         description: card_description(
@@ -92,11 +87,9 @@ module Admin
       )
     end
 
-    # ⚠️ A Threads token that expires is dead for all time, and only a new authorization corrects
-    # that. Thus the card must say two things: that a refresh was refused, while the token is still
-    # good, and that the token expired, because `connected?` stays true with the dead token in the
-    # store.
-    # @param service [Threads]
+    # ⚠️ The card must say two things: that a refresh was refused, while the token is still good,
+    # and that the token expired. An expired Threads token needs a new authorization, and
+    # `connected?` stays true with that token in the store.
     # @return [String, nil] A sentence for the card, or nil when the connection works.
     def threads_error_message(service)
       return unless service.connected?
@@ -116,9 +109,8 @@ module Admin
       end
     end
 
-    # ⚠️ The calendar URL *is* the connection: there is no deploy configuration, thus this card is
-    # always on the page. It names no account, because a feed has none, and a request to read the
-    # name of the calendar is what the rule below stops.
+    # ⚠️ This card names no account: a feed has none, and the rule at #card_description stops a
+    # request for the name of the calendar.
     def trainer_road_app
       service = TrainerRoad.new
 
@@ -164,10 +156,8 @@ module Admin
     # ⚠️ Each `account` here comes from Redis, and no card makes a request to name its account. The
     # page renders on each load of the admin, thus a fetch would put an upstream failure in the path
     # of the navigation.
-    # @param connected [Boolean] True if an account is connected now.
     # @param account [String, nil] The name of that account, in the form of its own service.
     # @param summary [String] The line to show when nothing is connected: what the integration does.
-    # @return [String]
     def card_description(connected:, account:, summary:)
       return summary unless connected
 
@@ -178,11 +168,10 @@ module Admin
       end
     end
 
-    # Whoop, Threads, and Strava each keep their tokens in Redis after the service refuses them, thus
-    # `connected?` alone cannot show the difference between an integration that works and one that
-    # does not. The scheduled refresh job would continue to fail below a green badge.
+    # Whoop, Threads, and Strava each keep their tokens in Redis after the service refuses them.
+    # Thus `connected?` alone cannot show whether an integration works, and the scheduled refresh
+    # job would continue to fail below a green badge.
     # @param error [Hash, nil] The `{ code:, at: }` of the last refused refresh.
-    # @param name [String] The name of the service.
     # @param consequence [String] What stays broken until the owner reconnects.
     # @return [String, nil] A sentence for the card, or nil when the last refresh was successful.
     def refresh_error_message(error, name:, consequence:)
@@ -194,7 +183,6 @@ module Admin
         name: name, code: error[:code], date: date, consequence: consequence)
     end
 
-    # @param time [Time, nil]
     # @return [String, nil] The date to name in a sentence, or nil with no time.
     def formatted_date(time)
       time&.in_time_zone&.strftime("%B %-e, %Y at %-I:%M %p %Z")

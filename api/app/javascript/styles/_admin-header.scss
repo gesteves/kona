@@ -3,25 +3,21 @@
 .admin-header {
   align-items: center;
   background-color: var(--wa-color-surface-raised);
-  // ⚠️ The height comes from the --header-height of <wa-page>, and not from the padding. Thus the
-  // bar and each element that must stay below it, for example the pinned preview of the map editor,
-  // always agree. Set that variable in _page.scss, and not here. Note that --header-height already
-  // includes the block spacing, and that is why the padding below applies to the inline sides only.
-  // The `::slotted([slot='header'])` of <wa-page> sets `padding: var(--wa-space-m)` on the four
-  // sides. Thus the block padding must be zero, or the space counts two times and the content goes
-  // out of the bar.
+  // ⚠️ The height comes from the --header-height of <wa-page>, thus the bar and each element that
+  // must stay below it always agree. Set that variable in _page.scss, and not here. It already
+  // includes the block spacing, and the `::slotted([slot='header'])` of <wa-page> sets
+  // `padding: var(--wa-space-m)` on the four sides. Thus the block padding below must be zero, or
+  // the space counts two times and the content goes out of the bar.
   block-size: var(--header-height);
   border-block-end: 1px solid var(--wa-color-surface-border);
   display: flex;
   gap: var(--wa-space-m);
   // ⚠️ The layout comes from the `justify-content: space-between` of <wa-page>, in
-  // `::slotted([slot='header'])`. Do not write it again, do not change its direction, and do not use
-  // an automatic margin. Two children on a mobile screen put the button at the start and the
-  // wordmark at the end. On the desktop the button is `display: none`, thus there is one child, and
-  // space-between then puts it at the start. That is true on the FIRST frame only because
-  // _page.scss makes the button visible below the breakpoint. `view` starts as "desktop", thus
-  // without that rule the wordmark would draw at the left and move across the bar one frame
-  // later.
+  // `::slotted([slot='header'])`. Do not write it again, do not change its direction, and do not
+  // use an automatic margin. On a mobile screen it puts the button at the start and the wordmark
+  // at the end. On the desktop the button is `display: none`, thus the one child goes to the
+  // start. On a phone, the first frame is correct only because _page.scss makes the button
+  // visible below the breakpoint: `view` starts as "desktop".
   padding-block: 0;
   padding-inline: var(--wa-space-m);
 

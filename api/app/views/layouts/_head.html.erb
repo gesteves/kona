@@ -5,10 +5,8 @@
 <meta name="robots" content="noindex">
 <title><%= [ title.presence, t("admin.site_name") ].compact.join(" · ") %></title>
 <%# ⚠️ This is here, and public/ serves it, and not Propshaft. With no declaration, the browser
-    keeps the last icon that it saw for this origin, which is the icon of Sidekiq, because
-    Sidekiq::Web has one and the admin had none. An /assets path with a fingerprint would not
-    correct a bookmark either: a bookmark makes a plain /favicon.ico request, and only public/
-    answers that. %>
+    keeps the last icon that it saw for this origin, which is the icon of Sidekiq::Web. A
+    bookmark makes a plain /favicon.ico request, and only public/ answers that. %>
 <link rel="icon" href="/favicon.ico" sizes="32x32">
 <%= csrf_meta_tags %>
 <%# Turbo puts this nonce on each script that it adds, and it refreshes the tag at each visit. That

@@ -4,17 +4,13 @@
 class TimeZoneResolver
   DEFAULT_TIME_ZONE = "America/Denver"
 
-  # The default timezone from the configuration. The code uses it when it cannot find the
-  # coordinates.
-  # @return [String] An IANA timezone id.
+  # @return [String] The default IANA timezone id, from the configuration.
   def self.default
     # ⚠️ `presence`, and not `ENV.fetch`: a secret with no value arrives as an empty string, and
     # `in_time_zone("")` raises inside each ranking.
     ENV["TIME_ZONE"].presence || DEFAULT_TIME_ZONE
   end
 
-  # @param latitude [Float, nil]
-  # @param longitude [Float, nil]
   # @return [String] An IANA timezone id. It is never nil: without one, it gives {default}.
   def self.call(latitude, longitude)
     return default if latitude.blank? || longitude.blank?

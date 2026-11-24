@@ -1,9 +1,7 @@
 # The functions that select a forecast and that format a value. Each method takes the data as an
-# argument, and none of them reads the state of a controller. The CONDITIONS constant and the
-# BEAUFORT constant come from config/initializers/weather_data.rb.
+# argument. CONDITIONS and BEAUFORT come from config/initializers/weather_data.rb.
 #
-# The text summary and its rules are in WeatherSummaryPresenter, which includes this module and
-# gives it the data of the request.
+# The text summary and its rules are in WeatherSummaryPresenter, which includes this module.
 module WeatherHelper
   include TimeHelper # parse_time
 
@@ -235,7 +233,6 @@ module WeatherHelper
     pollen&.pollen_type_info&.select { |p| p&.index_info&.value.to_i > 0 }&.map { |p| p.index_info.value }&.max.to_i
   end
 
-  # @param pollen [OpenStruct, nil]
   # @param value [Integer] The index value, from pollen_index_value. The caller can give it, thus
   #   the scan of the readings runs one time.
   # @return [String, nil] The category of the reading with that value, or nil when the reading has

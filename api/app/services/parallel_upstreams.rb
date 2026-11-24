@@ -1,15 +1,14 @@
 # Does the upstream fetches that do not depend on each other, at the same time, for a widget action
 # that calls more than one API. With a warm cache, each fetch is a Redis read and the order does not
-# matter. With a cold cache, which occurs each five minutes and after each deploy, they were a chain
-# of HTTP requests in sequence, in one request budget.
+# matter. With a cold cache, which occurs each five minutes and after each deploy, a sequence
+# would put a chain of HTTP requests in one request budget.
 module ParallelUpstreams
   private
 
   # Runs each block on its own thread and returns the values under the same keys.
   #
-  # ⚠️ Put each block in `safely` before you give it to this method. Thread#value raises the error of
-  # the thread again. Thus an upstream call with no protection would stop the join and the widget,
-  # and that is the opposite of the purpose of this method.
+  # ⚠️ Put each block in `safely` before you give it to this method. Thread#value raises the error
+  # of the thread again, thus an upstream call with no protection would stop the widget.
   #
   # ⚠️ Each thread runs in the Rails executor. A plain thread that causes an autoload can stop in
   # development, where Rails does not load each constant at the start.

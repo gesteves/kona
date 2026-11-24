@@ -1,14 +1,14 @@
 <%# One photo of a post: its thumbnail, its two controls, its id, and its alt text.
 
-    ⚠️ **The fields render in THIS order in every tile.** The names are `posts[][photos][]` and
+    ⚠️ The fields render in this order in each tile. The names are `posts[][photos][]` and
     `posts[][alts][]`, and Rack reads the two arrays by position. A tile that omits one field
-    would move each alt text after it by one. The order of the tiles in the document IS the order
+    would move each alt text after it by one. The order of the tiles in the document is the order
     of the photos, thus a reorder moves the tile and rewrites nothing.
 
-    A tile is a ROW, as a post of the thread is: the grip, the thumbnail, the alt text, and the
-    remove control. The tiles stack in a column, thus the alt text field takes the width.
+    A tile is a row, as a post of the thread is: the grip, the thumbnail, the alt text, and the
+    remove control.
 
-    ⚠️ The GRIP carries `draggable`, and never the tile: a draggable tile takes the pointer away
+    ⚠️ The grip carries `draggable`, and never the tile: a draggable tile takes the pointer away
     from the alt field inside it. The grip is a button and it takes the arrow keys, because a drag
     needs a pointer and this page must work without one. %>
 <%# ⚠️ `data-photo-alt-url` is the path of the Generate control of THIS tile. The server writes it

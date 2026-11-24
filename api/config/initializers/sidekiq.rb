@@ -13,12 +13,11 @@ redis_url = Rails.application.config.x.redis_url
 # quickly.
 #
 # The server: the fetch loop is a BRPOP with a 2s timeout on the server, and redis-client adds its
-# read timeout to that time and does not run the two at the same time. Thus the Sidekiq default of 3
-# gives a 5s budget for a reply that comes in 2s. That is short, and ordinary CPU competition on a
-# shared-cpu machine then raises out of the fetch loop. A value of 10 makes the window 12s, which
-# accepts a short problem and does not hide a true failure, because a Redis that the code cannot
-# reach raises CannotConnectError and still reports immediately. Refer to
-# lib/sidekiq_redis_timeout_filter.rb, which removes the reports that this still makes.
+# read timeout to that time. Thus the Sidekiq default of 3 gives a 5s budget for a reply that comes
+# in 2s, and ordinary CPU competition on a shared-cpu machine then raises out of the fetch loop. A
+# value of 10 makes the window 12s. That does not hide a true failure, because a Redis that the
+# code cannot reach raises CannotConnectError and still reports immediately.
+# lib/sidekiq_redis_timeout_filter.rb removes the reports that this still makes.
 #
 # The client: this runs in Puma, where more than one endpoint adds a job to the queue during a
 # request. Thus a long timeout would make a Redis delay into a request that stops, against the 20s

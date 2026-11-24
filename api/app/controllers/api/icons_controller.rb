@@ -6,11 +6,9 @@ module Api
   # It needs a bearer token, because a new id causes an upstream call that costs money. The edge
   # does not cache it: the build gets it, and FontAwesome already keeps each SVG in Redis.
   class IconsController < BaseController
-    # ⚠️ This is the maximum work for one request. Each icon that is not in the cache is a Font
-    # Awesome call that costs money and a Redis key that stays for a year. The rule that web posts
-    # small groups belongs to the caller, and this endpoint did not enforce it. The true list is ten
-    # times smaller than this limit, thus the limit catches only a request that is much too
-    # large.
+    # ⚠️ The maximum work for one request, because this endpoint cannot trust the caller to post
+    # small groups. Each icon that is not in the cache is a Font Awesome call that costs money and
+    # a Redis key that stays for a year. The true list is ten times smaller than this limit.
     MAX_ICONS = 250
 
     # The identifier shape of Font Awesome. Each other value can name no true icon, thus the code
@@ -21,9 +19,8 @@ module Api
       requested = params.to_unsafe_h[:icons]
       return render json: {}, status: :unprocessable_content unless requested.is_a?(Hash)
 
-      # The code makes one list and applies the limit before the first upstream call. Thus a request
-      # that is too large costs nothing, and the code does not pay for the icons before the
-      # refusal.
+      # The code applies the limit before the first upstream call. Thus a request that is too large
+      # costs nothing.
       triples = wanted_triples(requested)
       if triples.size > MAX_ICONS
         return render json: { error: "Too many icons; the limit is #{MAX_ICONS} per request." },

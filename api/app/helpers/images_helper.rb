@@ -13,16 +13,14 @@ module ImagesHelper
 
   # The `card` variant of config/srcsets.yml. ⚠️ That file is a copy of web/data/srcsets.yml, word
   # for word: the two cards go on the same page, thus a difference gives one image at the wrong
-  # size in the middle of one section. The file gives the method that makes the widths, and
-  # spec/contracts/srcsets_contract_spec.rb fails when the two copies are different.
+  # size. spec/contracts/srcsets_contract_spec.rb fails when the two copies are different.
   #
   # ⚠️ This reads the file one time, at the boot of the app, and `fetch` raises for a key that is
-  # absent. Thus a file with a fault stops the deploy. That is on purpose, and it is not the same
-  # as the rule below that `cdn_image_url` must never raise: that rule is about a REQUEST, where a
-  # raise gives a 500 and leaves an empty skeleton on the page.
+  # absent. Thus a file with a fault stops the deploy, on purpose. The rule that `cdn_image_url`
+  # must never raise is about a request, where a raise gives a 500.
   #
   # ⚠️ `aliases: true` is necessary. The file uses a merge key, and Psych 5 refuses an alias by
-  # default. Without the flag the app raises Psych::AliasesNotEnabled at boot.
+  # default.
   CARD = YAML.load_file(Rails.root.join("config", "srcsets.yml"), aliases: true).fetch("card").freeze
 
   CARD_SIZES = CARD.fetch("sizes").join(", ").freeze
@@ -30,27 +28,23 @@ module ImagesHelper
   # ⚠️ Keep the 1x desktop width first: `cover_image_tag` reads it for the `src`.
   CARD_WIDTHS = CARD.fetch("widths").map(&:to_i).freeze
 
-  # The shape of a cover image on a card: the height divided by the width. It comes from the
-  # `ratio` of the `card` variant, thus srcsets.yml is the ONE place that holds the shape and both
-  # apps read the same value.
+  # The shape of a cover image on a card: the height divided by the width. srcsets.yml is the one
+  # place that holds the shape, and both apps read the same value.
   CARD_RATIO = begin
     w, h = CARD.fetch("ratio").split(":", 2).map(&:to_i)
     Rational(h, w)
   end
 
-  # The same shape in the CSS form: it changes the colon into a slash. `cover_image_tag` writes it
-  # into the markup as `--card-ratio`, and _entry.scss reads it. Thus the stylesheet follows this
-  # file, and a person does not edit the shape in two languages.
+  # The same shape in the CSS form. `cover_image_tag` writes it into the markup as `--card-ratio`,
+  # and _entry.scss reads it. Thus a person does not edit the shape in two languages.
   CARD_ASPECT_RATIO = CARD.fetch("ratio").sub(":", " / ").freeze
 
   # The <img> of the cover image of an article card.
   #
   # ⚠️ It gives the element `alt=""`. The caller must put it in a link with `aria-hidden="true"`
-  # and `tabindex="-1"`. The headline below the image already links to the same page, thus without
-  # that, each card gives two identical tab stops and two identical entries in the link list of a
-  # screen reader.
+  # and `tabindex="-1"`. The headline already links to the same page, thus without that, each card
+  # gives two identical tab stops and two identical links to a screen reader.
   # ⚠️ Keep this the same as ImageHelpers#cover_image_tag of the static site.
-  # @param article [OpenStruct] The article.
   # @return [ActiveSupport::SafeBuffer, nil] The element, or nil when there is no image to render.
   def cover_image_tag(article)
     cover = article&.cover_image
@@ -104,9 +98,8 @@ module ImagesHelper
   # Makes a Cloudflare Images transformation URL on IMAGES_URL, from the mirror copy of the asset.
   #
   # ⚠️ It returns nil when IMAGES_URL or IMAGE_HOST has no value, and it never raises. The static
-  # site raises in the same condition, on purpose, because a raise there stops a bad deploy. A
-  # raise here gives a 500, and the live-update controller then leaves an empty skeleton on the
-  # page. Do not "correct" this into a raise.
+  # site raises in the same condition, because a raise there stops a bad deploy. A raise here
+  # gives a 500, and the live-update controller then leaves an empty skeleton on the page.
   # @param url [String, nil] The Contentful URL of the asset.
   # @param params [Hash] The transformation parameters (:w, :h, :fm, :fit).
   # @return [String, nil] The transformation URL, or nil when the app cannot make one.
@@ -121,9 +114,8 @@ module ImagesHelper
 
   # Changes the host of a Contentful asset URL to the R2 image mirror, and keeps the path.
   #
-  # ⚠️ The path is the contract with the api side that writes the object, and with the static site.
-  # Refer to AssetMirror#object_key. Never change the path.
-  # @param url [String, nil] The Contentful URL of the asset.
+  # ⚠️ Never change the path. It is the contract with the code that writes the object, and with
+  # the static site. Refer to AssetMirror#object_key.
   # @return [String, nil] The mirror URL, or nil for a blank URL, an unusable URL, or a host that
   #   is not ctfassets.
   def mirror_url(url)
@@ -143,7 +135,6 @@ module ImagesHelper
   end
 
   # Changes the transformation parameters into the Cloudflare option string.
-  # @param params [Hash] The transformation parameters (:w, :h, :fm, :fit).
   # @return [String] The options, in a fixed order.
   def cdn_image_options(params)
     options = []
@@ -158,9 +149,6 @@ module ImagesHelper
     options.join(",")
   end
 
-  # @param url [String] The Contentful URL of the asset.
-  # @param widths [Array<Integer>] The candidate widths.
-  # @return [String] The srcset attribute value.
   def card_srcset(url, widths)
     widths.map do |w|
       "#{cdn_image_url(url, fm: 'auto', w: w, h: (w * CARD_RATIO).round, fit: 'cover')} #{w}w"
@@ -169,7 +157,6 @@ module ImagesHelper
 
   # The candidate widths of a card image. It removes each width above the width of the asset,
   # because Cloudflare does not make an image larger than its source.
-  # @param asset_width [Integer, nil] The width of the asset.
   # @return [Array<Integer>] The widths, in order, with no duplicate.
   def card_widths(asset_width)
     candidates = CARD_WIDTHS.dup
@@ -181,7 +168,6 @@ module ImagesHelper
     candidates.uniq.sort
   end
 
-  # @param cover [OpenStruct] The cover image.
   # @return [String, nil] The data URI of the blurhash placeholder, or nil when there is none.
   def blurhash_placeholder(cover)
     BlurhashPlaceholder.new.read(cover.sys&.id, cover.sys&.published_version)

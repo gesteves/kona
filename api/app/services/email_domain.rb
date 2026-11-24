@@ -27,7 +27,6 @@ module EmailDomain
     mx_records(domain).any? { |mx| !mx.exchange.to_s.empty? }
   end
 
-  # @param domain [String]
   # @return [Array<Resolv::DNS::Resource::IN::MX>] Empty for NXDOMAIN and for an answer with no MX.
   # @raise [LookupError] If the lookup times out.
   def mx_records(domain)

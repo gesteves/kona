@@ -1,12 +1,11 @@
 # One Anthropic call with a structured output, or with a plain text answer. The services that make
 # such a call share it: the lines of the activity description, the subject line and the abuse check
 # of the contact form, and the alt text of a photo. They are different only in the env var that
-# names their model and in their token and timeout limits, thus each other part is in the code one
-# time.
+# names their model, and in their token and timeout limits.
 #
-# ⚠️ Use `extend` for this module, and not `include`. Both callers are `module_function` modules,
-# thus their own methods are singleton methods, and they could not see the instance methods of a
-# module that they include.
+# ⚠️ Use `extend` for this module, and not `include`. Each caller is a `module_function` module,
+# thus its own methods are singleton methods, and they cannot see the instance methods of a
+# module that it includes.
 #
 # The module that uses this supplies `DEFAULT_MODEL`, `MAX_TOKENS`, and `TIMEOUT_SECONDS`, and also
 # `anthropic_model_env`, which names the env var that replaces the model. A module whose call runs
@@ -21,8 +20,8 @@ module AnthropicStructuredOutput
   end
 
   # ⚠️ The code does not write the name of the env var here. Thus a `grep ENV\[` of the app does not
-  # find ANTHROPIC_DESCRIPTION_MODEL and ANTHROPIC_CONTACT_SUBJECT_MODEL. They are in .env.example.
-  # Look for `anthropic_model_env` when you compare the two.
+  # find the `ANTHROPIC_*_MODEL` variables. They are in .env.example. Look for
+  # `anthropic_model_env` when you compare the two.
   # @return [String] The model to call.
   def model
     ENV[anthropic_model_env].presence || self::DEFAULT_MODEL
@@ -39,8 +38,6 @@ module AnthropicStructuredOutput
   # Makes an Anthropic call with a structured output. Such an output is always correct JSON that
   # agrees with the schema in its first text block. Thus a caller can parse it and does not need a
   # check for plain text.
-  # @param system [String] The system prompt.
-  # @param user [String] The user message.
   # @param schema [Hash] The JSON schema that the response must agree with.
   # @return [Hash] The parsed output, with symbol keys.
   # @raise [Refusal] If the model declined the request.
@@ -53,7 +50,6 @@ module AnthropicStructuredOutput
   end
 
   # Makes an Anthropic call whose answer is plain text.
-  # @param system [String] The system prompt.
   # @param content [String, Array<Hash>] The user message: words, or an array of content blocks,
   #   for example an image and a text.
   # @return [String, nil] The first text block, stripped, or nil with none.
@@ -95,8 +91,8 @@ module AnthropicStructuredOutput
     model == "claude-sonnet-5-5" ? :between_tools : :disabled
   end
 
-  # The code keeps this value. Both callers made a new client for each call, and that read the key
-  # again and made the connection configuration again for no purpose.
+  # One client for all calls. A new client reads the key and makes the connection configuration
+  # again.
   def anthropic_client
     @anthropic_client ||= Anthropic::Client.new(api_key: ENV["ANTHROPIC_API_KEY"])
   end

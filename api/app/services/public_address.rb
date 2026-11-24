@@ -22,7 +22,6 @@ module PublicAddress
 
   PUBLIC_PORTS = [ 80, 443 ].freeze
 
-  # @param url [String, nil]
   # @return [Boolean] True for an http or https URL on a public host and a web port.
   def self.public_url?(url)
     uri = URI.parse(url.to_s)
@@ -55,7 +54,6 @@ module PublicAddress
     []
   end
 
-  # @param address [IPAddr]
   # @return [Boolean] True when the address is outside each private range.
   def self.public_ip?(address)
     address = address.native if address.ipv4_mapped?

@@ -1,6 +1,6 @@
 # Holds the data decisions of the race-day weather fragment of each event, thus the template does
-# not make them. It uses the helper code that exists — the event forecast lookup, the SF Bay current
-# lookup, and the SF locality check — and it does not copy that code.
+# not make them. It uses the helper code for the event forecast, the SF Bay conditions, and the SF
+# locality check, and it does not copy that code.
 class EventWeatherPresenter
   include EventsHelper
   include BayHelper
@@ -15,15 +15,14 @@ class EventWeatherPresenter
     @goodspeed = goodspeed
   end
 
-  # The forecast day for the date of the event. It has the sunrise and the sunset.
-  # @return [OpenStruct, nil]
+  # @return [OpenStruct, nil] The forecast day for the date of the event. It has the sunrise and
+  #   the sunset.
   def forecast_day
     return @forecast_day if defined?(@forecast_day)
     @forecast_day = event_forecast_day(event)
   end
 
-  # The daytime forecast for the date of the event.
-  # @return [OpenStruct, nil]
+  # @return [OpenStruct, nil] The daytime forecast for the date of the event.
   def forecast
     forecast_day&.daytime_forecast
   end

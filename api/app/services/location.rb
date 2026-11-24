@@ -1,7 +1,7 @@
 # The current geographic location, for the timezone lookup and, later, for the weather, the
 # elevation, and more. The location comes from the LOCATION env var, if that var has a correct
-# value. In all other conditions it comes from Redis, where the POST /location endpoint, which needs
-# a bearer token, and the Location page of the admin write it.
+# value. In all other conditions it comes from Redis, where the POST /api/location endpoint, which
+# needs a bearer token, and the Location page of the admin write it.
 class Location
   attr_reader :latitude, :longitude
   LOCATION_CACHE_KEY = "location:current"
@@ -21,7 +21,6 @@ class Location
     TimeZoneResolver.default
   end
 
-  # Checks a latitude and longitude pair.
   # @return [Boolean] True if the two coordinates are available and in the correct range.
   def self.valid_coordinates?(latitude, longitude)
     return false if latitude.blank? || longitude.blank?
@@ -80,8 +79,6 @@ class Location
   # ⚠️ Write to Redis first, then add the job. The widgets read the stored value, thus it must not
   # wait for a problem in the geocoder. You can do the sync more than one time, thus its Sidekiq
   # retries are safe.
-  # @param latitude [Float]
-  # @param longitude [Float]
   def self.store(latitude, longitude)
     $redis.set(LOCATION_CACHE_KEY, "#{latitude},#{longitude}")
     LocationSyncJob.perform_async(latitude, longitude)

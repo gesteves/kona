@@ -24,13 +24,12 @@
 
           <div class="wa-cluster wa-gap-s">
             <% if app.connectable? %>
-              <%# ⚠️ This uses `turbo: false`, because the connect path of Whoop is a same-origin URL
-                  that gives a 302 to another origin, and Turbo Drive cannot follow that. It is
-                  necessary: Turbo goes into a shadow root and out of it. It finds the <a> in
-                  wa-button through the composed path of the click, then it finds this attribute on
-                  the host. It has no condition, because for an app whose connect path is an
-                  ordinary admin page, such as the form of Bluesky, the only cost is a full page
-                  load. %>
+              <%# ⚠️ This uses `data-turbo="false"`, because the connect path of Whoop is a
+                  same-origin URL that gives a 302 to another origin, and Turbo Drive cannot follow
+                  that. Turbo finds the <a> in wa-button through the composed path of the click,
+                  then it finds this attribute on the host. It has no condition: for a connect path
+                  that is an ordinary admin page, such as the form of Bluesky, the only cost is a
+                  full page load. %>
               <wa-button href="<%= app.connect_path %>" variant="brand" appearance="accent"
                          data-turbo="false">
                 <%= slotted_icon_svg("classic", "light", "link") %>

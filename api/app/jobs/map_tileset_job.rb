@@ -6,8 +6,7 @@
 # does not do this work itself: the request budget is 20 seconds.
 #
 # This job is safe with the 24-hour retry from the parent class, because you can call
-# MapboxTileset#create_from_coordinates! more than one time: the source upload replaces the source
-# and does not add to it, a tileset that exists is a success, and a publish only makes a new job.
+# MapboxTileset#create_from_coordinates! more than one time.
 # ⚠️ The `kill_timeout` of fly is 30s, thus a deploy during a status read stops this job. Sidekiq
 # puts the job in the queue again after a clean SIGTERM, and the next attempt completes it.
 class MapTilesetJob < ApplicationJob

@@ -57,11 +57,11 @@ class ArticleTaxonomy
   end
 
   # The race concept of an article: its deepest sports concept at the race level or below it.
-  # @return [String, nil] The concept id, or nil when the article names no race.
   #
   # ⚠️ The depth is the length of the longest chain to a root, and not the number of ancestors.
   # A concept with two parents has more ancestors than its chain is long, and a count would call
   # a distance a race.
+  # @return [String, nil] The concept id, or nil when the article names no race.
   def race_concept_id(article)
     Array(article.concept_ids)
       .select { |id| @tree.dig(id, :scheme) == SPORTS_SCHEME }
@@ -73,7 +73,6 @@ class ArticleTaxonomy
 
   private
 
-  # @param id [String] A concept id.
   # @param seen [Set] The ids on the current chain, against a cycle.
   # @return [Integer] The length of the longest chain from the concept to a root, the concept
   #   included.

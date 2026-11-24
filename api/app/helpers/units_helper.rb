@@ -2,10 +2,8 @@ module UnitsHelper
   include ActiveSupport::NumberHelper
 
   # Changes a distance in meters into metric units or imperial units.
-  # @param meters [Float] The distance in meters.
-  # @param units [String] The unit system: 'si', 'metric', or 'imperial'. It is optional, and the
-  #   default is 'si'.
-  # @return [String] The distance as a string, in the given unit system.
+  # @param units [String] The unit system: "si", "metric", or "imperial".
+  # @return [String] The distance with its unit.
   def distance(meters, units: "si")
     case units
     when "si", "metric"
@@ -24,7 +22,6 @@ module UnitsHelper
     distance(meters, units: units).split(/\s+/, 2)
   end
 
-  # Formats a distance number with the given unit and the given number of decimals.
   def formatted_distance(distance, units, precision)
     number_to_human(distance, units: units, precision: precision,
                     strip_insignificant_zeros: true, significant: false, delimiter: ",")
@@ -48,27 +45,22 @@ module UnitsHelper
     end
   end
 
-  # Changes a temperature from Celsius into Fahrenheit.
   def celsius_to_fahrenheit(celsius)
     (celsius * (9.0 / 5.0)) + 32
   end
 
-  # Changes kilometers into miles.
   def kilometers_to_miles(km)
     km * 0.621371
   end
 
-  # Changes a speed from kilometers each hour into knots.
   def kph_to_knots(kph)
     kph * 0.539957
   end
 
-  # Changes meters into feet.
   def meters_to_feet(meters)
     meters * 3.28084
   end
 
-  # Changes millimeters into inches.
   def millimeters_to_inches(millimeters)
     millimeters / 25.4
   end

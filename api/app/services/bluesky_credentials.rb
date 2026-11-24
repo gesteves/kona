@@ -1,9 +1,8 @@
 # The Bluesky handle and app password that open a PDS session. The owner types them on the
 # Connected apps page of the admin, and Redis holds them.
 #
-# This is not an ApplicationService, because that base class is for HTTP integrations and this
-# class makes no network call. StandardSite checks a credential pair, because it is the class that
-# opens a session.
+# This class makes no network call, thus it is not an ApplicationService. StandardSite checks a
+# credential pair, because it is the class that opens a session.
 #
 # ⚠️ The app password is encrypted in the store (refer to EncryptedCredentials). It is an account
 # credential that works from each place, with no connection to one client.
@@ -32,9 +31,6 @@ class BlueskyCredentials
 
   # Replaces the stored pair. A caller must check the pair first: no code here tests that the
   # credentials open a session.
-  # @param handle [String]
-  # @param app_password [String]
-  # @return [void]
   def self.store(handle:, app_password:)
     $redis.hset(REDIS_KEY, "handle", handle.to_s.strip, "app_password", encrypt(app_password))
     nil

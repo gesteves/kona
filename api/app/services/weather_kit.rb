@@ -7,12 +7,11 @@ require "base64"
 class WeatherKit < ApplicationService
   WEATHERKIT_API_URL = "https://weatherkit.apple.com/api/v1/"
 
-  # ⚠️ This runs in the request of the weather widget, which has a 20s rack-timeout budget and
-  # approximately ten upstream calls. The timeout for each call and the full budget are both much
-  # smaller than the defaults of the app, on purpose. A chain of retries here with no limit — two
-  # with_retries calls, one in the other, and 14s of waits in each one on the shared defaults —
-  # uses the full request and gives the widget a 500. An empty fragment, where the edge serves its
-  # stale-if-error copy, is faster and is what the live-update contract needs.
+  # ⚠️ This runs in the request of the weather widget, which has a 20s rack-timeout and
+  # approximately ten upstream calls. Thus the timeout of each call and the full budget are much
+  # smaller than the defaults of the app. With the defaults, the two with_retries calls, one in
+  # the other, use the full request and give the widget a 500. An empty fragment is faster, and
+  # the edge then serves its stale-if-error copy.
   HTTP_TIMEOUT = 4
   REQUEST_BUDGET = 8.0
   # One quick second attempt gets past a short problem and does not use much of the budget.
@@ -22,8 +21,6 @@ class WeatherKit < ApplicationService
   # outage costs the full retry budget on each request.
   EMPTY_TTL = 1.minute
 
-  # @param latitude [Float]
-  # @param longitude [Float]
   # @param time_zone [String] An IANA timezone id.
   # @param country [String] An ISO country code.
   def initialize(latitude, longitude, time_zone, country)
@@ -41,8 +38,6 @@ class WeatherKit < ApplicationService
   HOURLY_HTTP_TIMEOUT = 10
 
   # Gets the hours of a time range, which can be in the past, at one location.
-  # @param latitude [Float]
-  # @param longitude [Float]
   # @param from [Time] The first hour. WeatherKit starts at the hour that contains it.
   # @param to [Time] The end of the range. WeatherKit does not include this hour.
   # @return [Array<Hash>, nil] The hours, with the camelCase keys of WeatherKit and metric units,
@@ -56,9 +51,6 @@ class WeatherKit < ApplicationService
 
   # Gets the moon phase of the UTC day that holds a moment, which can be in the past. The hourly
   # data set has no moon phase, thus this is a separate call to the daily data set.
-  # @param latitude [Float]
-  # @param longitude [Float]
-  # @param time [Time]
   # @return [String, nil] The `moonPhase` of WeatherKit, for example "waxingGibbous", or nil on a
   #   failure.
   def self.moon_phase(latitude, longitude, time)
@@ -174,19 +166,17 @@ class WeatherKit < ApplicationService
     end
   end
 
-  # The time that stays in the budget of this instance. The two calls share it, thus a slow
+  # The seconds that stay in the budget of this instance. The two calls share it, thus a slow
   # availability lookup uses part of the time of the weather lookup, and the worst case is not two
   # times as long.
-  # @return [Float]
   def remaining_budget
     [ @budget_expires_at - Process.clock_gettime(Process::CLOCK_MONOTONIC), 0.0 ].max
   end
 
-  # The ES256 JWT for the WeatherKit authentication. It is the same for the full app, because it
-  # has no latitude and no longitude, and it is good for one minute. But a signature, which loads
-  # the EC key and signs, is slow. Thus Redis holds it for a little less than its expiry time, and
-  # each request and each instance uses the same one.
-  # @return [String, nil]
+  # The ES256 JWT for the WeatherKit authentication. It has no latitude and no longitude, thus it
+  # is the same for the full app. A signature is slow, thus Redis holds the token for a little
+  # less than its expiry time of one minute.
+  # @return [String, nil] Nil when the code cannot sign a token.
   def token
     $redis.get("weatherkit:jwt") || generate_token
   end
@@ -195,7 +185,6 @@ class WeatherKit < ApplicationService
   # the extra 10s is for a clock difference and for a request in progress. On a failure it returns
   # nil and puts nothing in the cache.
   # @see https://developer.apple.com/documentation/weatherkitrestapi/request_authentication_for_weatherkit_rest_api
-  # @return [String, nil]
   def generate_token
     key_id = ENV["WEATHERKIT_KEY_ID"]
     team_id = ENV["WEATHERKIT_TEAM_ID"]

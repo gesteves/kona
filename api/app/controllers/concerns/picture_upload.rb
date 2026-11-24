@@ -41,8 +41,6 @@ module PictureUpload
     render json: { alt: text }
   end
 
-  # @param message [String]
-  # @param status [Symbol]
   def refuse(message, status: :unprocessable_content)
     render json: { error: message }, status: status
   end

@@ -1,7 +1,7 @@
-# Separates one upstream data source: it runs the block, and on a raise it writes a log line, sends a
-# report, and returns the fallback value. Thus a dependency that fails gives "no data" and does not
-# make the full widget a 500. The live-update contract needs an empty fragment, or a fragment with
-# some data, and not an error.
+# Separates one upstream data source: it runs the block, and on a raise it writes a log line,
+# sends a report, and returns the fallback value. Thus a dependency that fails gives "no data"
+# and does not make the full widget a 500. The live-update contract needs an empty fragment, or a
+# fragment with some data, and not an error.
 module UpstreamIsolation
   private
 

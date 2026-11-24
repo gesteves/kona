@@ -79,8 +79,8 @@
   }
 
   // ⚠️ The list is a `plain-list wa-stack` in the markup, and not a flex column here. The stack
-  // utility is what makes the `margin-inline-start` zero, which native.css puts on each <li>, and no
-  // rule on the <ul> can reach that margin.
+  // utility is what makes the `margin-inline-start` zero, which native.css puts on each <li>, and
+  // no rule on the <ul> can reach that margin.
   //
   // The full row is the button: a race is one target, and a separate "use this" control beside the
   // name would be a second target for the same click.
@@ -116,15 +116,13 @@
     overflow-wrap: anywhere;
   }
 
-  // The map stays visible while you read a long list of races. It must be below the sticky header:
-  // at the top of the viewport, the map goes under the header. The preview of the course-map editor
-  // does the same.
+  // The map stays visible while you read a long list of races. It must be below the sticky header,
+  // as the preview of the course-map editor is.
   //
   // ⚠️ This applies to a parent element, and not to the map element. Mapbox GL JS adds
-  // `mapboxgl-map` to its container and adds its own stylesheet to the head at run time, that is,
-  // after ours. Thus `.mapboxgl-map { position: relative }` wins over a `position: sticky` here with
-  // the same specificity, because of the order. `top` then becomes a plain relative offset that
-  // moves the map down the page by that amount, at each scroll position.
+  // `mapboxgl-map` to its container, and it adds its own stylesheet to the head after ours. Thus
+  // `.mapboxgl-map { position: relative }` wins over `position: sticky`, and `top` becomes a
+  // relative offset that moves the map down the page.
   &__view {
     position: sticky;
     top: calc(var(--header-height, 0px) + var(--wa-space-m));

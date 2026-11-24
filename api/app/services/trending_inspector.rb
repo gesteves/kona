@@ -19,7 +19,6 @@ class TrendingInspector
   end
 
   # The list as of each of the last `days` days, from one series that reaches that far back.
-  # @param days [Integer]
   # @return [Hash] { days: [ { date:, rows: } ], changes: } where `changes` is the mean number of
   #   new entries in the top WIDGET_COUNT from one day to the next.
   def replay(days:)

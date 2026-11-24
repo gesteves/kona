@@ -1,18 +1,17 @@
 // The mention patterns of the Social media composer, and the substitution that the character
 // count needs.
 //
-// ⚠️ **MENTION CONTRACT.** The three strings below are the sources of
+// ⚠️ MENTION CONTRACT. The three strings below are the sources of
 // `SocialMentions::TOKEN_SOURCE`, `SocialMentions::DOMAIN_SOURCE`, and `Bluesky::URL_PATTERN`,
 // character for character. `spec/contracts/social_mentions_contract_spec.rb` compares them.
 //
-// The browser needs its own copy because the count must follow each keystroke, and the count
-// measures the text that **Bluesky** will get: a mention grows into a handle, thus a count of the
-// raw words would say that a draft fits when Bluesky refuses it.
+// The browser needs its own copy because the count follows each keystroke, and it measures the
+// text that Bluesky gets. A mention grows into a handle, thus a count of the raw words would
+// permit a draft that Bluesky refuses.
 //
-// ⚠️ A difference between the two copies fails SAFE in both directions. A token that only the
-// browser finds gives a row that the action ignores. A token that only Ruby finds gets no row,
-// thus it has no value, thus the action removes its "@" and keeps the word. Neither one can tag
-// the wrong account.
+// ⚠️ A difference between the two copies fails safe in both directions. The action ignores the
+// row of a token that only the browser finds. A token that only Ruby finds has no row, thus the
+// action removes its "@" and keeps the word. Neither one can tag the wrong account.
 //
 // ⚠️ No `u` flag on any of these. These patterns index by UTF-16 code unit, as the ranges that
 // read them do, and `u` would change that.
@@ -21,8 +20,8 @@ export const TOKEN_SOURCE = "(?:^|[$|\\W])(@[a-zA-Z0-9](?:[a-zA-Z0-9._-]*[a-zA-Z
 export const DOMAIN_SOURCE = "(?:[a-zA-Z0-9](?:[a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9])?\\.)+[a-zA-Z](?:[a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9])?";
 export const URL_SOURCE = "(?:^|[$|\\W])(https?://\\S+)";
 
-// A Bluesky handle is a domain. ⚠️ It is the ONE shape that this file knows, because the count
-// only ever measures the Bluesky text. The other two networks are the concern of the server.
+// A Bluesky handle is a domain. ⚠️ It is the one shape that this file knows, because the count
+// measures the Bluesky text only. The server owns the other two networks.
 const BLUESKY_HANDLE = new RegExp(`^${DOMAIN_SOURCE}$`);
 
 /**
@@ -65,7 +64,6 @@ export function trimUrl(url) {
  *
  * ⚠️ `SocialText.url_ranges` trims the same way. Thus the mask of the typography, the mentions
  * that it skips, and the facets of a post all agree about where an address ends.
- * @param {string} text
  * @returns {Array<[number, number]>}
  */
 export function urlRanges(text) {
@@ -82,7 +80,6 @@ export function urlRanges(text) {
 
 /**
  * The character ranges of the first group of each match.
- * @param {string} text
  * @param {string} source A pattern whose first group ends the match.
  * @returns {Array<[number, number]>}
  */
@@ -104,8 +101,6 @@ export function groupRanges(text, source) {
  * Each mention token of a text, in order, with its "@" and the spelling of the owner.
  *
  * ⚠️ A token inside a URL is not a token: to replace one would break the address.
- * @param {string} text
- * @returns {string[]}
  */
 export function tokensOf(text) {
   const body = text ?? "";
@@ -116,26 +111,20 @@ export function tokensOf(text) {
     .map(([start, end]) => body.slice(start, end));
 }
 
-/**
- * The key of a token in the mention map. ⚠️ It folds the case, as SocialMentions.key does.
- * @param {string} token
- * @returns {string}
- */
+/** The key of a token in the mention map. ⚠️ It folds the case, as SocialMentions.key does. */
 export function mentionKey(token) {
   return (token ?? "").replace(/^@/, "").toLowerCase();
 }
 
-/**
- * The words that go in place of one token, for Bluesky.
- * @param {string} token
- * @param {string|undefined} value
- * @returns {string}
- */
 // ⚠️ It names each character, as markdown_links.js does. `trim()` reads Unicode space and
 // `String#strip` reads ASCII space, thus a value with a no-break space at its end would be a
 // handle in one file and words in the other.
 const TRIM = /^[ \t\r\n\f\v]+|[ \t\r\n\f\v]+$/g;
 
+/**
+ * The words that go in place of one token, for Bluesky.
+ * @param {string|undefined} value The Bluesky field of that mention.
+ */
 function replacement(token, value) {
   const raw = (value ?? "").replace(TRIM, "");
   if (!raw) return token.replace(/^@/, "");
@@ -150,11 +139,9 @@ function replacement(token, value) {
 /**
  * The text of a post as Bluesky will get it. The count measures this and not the raw words.
  *
- * ⚠️ It is ONE left-to-right pass, and never a replace for each entry of the map: a handle that
- * one pass wrote would be matched again by a later token.
- * @param {string} text
+ * ⚠️ It is one left-to-right pass, and never a replace for each entry of the map: a later token
+ * would match a handle that an earlier replace wrote.
  * @param {Object<string, string>} values The Bluesky field of each mention, by key.
- * @returns {string}
  */
 export function blueskyText(text, values) {
   const body = text ?? "";

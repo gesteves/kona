@@ -12,7 +12,6 @@ class JsonHashStore
     @key = key
   end
 
-  # @param id [String] The field.
   # @param record [Hash] The record. It must be JSON-serializable.
   # @return [Hash] The record.
   def write(id, record)
@@ -20,7 +19,6 @@ class JsonHashStore
     record
   end
 
-  # @param id [String]
   # @return [Hash, nil] The record, or nil when it is absent or cannot be read.
   def read(id)
     parse($redis.hget(@key, id))
@@ -37,7 +35,6 @@ class JsonHashStore
     end
   end
 
-  # @param ids [Array<String>]
   # @return [Integer] The number of records that the code removed.
   def delete(*ids)
     return 0 if ids.empty?
@@ -85,7 +82,6 @@ class JsonHashStore
 
   # The code removes a record with an incorrect shape and does not raise. One bad entry must not
   # stop the full page.
-  # @return [Hash, nil]
   def parse(raw)
     return nil if raw.blank?
 

@@ -1,6 +1,6 @@
 # Makes one structured line from the many request log lines of Rails. This is an API for machines
-# only, behind a CDN proxy. Thus the summary — the widget, the status, and the time — is all that a
-# person needs.
+# only, behind a CDN proxy. Thus the summary is all that a person needs: the widget, the status,
+# and the time.
 Rails.application.configure do
   config.lograge.enabled = !Rails.env.test?
 

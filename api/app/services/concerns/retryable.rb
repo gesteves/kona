@@ -1,8 +1,8 @@
 # Does a block again after a failure, with a wait that doubles each time, until the attempts or the
 # deadline end. It raises the last error at the end, and the includer decides what that means.
 #
-# The wait is a flat back-off. It does not add a random part, because this app is one tenant, thus
-# there is no group of clients to separate in time.
+# The wait has no random part, because this app is one tenant, thus there is no group of clients
+# to separate in time.
 module Retryable
   # @param max [Integer] The maximum number of attempts after the first attempt.
   # @param base_delay [Numeric] The seconds to wait before the second attempt. Each wait is two

@@ -42,7 +42,6 @@ class RelatedInspector < ApplicationService
 
   # The health of the corpus: how much of it the index holds, how many entries get a full section,
   # and how far the similarities separate.
-  # @return [Hash]
   def audit
     published = @articles.list.reject(&:draft)
     ids = published.filter_map { |article| article.sys&.id }

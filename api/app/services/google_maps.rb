@@ -9,8 +9,6 @@ class GoogleMaps < ApplicationService
 
   GOOGLE_MAPS_API_URL = "https://maps.googleapis.com/maps/api"
 
-  # @param latitude [Float] The latitude of the location.
-  # @param longitude [Float] The longitude of the location.
   def initialize(latitude, longitude)
     @latitude = latitude
     @longitude = longitude
@@ -18,7 +16,6 @@ class GoogleMaps < ApplicationService
 
   # The full location hash: the address from the geocoder, the timezone, and the elevation. This
   # starts all three lookups.
-  # @return [Hash]
   def location
     @location ||= { geocoded: geocoded, time_zone: time_zone, elevation: elevation }
   end
@@ -41,14 +38,12 @@ class GoogleMaps < ApplicationService
     @elevation = get_elevation&.dig(:elevation)
   end
 
-  # The timezone ID, in the form "America/Denver".
-  # @return [String, nil] The timezone ID.
+  # @return [String, nil] The timezone ID, in the form "America/Denver".
   def time_zone_id
     time_zone&.dig(:time_zone_id)
   end
 
-  # The country code of the coordinates.
-  # @return [String, nil] The country code, or nil if it is not available.
+  # @return [String, nil] The country code of the coordinates, or nil if it is not available.
   def country_code
     geocoded&.dig(:address_components)&.find { |component| component[:types]&.include?("country") }&.dig(:short_name)
   end
@@ -72,7 +67,6 @@ class GoogleMaps < ApplicationService
     end
   end
 
-  # Gets the elevation of the coordinates.
   # @see https://developers.google.com/maps/documentation/elevation/requests-elevation
   # @return [Hash, nil] The elevation data, or nil if the fetch fails.
   def get_elevation
@@ -87,7 +81,6 @@ class GoogleMaps < ApplicationService
     end
   end
 
-  # Gets the timezone data of the coordinates.
   # @see https://developers.google.com/maps/documentation/timezone/requests-timezone
   # @return [Hash, nil] The timezone data, or nil if the fetch fails.
   def get_time_zone

@@ -1,15 +1,13 @@
 require "time"
 
-# The record of each file that the media uploader sent to Contentful, and what became of it.
+# The record of each file that the media uploader sent to Contentful, and what became of it. It
+# makes no network call, thus it is not an ApplicationService.
 #
 # The page cannot say "it worked" at the submit: `ContentfulAssetJob` does the work, and the
 # processing of a file at Contentful is asynchronous. Thus the job writes its result here and the
 # page reads it again each few seconds, as the Maps page does with its tilesets.
 #
-# It is not an ApplicationService, because that base class is for HTTP integrations and this class
-# makes no network call.
-#
-# ⚠️ This is a short HISTORY and not a durable record. The asset itself is in Contentful, thus
+# ⚠️ This is a short history and not a durable record. The asset itself is in Contentful, thus
 # nothing here is the only copy of anything, and `#stage` prunes.
 class UploadLibrary
   include JsonRecordLibrary

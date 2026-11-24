@@ -14,8 +14,7 @@ module ActivityDescription
     # The separator of the parts, the same as in the other stat lines.
     SEPARATOR = " · ".freeze
 
-    # The parts, in this order: the conditions, the temperature, the humidity, the wind, and the AQI.
-    # @param summary [Hash] The summary of Weather.
+    # The parts, in order: the conditions, the temperature, the humidity, the wind, and the AQI.
     # @param changing [String, nil] The phrase of the LLM from the condition facts. With nil,
     #   the line uses #conditions.
     # @return [String] The line, with no emoji and no period at the end.
@@ -41,7 +40,6 @@ module ActivityDescription
     end
 
     # "3–5 mph W wind with 8 mph gusts (55% headwind)".
-    # @return [String]
     def wind(wind, headwind_percent, unit)
       speed = wind[:speed]
       text = [ "#{span(speed[:min], speed[:max])} #{unit}", wind[:direction], "wind" ].compact.join(" ")
@@ -51,7 +49,6 @@ module ActivityDescription
     end
 
     # "64°F–71°F (feels like 62°F–72°F)", with the unit at each end.
-    # @return [String, nil]
     def temperature(summary, unit)
       return if summary[:temperature].nil?
 

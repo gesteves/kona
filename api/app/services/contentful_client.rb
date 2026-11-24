@@ -12,8 +12,6 @@ class ContentfulClient < ApplicationService
   end
 
   # Does a GraphQL query.
-  # @param gql [String] The query.
-  # @param variables [Hash, nil] The variables of the query.
   # @return [Hash, nil] The `data` of the response, with symbol keys, or nil if there is no
   #   configuration or the request fails.
   def query(gql, variables = nil)

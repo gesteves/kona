@@ -30,9 +30,8 @@
 
   <div class="location__controls">
     <div class="location__summary">
-      <%# The name that the weather widget would show for these coordinates. This page is a preview
-          of that name, thus the code makes it again at each new staged location and it does not
-          become old. The status line below says if the app stored that location. %>
+      <%# The name that the weather widget would show for these coordinates. The code makes it again
+          at each new staged location. The status line says if the app stored that location. %>
       <h2 class="location__place wa-heading-l" data-location-map-target="place"><%= @location.heading %></h2>
       <%# The badge is the answer of the page to "did the app store this?". Thus it is with the
           coordinates, and not in the label of the button. `aria-live` is on the line and not on the
@@ -43,11 +42,10 @@
         <span data-location-map-target="status"><%= @location.details %></span>
       </p>
 
-      <%# Both are off at the first render, and that is correct: nothing is staged, thus there is
-          nothing to write and nothing to remove. The controller sets both on when the staged
-          location becomes different from the stored one, and it sets them off again after a
-          successful save, and after Undo puts the pin back. Each label is one word, thus neither
-          one looks like the larger action. %>
+      <%# Both are off at the first render, because nothing is staged. The controller sets both on
+          when the staged location becomes different from the stored one, and off again after a
+          successful save and after Undo. Each label is one word, thus neither one looks like the
+          larger action. %>
       <div class="location__actions">
         <wa-button class="location__save" variant="brand" appearance="accent" disabled
                    data-location-map-target="save" data-action="click->location-map#save">

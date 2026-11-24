@@ -10,9 +10,9 @@ class AirQuality
     @country_code = country_code
   end
 
-  # ⚠️ The code separates each provider. With `||=` alone, it uses Google only when PurpleAir returns
-  # *nil*. A raise goes past the Google code, thus that code never ran in the one condition that it
-  # exists for.
+  # ⚠️ Each provider has its own `safely`. With `||=` alone, the code uses Google only when
+  # PurpleAir returns *nil*. A raise goes past the Google call, and a raise is the one condition
+  # that the Google call exists for.
   # @return [OpenStruct, nil]
   def data
     aqi = safely("PurpleAir") { PurpleAir.new(@latitude, @longitude).aqi }

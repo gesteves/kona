@@ -1,8 +1,8 @@
 # Makes the text summary of the current-weather widget. It holds the rules (is the weather good or
-# bad, and is it the indoor season) and the methods that make each sentence. Those stay out of the
-# helper layer, which keeps the small format and selection methods (WeatherHelper).
-# This is a plain object: it holds the weather data of the request as its own state, and it gives
-# that data to each helper function that it calls.
+# bad, and is it the indoor season) and the methods that make each sentence. WeatherHelper keeps
+# the small format and selection methods.
+# This object holds the weather data of the request, and it gives that data to each helper
+# function that it calls.
 class WeatherSummaryPresenter
   include WeatherHelper   # forecast selection + condition/temperature/wind formatting
   include MarkupHelper    # units_tag
@@ -30,16 +30,13 @@ class WeatherSummaryPresenter
     @time_zone = time_zone.presence || TimeZoneResolver.default
   end
 
-  # Each of the two forecast selections reads the daily forecast from the start and parses two
-  # timestamps for each day, and more than one sentence needs them. This class keeps the values,
-  # because the state of the request is already here. WeatherHelper does not keep them, because it
-  # is a set of functions that use only their arguments, on purpose.
+  # Keeps the forecast of today for the request. More than one sentence needs it, and each
+  # selection parses two timestamps for each day. WeatherHelper keeps no value, because each of its
+  # functions uses only its arguments.
   #
-  # ⚠️ The value goes on `todays_forecast` itself, and not on another method, because sunrise and
-  # sunset, and through them daytime?, evening?, and rest_of_day_forecast, each call it. One summary
-  # calls it approximately ten times. A new selection method here makes all of those fast. Another
-  # method around it would cover only the direct callers. Each other weather object goes to the
-  # original method.
+  # ⚠️ The value goes on `todays_forecast` itself, and not on a method around it. sunrise, sunset,
+  # daytime?, evening?, and rest_of_day_forecast each call it, and a method around it would cover
+  # only the direct callers. Each other weather object goes to the original method.
   def todays_forecast(weather = @weather)
     return super unless weather.equal?(@weather)
     return @todays_forecast if defined?(@todays_forecast)
@@ -53,8 +50,7 @@ class WeatherSummaryPresenter
     @rest_of_day = rest_of_day_forecast(@weather, @time_zone)
   end
 
-  # The same shape for the events: race_day? calls todays_race, and the summary calls it five
-  # times.
+  # The same rule for the events: race_day? calls todays_race.
   def todays_race(events = @events, time_zone = @time_zone)
     return super unless events.equal?(@events) && time_zone == @time_zone
     return @todays_race if defined?(@todays_race)
@@ -135,10 +131,9 @@ class WeatherSummaryPresenter
   def wind
     current = current_weather(@weather)
     direction = wind_direction(current&.wind_direction)
-    # ⚠️ Do the check before the format, and not after. WeatherKit omits some fields, and the
-    # `.round` in format_wind_speed makes a windSpeed that is absent into a NoMethodError. The
-    # widget then gives a 500 and does not go away. A nil speed becomes 0 knots, which is
-    # Beaufort 0, thus this method returns here.
+    # ⚠️ Do the check before the format. WeatherKit omits some fields, and a wind speed that is
+    # absent must give no sentence. A nil speed becomes 0 knots, which is Beaufort 0, thus this
+    # method returns here.
     wind_speed_knots = kph_to_knots(current&.wind_speed.to_f)
     return if direction.blank? || beaufort_number(wind_speed_knots).zero?
 
@@ -197,9 +192,6 @@ class WeatherSummaryPresenter
     text.join(", ")
   end
 
-  # ⚠️ The sun times are absent above the polar circles, and weather_data_is_current?, the check
-  # that lets the rest of the summary use its data, does not test them. Remove the line, and do not
-  # remove the full widget.
   # The name of the location, one time for each summary. Three sentences read it.
   # @return [String, nil]
   def location_name
@@ -208,6 +200,8 @@ class WeatherSummaryPresenter
     @location_name = format_location(@location)
   end
 
+  # ⚠️ The sun times are absent above the polar circles, and weather_data_is_current? does not
+  # test them. Remove the line, and do not remove the full widget.
   def sunrise_or_sunset
     now = Time.now
     todays_sunrise = sunrise(@weather, @time_zone)

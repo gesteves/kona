@@ -77,9 +77,7 @@
               <% end %>
 
               <%# Use neutral and not danger, for the same reason as on the spam cards: the brand
-                  colors here are red. Thus a danger variant beside a brand-accent button makes the
-                  safe action the most prominent one on the card. Red is for the confirm button in
-                  the dialog only. %>
+                  colors here are red. Red is for the confirm button in the dialog only. %>
               <wa-button variant="neutral" appearance="outlined" data-dialog="open <%= track.dialog_id %>">
                 <%= slotted_icon_svg("classic", "light", "trash") %>
                 <%= t("admin.actions.delete") %>

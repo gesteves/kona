@@ -1,12 +1,9 @@
 # The Threads access token of the connected account, and the record of a refused refresh. Redis
-# holds them, and the OAuth round trip on the Connected apps page of the admin writes them.
+# holds them, and the OAuth round trip on the Connected apps page of the admin writes them. This
+# class makes no network call, thus it is not an ApplicationService: Threads talks to the API.
 #
-# ⚠️ The app credentials are NOT here: THREADS_APP_ID and THREADS_APP_SECRET come from the Meta
-# dashboard through the environment, as the Whoop client does. This store holds the part that
-# belongs to the account.
-#
-# This is not an ApplicationService, because that base class is for HTTP integrations and this
-# class makes no network call. Threads is the class that talks to the API.
+# ⚠️ The app credentials are not here: THREADS_APP_ID and THREADS_APP_SECRET come from the
+# environment, as the Whoop client does. This store holds the part that belongs to the account.
 #
 # ⚠️ The access token is encrypted in the store (refer to EncryptedCredentials). It posts as the
 # owner.
@@ -30,9 +27,8 @@ class ThreadsCredentials
     # @return [Boolean] True if an account is connected now.
     def usable? = access_token.present?
 
-    # ⚠️ Meta refuses a refresh before the token is 24 hours old. The scheduled job must count that
-    # as "not yet" and never as a failure, or the card says "Needs attention" for a connection that
-    # a person made minutes ago.
+    # ⚠️ The scheduled job must count a token below MIN_TOKEN_AGE as "not yet" and never as a
+    # failure, or the card says "Needs attention" for a connection that a person made minutes ago.
     # @return [Boolean] True if the token is old enough to refresh.
     def refreshable? = usable? && issued_at.present? && issued_at <= MIN_TOKEN_AGE.ago
 
@@ -63,9 +59,6 @@ class ThreadsCredentials
   # Stores the account at the end of the OAuth round trip.
   # @param access_token [String] The long-lived token.
   # @param expires_in [Integer, nil] The seconds that Meta gives it.
-  # @param user_id [String] The Threads id of the account.
-  # @param username [String] The name to show in the admin.
-  # @return [void]
   def self.store_account(access_token:, expires_in:, user_id:, username:)
     $redis.hset(REDIS_KEY, "user_id", user_id.to_s, "username", username.to_s)
     store_access_token(access_token: access_token, expires_in: expires_in)
@@ -75,10 +68,8 @@ class ThreadsCredentials
   # account, thus this keeps the user id and the name.
   #
   # It also removes the record of a refused refresh: a token that arrives is the correction.
-  # @param access_token [String]
   # @param expires_in [Integer, nil] The seconds that Meta gives it. With no value, or a value that
   #   is not positive, the token gets DEFAULT_TOKEN_LIFETIME.
-  # @return [void]
   def self.store_access_token(access_token:, expires_in:)
     now = Time.current
     lifetime = expires_in.to_i.positive? ? expires_in.to_i.seconds : DEFAULT_TOKEN_LIFETIME

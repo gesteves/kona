@@ -1,19 +1,17 @@
 require "time"
 
-# Presents one GPX track that a user uploaded, as a card on the Maps index and as the subject of
-# the render-settings page.
+# Presents one GPX track that a user uploaded, as a card on the Course maps index and as the
+# subject of the render-settings page.
 #
-# The caller gives each path, and this class does not make one. ConnectedAppPresenter does the same.
-# Thus the view uses no route helper and this presenter uses no Rails URL code.
+# The caller gives each path, thus the view uses no route helper and this presenter uses no Rails
+# URL code.
 class MapTrackPresenter
   attr_reader :id, :title, :activity_type, :error,
     :show_path, :preview_path, :download_path, :delete_path
 
   # @param record [Hash] One TrackLibrary record.
-  # @param show_path [String] The settings page of this track.
   # @param preview_path [String] The preview image, through the proxy.
   # @param download_path [String] The full-size download, through the proxy.
-  # @param delete_path [String] The path that the delete form posts to.
   def initialize(record:, show_path:, preview_path:, download_path:, delete_path:)
     @id = record["id"].to_s
     @title = record["title"].to_s
@@ -42,7 +40,6 @@ class MapTrackPresenter
   # @return [Boolean] True if the publish stopped after the last attempt.
   def failed? = status == "failed"
 
-  # @return [String] The label of the badge for the current status.
   def status_label
     I18n.t("admin.course_maps.status.#{status}")
   end
@@ -58,12 +55,11 @@ class MapTrackPresenter
   # @return [String] The sport, for example "Road Biking".
   def summary = @activity_type
 
-  # The render settings. Each key that is absent gets its default value, because a record from
-  # before a new setting must still render.
+  # The render settings. Each key that is absent gets its default value, because an old record
+  # must still render.
   #
-  # A "custom" style that is in fact a Mapbox style belongs in the dropdown, and not in the override
-  # box. Thus the box stays empty until it truly replaces a style. This is also how a record from
-  # before the dropdown, when each style was in `style_url`, changes itself at the first read.
+  # A "custom" style that is in fact a Mapbox preset belongs in the dropdown, and not in the
+  # override box. Thus a record that holds a preset in `style_url` moves it at the read.
   # @return [Hash]
   def settings
     return @merged_settings if defined?(@merged_settings)
@@ -75,8 +71,6 @@ class MapTrackPresenter
     @merged_settings = merged
   end
 
-  # @param key [String] The name of a setting.
-  # @return [Object] Its current value.
   def setting(key) = settings[key]
 
   # @return [String] The DOM id of the delete-confirmation dialog of this track.

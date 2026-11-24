@@ -5,7 +5,7 @@ import { Controller } from "@hotwired/stimulus";
  *
  * ⚠️ The countdown of a `<wa-toast-item>` stops when Turbo disconnects the DOM, and it never starts
  * again. Thus a message in the snapshot appears again, and it does not go away, at the next
- * restoration visit. The flash controller and the dialog controller exist for the same problem.
+ * restoration visit. The dialog controller exists for the same problem.
  */
 export default class extends Controller {
   connect() {

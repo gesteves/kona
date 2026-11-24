@@ -29,8 +29,7 @@ module ActivityDescription
 
     module_function
 
-    # @param activity [Hash] The Intervals.icu activity.
-    # @param day_activities [Array<Hash>] The Intervals.icu activities of its date.
+    # @param day_activities [Array<Hash>] The Intervals.icu activities of the date of the activity.
     # @param race_name [String, nil] The race of that date, from TrainerRoad#race_name.
     # @return [Leg, nil] The leg, or nil when the activity is not a leg of the race.
     def find(activity, day_activities:, race_name:)
@@ -57,7 +56,6 @@ module ActivityDescription
     # A transition is T1 after the swim and T2 after the bike. A race with no swim starts with the
     # bike, thus its one transition comes after the bike and is T2. With no leg before it, the next
     # leg decides: T1 before the bike.
-    # @return [String, nil]
     def label_in_group(group, index)
       return if index.nil?
 
@@ -73,7 +71,6 @@ module ActivityDescription
 
     # The bike and the run of a race in separate files. Each activity of a multisport file is out of
     # this search.
-    # @return [Leg, nil]
     def separate_leg(activity, day_activities, race_name)
       singles = day_activities.reject { |candidate| multisport_group(candidate, day_activities) }
                               .sort_by { |candidate| candidate[:start_date].to_s }
@@ -98,8 +95,7 @@ module ActivityDescription
     # that distance, inside DISTANCE_TOLERANCE. With no distance, it is the longest run of the day.
     # ⚠️ Without a distance, a warm-up that uploads before the race ends is the longest run at that
     # moment, and it keeps the name.
-    # @param activity [Hash] The Intervals.icu activity.
-    # @param day_activities [Array<Hash>] The Intervals.icu activities of its date.
+    # @param day_activities [Array<Hash>] The Intervals.icu activities of the date of the activity.
     # @param races [Array<Hash>] The A, B, and C races of that date, from Intervals#race_events.
     # @return [Leg, nil] The leg, or nil when the activity is not the race run, or with no running
     #   race, or with more than one.

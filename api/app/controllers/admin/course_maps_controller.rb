@@ -19,8 +19,8 @@ module Admin
 
     # POST /course-maps
     def create
-      # The code removes each item that is not an upload and does not examine it. An empty file
-      # field posts a blank string, and a request that a person makes can post any content.
+      # It keeps the uploads only. An empty file field posts a blank string, and a request that a
+      # person makes can post any content.
       files = Array(params[:gpx_files]).grep(ActionDispatch::Http::UploadedFile)
       return redirect_to(course_maps_path, status: :see_other, alert: t("admin.course_maps.flash.no_files")) if files.empty?
 
@@ -42,9 +42,8 @@ module Admin
 
     # GET /course-maps/:id
     #
-    # The settings in the query string replace the stored settings. Thus the path with no
-    # JavaScript, where you submit the form and get a new page, shows the same render as the live
-    # preview.
+    # The settings in the query string replace the stored settings. Thus the page with no
+    # JavaScript shows the same render as the live preview.
     def show
       record = find_track!
       return if performed?
@@ -56,8 +55,8 @@ module Admin
 
     # PATCH /course-maps/:id
     #
-    # Saves each change to the render settings. Thus a track that you open again has the settings
-    # from the last session. The preview controller calls this, and not a form submission.
+    # Saves the render settings, thus a track that you open again keeps them. The preview
+    # controller calls this, and not a form submission.
     def update
       record = library.update_settings(params[:id], settings_params)
       return head :not_found if record.nil?
@@ -87,10 +86,7 @@ module Admin
     # browser.
     #
     # This renders at 2x, as the download does, and not at a smaller preview size. The API bills
-    # for each request and not for each pixel, thus a smaller render saves nothing important. The
-    # zoom dialog also shows this same image at its full width, and at 1x that is half the pixels
-    # that a retina screen needs. The cost is the bandwidth for each change, and the debounce
-    # already limits that.
+    # for each request and not for each pixel, and the zoom dialog shows this image at full width.
     def preview
       send_render(disposition: "inline")
     end
@@ -192,18 +188,16 @@ module Admin
       map = StaticMap.new(track: record, settings: render_settings(record))
       send_data map.render, type: "image/png", disposition: disposition, filename: map.filename
     # ⚠️ This is the same group of errors that StaticMap#get_with_retries catches, because that
-    # method raises the original exception again after the last attempt and does not put it in
-    # another error. A rescue of RenderError alone let a Mapbox timeout become a 500 that nothing
-    # caught. Bugsnag then reported a crash, and an <img> got that 500. These two actions exist to
-    # give a clean status code instead.
+    # method raises the original exception again after its last attempt. A rescue of RenderError
+    # alone would let a Mapbox timeout become a 500, and an <img> would get that 500.
     rescue StaticMap::RenderError, Net::OpenTimeout, Net::ReadTimeout, SocketError,
            Errno::ECONNRESET, HTTParty::Error => e
       Rails.logger.error("Maps: render failed for #{params[:id]} (#{e.class}: #{e.message})")
       head :bad_gateway
     end
 
-    # The query parameters replace the stored settings. Thus the preview can change with the form
-    # and does not need a save first.
+    # The query parameters replace the stored settings. Thus the preview changes with the form and
+    # needs no save first.
     def render_settings(record)
       (record["settings"] || {}).merge(settings_params)
     end

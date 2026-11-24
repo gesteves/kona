@@ -1,10 +1,8 @@
-# One file that the owner picked on the media uploader, between the pick and the submit.
+# One file that the owner picked on the media uploader, between the pick and the submit. It makes
+# no network call, thus it is not an ApplicationService.
 #
-# The bytes are NOT here: they went to Contentful at the pick, and this record keeps only the id of
-# that Upload. The thumbnail is here, because the tile shows it and Claude reads it.
-#
-# It is not an ApplicationService, because that base class is for HTTP integrations and this class
-# makes no network call.
+# The bytes are not here: they went to Contentful at the pick, and this record keeps only the id
+# of that Upload. The thumbnail is here, because the tile shows it and Claude reads it.
 #
 # ⚠️ One key for each file, with a TTL, as `SocialPhotos` has. A page that the owner never submits
 # must not keep its records for all time. Thus these keys are in group 2 of "What Redis holds", and
@@ -21,8 +19,6 @@ class StagedUpload
   # Keeps one picked file.
   # @param thumbnail [String] The small JPEG of the tile, which Claude also reads.
   # @param upload_id [String] The Upload of Contentful that holds the original bytes.
-  # @param file_name [String] The name of the file that the owner picked.
-  # @param content_type [String] Its media type.
   # @param width [Integer] The width of the thumbnail.
   # @param height [Integer] The height of the thumbnail.
   # @return [String] The id.
@@ -31,7 +27,6 @@ class StagedUpload
                    "content_type" => content_type.to_s, "width" => width.to_i, "height" => height.to_i)
   end
 
-  # @param id [String]
   # @return [Hash, nil] The record with symbol keys, or nil when the file is absent.
   def fetch(id)
     return nil unless self.class.id?(id)

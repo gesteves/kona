@@ -1,20 +1,18 @@
 require "time"
 
-# The GPX tracks that a user uploads on the Maps page of the admin, and their Mapbox tilesets.
+# The GPX tracks that a user uploads on the Course maps page of the admin, and their Mapbox
+# tilesets.
 #
-# To render a map, the code needs the bounding box of the track, its two end points, and its sport.
-# The GPX parse gives all of them. The code removes the upload after Mapbox has the geometry, thus
-# it keeps those values here. Without them the settings screen could not put the pins on a track
-# from last week.
+# The code removes the upload after Mapbox has the geometry. Thus the record keeps what a render
+# needs from the GPX parse: the bounding box of the track, its two end points, and its sport.
 #
 # It is not an ApplicationService, because that base class is for HTTP integrations and this class
 # makes no network call.
-#
-# One Redis hash holds the records (refer to JsonHashStore), with the track id as the field.
 class TrackLibrary
   include JsonRecordLibrary
 
-  # The Redis hash: the field is the track id, and the value is the JSON record.
+  # The Redis hash: the field is the track id, and the value is the JSON record. Refer to
+  # JsonHashStore.
   REDIS_KEY = "maps:tracks".freeze
 
   # Holds the coordinates that an upload in the queue still needs.
@@ -33,7 +31,6 @@ class TrackLibrary
   # `app` and `worker` are different fly machines, thus the worker cannot read a temporary file
   # from the request. And a track with 9,000 points is a few hundred KB, which is too large for a
   # record that the index page loads in full, and too large for a Sidekiq argument.
-  #
   # @param track [GpxTrack] The upload after the parse.
   # @return [String] The track id.
   def stage(track)
@@ -57,9 +54,7 @@ class TrackLibrary
     id
   end
 
-  # The coordinates for a track, if they did not expire.
-  # @param id [String]
-  # @return [Array<Array<Float>>, nil]
+  # @return [Array<Array<Float>>, nil] The coordinates for a track, or nil after they expired.
   def pending_coordinates(id)
     raw = $redis.get(pending_key(id))
     return nil if raw.blank?
@@ -70,16 +65,13 @@ class TrackLibrary
     nil
   end
 
-  # @param id [String]
   def discard_pending(id)
     $redis.del(pending_key(id))
   end
 
   # Replaces the render settings of a track. It keeps only the keys that are settings, thus a form
   # that an attacker makes cannot write other fields into the record.
-  # @param id [String]
-  # @param settings [Hash]
-  # @return [Hash, nil] The updated record.
+  # @return [Hash, nil] The updated record, or nil with no such track.
   def update_settings(id, settings)
     record = find(id)
     return nil if record.nil?
@@ -94,7 +86,6 @@ class TrackLibrary
   end
 
   # Removes a track, and the coordinates that its upload still holds.
-  # @param id [String]
   # @return [Boolean] True if the code removed a record.
   def delete(id)
     discard_pending(id)

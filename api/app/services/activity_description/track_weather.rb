@@ -69,7 +69,6 @@ module ActivityDescription
 
     # The points that got hours, in track order, as the track point with :hours. A query point with
     # no hours stops the calls, and the track after the last query point with hours gets no weather.
-    # @return [Array<Hash>]
     def query_points
       @query_points ||= begin
         queried = []
@@ -90,7 +89,6 @@ module ActivityDescription
     # The first track point in each cell that the track enters, and the last point. A cell that the
     # track enters again gets a query point again, and it shares the call. With more than MAX_CALLS
     # points, an even share of them.
-    # @return [Array<Hash>]
     def cell_points
       points = []
       @points.each { |point| points << point if points.empty? || cell(point) != cell(points.last) }
@@ -166,7 +164,6 @@ module ActivityDescription
     # Mixes two weather values: linear for the LINEAR_FIELDS, a vector for the wind direction, and
     # the code, the precipitation type, and the daylight of the nearer one.
     # @param share [Float] The share of the second value, from 0 to 1.
-    # @return [Hash]
     def mix(first, second, share)
       values = LINEAR_FIELDS.index_with do |field|
         a = first[field]
@@ -215,10 +212,8 @@ module ActivityDescription
     end
 
     # The condition code of a point. A code that is already precipitation stays the same.
-    # @param code [String, nil] The condition code of the hour.
     # @param type [String, nil] The `precipitationType` of the hour, for example "rain".
     # @param intensity [Float, nil] The rate of precipitation, in mm/h.
-    # @return [String, nil]
     def wet_code(code, type, intensity)
       return code if code.present? && precipitation_type(code)
       return code if intensity.to_f < MIN_PRECIPITATION_MM_PER_HOUR

@@ -6,7 +6,6 @@
 class Resend < ApplicationService
   RESEND_API_URL = "https://api.resend.com/emails"
 
-  # @param api_key [String] The Resend API key.
   # @param from [String] The sender address, on a domain that Resend verified.
   def initialize(api_key: ENV["RESEND_API_KEY"], from: ENV["CONTACT_FROM_ADDRESS"])
     @api_key = api_key
@@ -18,11 +17,7 @@ class Resend < ApplicationService
     @api_key.present? && @from.present?
   end
 
-  # Sends an email.
-  # @param to [String] The address of the receiver.
-  # @param subject [String] The subject line.
-  # @param text [String] The plain-text body.
-  # @param reply_to [String, nil] The Reply-To address.
+  # Sends a plain-text email.
   # @param idempotency_key [String, nil] The same key at each attempt of one email. Resend keeps it
   #   for 24 hours and sends that email one time only. Thus a retry after a timeout, where Resend
   #   already accepted the email, sends nothing more.

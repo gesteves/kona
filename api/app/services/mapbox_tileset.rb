@@ -17,12 +17,12 @@ class MapboxTileset
   # letters, digits, spaces, "-", "_", and ".".
   MAX_NAME_LENGTH = 64
 
-  # An MTS publish job is asynchronous. Read the job status until the job ends.
+  # An MTS publish job is asynchronous, thus the code reads the job status until the job ends.
   #
-  # ⚠️ A track with approximately 9,000 points takes approximately three and a half minutes to
-  # publish, thus the timeout has much less extra time than it looks. A stop raises, and the next
-  # attempt then does a full upload again. Thus the timeout is long, on purpose. A worker thread
-  # for this length of time is acceptable at concurrency 5 for a queue that only the owner fills.
+  # ⚠️ The timeout is long, on purpose. A track with approximately 9,000 points takes
+  # approximately three and a half minutes to publish. A stop raises, and the next attempt then
+  # does a full upload again. A worker thread for this length of time is acceptable at
+  # concurrency 5 for a queue that only the owner fills.
   POLL_INTERVAL = 5   # seconds between job-status polls
   POLL_TIMEOUT  = 600 # give up after this many seconds
   HTTP_TIMEOUT  = 30  # per-request timeout
@@ -49,9 +49,7 @@ class MapboxTileset
   # You can do this more than one time, and the retry policy of the job depends on that: the source
   # upload replaces the source and does not add to it, a tileset that exists is a success, and a
   # publish only makes a new job.
-  #
   # @param id [String] The Mapbox tileset and source id (32 characters or less, [-_] only).
-  # @param name [String] A readable name for the tileset.
   # @param coordinates [Array<Array<Float>>] The track points, as [lon, lat] pairs.
   # @return [String] The full tileset id ("username.id").
   def create_from_coordinates!(id:, name:, coordinates:)
@@ -68,9 +66,7 @@ class MapboxTileset
   #
   # A 404 from one of them is a success, because the object is gone. Each other error raises. Thus
   # a delete that fails does not remove the local record and keep the remote one.
-  #
   # @param id [String] The Mapbox tileset id, with no user name at the start.
-  # @return [true]
   def destroy!(id)
     delete!("#{API}/#{@username}.#{id}", "delete tileset")
     delete!("#{API}/sources/#{@username}/#{id}", "delete tileset source")
@@ -86,10 +82,9 @@ class MapboxTileset
     raise upload_error(action, response)
   end
 
-  # Makes GeoJSON with one line for each item (here, one LineString Feature on one line) and PUTs
-  # it as a tileset source. It replaces a source with the same id. A POST would add to a source
-  # that exists and would collect old tracks. A PUT replaces, thus a second upload gives only this
-  # track.
+  # Makes GeoJSON with one item on each line (here, one LineString Feature) and PUTs it as a
+  # tileset source. A PUT replaces a source with the same id. A POST would add to it, and the
+  # source would collect old tracks.
   def upload_source(id, coordinates)
     feature = {
       type: "Feature",
@@ -112,8 +107,8 @@ class MapboxTileset
   end
 
   # Makes the tileset from a recipe. The LAYER_NAME key sets the source-layer name. A second run
-  # gets an "already exists" error, which is not a problem: the code refreshed the source above and
-  # the publish makes the tiles again. Thus the code continues.
+  # gets an "already exists" error, and the code continues: the source is already new, and the
+  # publish makes the tiles again.
   def create_tileset(id, name)
     recipe = {
       version: 1,
@@ -140,10 +135,9 @@ class MapboxTileset
     raise upload_error("create tileset", response)
   end
 
-  # Changes a readable name into the set of characters that Mapbox permits. It changes the text to
-  # ASCII, thus "Coeur d'Alene" loses its curly apostrophe and its accents. It removes each
-  # character outside [letter, digit, space, -, _, .], makes each group of spaces into one space,
-  # and cuts the result at MAX_NAME_LENGTH.
+  # Changes a readable name into the characters that Mapbox permits, and cuts it at
+  # MAX_NAME_LENGTH. The text becomes ASCII first, thus "Coeur d'Alene" loses its curly apostrophe
+  # and its accents, and keeps its letters.
   def sanitize_name(name)
     ActiveSupport::Inflector.transliterate(name.to_s)
       .gsub(/[^a-zA-Z0-9 \-_.]/, "")
@@ -190,8 +184,7 @@ class MapboxTileset
     end
   end
 
-  # A tileset create for an id that exists returns a 4xx with a message that says that it already
-  # exists. Count that as a success, thus you can run this more than one time.
+  # @return [Boolean] True for the 4xx that Mapbox gives for a tileset id that already exists.
   def already_exists?(response)
     parsed_message(response).to_s.match?(/already exists/i)
   end

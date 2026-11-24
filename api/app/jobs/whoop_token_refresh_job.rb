@@ -13,7 +13,7 @@ class WhoopTokenRefreshJob < ApplicationJob
     return unless whoop.valid_credentials? && whoop.connected?
 
     if whoop.refresh_tokens!.present?
-      # The label of the Connected apps page. This covers a connection from before the app stored
+      # The label of the Connected apps page. A connection can have no stored email, and this gets
       # it, thus no person has to authorize again to see which account is connected.
       whoop.store_account_email! if whoop.account_email.blank?
       Rails.logger.info("Whoop access token refreshed on schedule")

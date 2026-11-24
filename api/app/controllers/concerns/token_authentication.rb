@@ -1,6 +1,6 @@
-# The bearer-token authentication of the write endpoints, for example POST /api/location. It
-# compares the `Authorization: Bearer <token>` header with the API_TOKEN env var, and that comparison
-# always takes the same time.
+# The bearer-token authentication of the endpoints for a machine: /widgets/* and /api/*. It
+# compares the `Authorization: Bearer <token>` header with the API_TOKEN env var, and that
+# comparison always takes the same time.
 module TokenAuthentication
   extend ActiveSupport::Concern
 

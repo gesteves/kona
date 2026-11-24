@@ -3,7 +3,7 @@
 // ⚠️ There is no padding here: <wa-page> already gives padding to the `main` in its slot, and more
 // padding here makes it two times as large. There is also no maximum width: the shell fills the
 // window, thus each element that needs a reading width asks for one itself, for example `wa-prose`
-// at 65ch. Each page is not in a narrow column at the center.
+// at 65ch.
 
 // The page header, from layouts/_page_header.html.erb. It is a `wa-stack`, thus its children have
 // no margin.

@@ -1,25 +1,19 @@
 require "time"
 
-# Presents one contact-form submission from the quarantine, as a card on the Contact page.
-#
-# It shows the same fields as the notification email. Thus a message here gives the owner the same
-# data that their inbox would give.
+# Presents one contact-form submission from the quarantine, as a card on the Spam page. It shows
+# the same fields as the notification email.
 #
 # ⚠️ Each string here is input from an attacker, and no code removes anything from it. This class
-# only formats a value and makes it shorter. It never marks a value `html_safe`, and the view must
-# render each value with a plain `<%= %>`.
+# never marks a value `html_safe`, and the view must render each value with a plain `<%= %>`.
 class SpamMessagePresenter
-  # The point where the code cuts the body, and the "Show full message" control then gives the rest.
-  # It is long enough to judge the message, and short enough to keep a list of messages easy to
-  # read.
+  # The point where the code cuts the body. The "Show full message" control then gives the rest.
+  # It is long enough to judge the message, and short enough to keep the list easy to read.
   PREVIEW_LIMIT = 280
 
   attr_reader :id, :name, :email, :message, :reason, :not_spam_path, :delete_path
 
   # @param payload [Hash] One SpamQuarantine entry: "id", "name", "email", "message", "context",
   #   "reason", and "received_at".
-  # @param not_spam_path [String] The path that the "Not spam" form posts to.
-  # @param delete_path [String] The path that the "Delete forever" form posts to.
   def initialize(payload:, not_spam_path:, delete_path:)
     @id = payload["id"].to_s
     @name = payload["name"].to_s

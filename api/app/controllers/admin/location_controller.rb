@@ -1,15 +1,12 @@
 module Admin
   # The current location: a map for a pin, an address box, and a shortcut for each upcoming race.
-  # All three only **stage** a location. `create` is the one action that writes, and it writes the
-  # same Redis key as the POST /api/location that needs a bearer token, through the same
-  # Location.store. Thus this is a front end for the write that already exists, and not a second
-  # way to store a location.
+  # All three only stage a location. `create` is the one action that writes, through the same
+  # Location.save as the POST /api/location that needs a bearer token.
   class LocationController < BaseController
     # The base map for the selection of a place.
     #
-    # ⚠️ This is not MAPBOX_STYLE_URL, on purpose. That variable names the default style for a *GPX
-    # render*, where a custom style is the purpose. Here it would give a base map for a race photo,
-    # with no streets and no labels, and this page exists to read those.
+    # ⚠️ This is not MAPBOX_STYLE_URL, on purpose. That variable names the style of a GPX render,
+    # which has no streets and no labels, and this page exists to read those.
     MAP_STYLE = "mapbox://styles/mapbox/streets-v12".freeze
 
     # The zoom levels: near enough to know a neighborhood, or the full world when there is no
@@ -24,9 +21,8 @@ module Admin
 
     # GET /location/lookup
     #
-    # Finds the location that the page is *ready* to save, and saves nothing: an `address` to
-    # geocode, or a pair of coordinates to name. This is what lets a pin, a race shortcut, or a
-    # search show its name below the heading before someone presses the Save button.
+    # Finds the location that the page is ready to save: an `address` to geocode, or a pair of
+    # coordinates to name. Thus a pin, a race shortcut, or a search shows its name before a save.
     #
     # ⚠️ This must never write. It is the half of this page that anyone can use as much as they
     # want, and the purpose of the Save button is that nothing before it changes what the widgets
@@ -40,12 +36,11 @@ module Admin
 
     # POST /location
     #
-    # Saves a staged pair of coordinates. It takes **coordinates only**, on purpose. `lookup`
-    # resolves an address first, thus this action stores one shape of data and one place decides
-    # what a correct location is.
+    # Saves a staged pair of coordinates. It takes coordinates only, on purpose: `lookup` resolves
+    # an address first, thus one place decides what a correct location is.
     #
-    # It answers with the place and not with a redirect: the only caller is the fetch of the page,
-    # and that fetch changes the heading in place and does not load the page again.
+    # It answers with the place and not with a redirect, because the only caller is the fetch of
+    # the page, and that fetch changes the heading in place.
     def create
       coordinates = Location.save(params[:latitude], params[:longitude])
       return head :unprocessable_content if coordinates.nil?
@@ -88,13 +83,11 @@ module Admin
       )
     end
 
-    # The place name, as the **weather widget** makes it. That is what makes this page a preview of
-    # the name in that widget.
+    # The place name, as the weather widget makes it. Thus this page is a preview of that name.
     #
     # ⚠️ This is the same path as in Widgets::WeatherController: format_location over
-    # GoogleMaps#location. Do not use LocationContext#label. That method adds other names
-    # ("Current location") that the widget does not have, thus the preview would show a name that
-    # the widget would never show. This method gives nothing on a failure, thus a GOOGLE_API_KEY
+    # GoogleMaps#location. Do not use LocationContext#label: it adds other names ("Current
+    # location") that the widget never shows. A failure gives a nil place, thus a GOOGLE_API_KEY
     # with no value leaves the coordinates.
     # @return [Hash] :place, which can be nil.
     def described(coordinates)

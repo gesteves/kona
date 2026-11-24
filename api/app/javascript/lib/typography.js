@@ -1,24 +1,25 @@
-// The part of the SmartyPants typography that changes the LENGTH of a post.
+// The part of the SmartyPants typography that changes the length of a post.
 //
-// ⚠️ **This file is for the COUNT, and it must never render text that a person reads.** It writes
-// the ellipsis and the two dashes and it leaves every quotation mark straight. The server, through
-// `Typography` and `MarkdownHelper#smartypants`, is the one place that writes the true text.
+// ⚠️ This file is for the count, and it must never render text that a person reads. It leaves
+// each quotation mark straight. The server, through `Typography` and
+// `MarkdownHelper#smartypants`, is the one place that writes the true text.
 //
-// ⚠️ **A quotation mark is why that split is safe.** `"` becomes `“` or `”` and `'` becomes `’`,
-// and each of those is ONE character in place of one. Thus the direction of a quotation mark, which
-// is the hard half of SmartyPants and the half that no small copy can match, cannot change a count.
-// A measurement against Redcarpet gave the same length for every quotation shape.
+// ⚠️ A quotation mark is why that split is safe. `"` becomes `“` or `”` and `'` becomes `’`, and
+// each of those is one character in place of one. Thus the direction of a quotation mark, which
+// no small copy can match, cannot change a count.
 //
-// The rules below are what is left, and each one is context-free:
+// The rules below are what is left. Only the fractions read the characters beside them:
 //
-//   ...  or  . . .   ->  …     (three characters, or three with ONE space between each, become one)
+//   ...  or  . . .   ->  …     (three characters, or three with one space between each)
 //   ---                ->  —
 //   --                 ->  –
+//   (c)  (r)  (tm)     ->  ©  ®  ™
+//   1/4  1/2  3/4      ->  ¼  ½  ¾   (not beside a digit or a slash)
 //
-// ⚠️ The dashes run LONGEST FIRST, as Redcarpet does. Four dashes give `—-` and five give `—–`.
+// ⚠️ The dashes run longest first, as Redcarpet does. Four dashes give `—-` and five give `—–`.
 //
-// ⚠️ An address goes through with NO change, exactly as `Typography` leaves it alone: a link that
-// holds `--` must keep it, and a count that shortened one would be smaller than the server's.
+// ⚠️ An address goes through with no change, as `Typography` leaves it alone: a link that holds
+// `--` must keep it, and a count that shortened one would be smaller than that of the server.
 
 import { TOKEN_SOURCE, groupRanges, urlRanges } from "./social_mentions";
 
@@ -36,7 +37,6 @@ const FRACTION_CHARS = { "1/4": "¼", "1/2": "½", "3/4": "¾" };
  * Applies the rules that change the length of a post.
  *
  * ⚠️ For the count only. Refer to the ⚠️ at the top of this file.
- * @param {string} text
  * @returns {string} The text at the length that the server will post.
  */
 export function applyLengthRules(text) {
@@ -54,10 +54,7 @@ export function applyLengthRules(text) {
   return out + convert(body.slice(last));
 }
 
-/**
- * @param {string} chunk A piece of the text that holds no address.
- * @returns {string}
- */
+/** @param {string} chunk A piece of the text that holds no address and no mention token. */
 function convert(chunk) {
   return chunk
     .replace(ELLIPSIS, "…")
@@ -71,8 +68,7 @@ function convert(chunk) {
 
 /**
  * Each address and each mention token, in order. ⚠️ A handle can hold `--`, and the server keeps
- * it: `Typography#masked_ranges` masks the same two shapes.
- * @param {string} text
+ * it: `Typography.masked_ranges` masks the same two shapes.
  * @returns {Array<[number, number]>}
  */
 function maskedRanges(text) {

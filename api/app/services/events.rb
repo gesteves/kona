@@ -1,7 +1,6 @@
 # Gets the race events from Contentful. `all` gets each field that the upcoming-races widget
-# renders: title, summary, description, location, url, date, going, and coordinates. That set
-# includes each field that the current-weather widget needs to find the race of today. Redis caches
-# it for 10 minutes. `all` returns an array in an object with dot access.
+# renders, and that set includes each field that the current-weather widget needs to find the race
+# of today. Redis caches it for 5 minutes. `all` returns an array of objects with dot access.
 class Events < ApplicationService
   include ContentfulConsumer
 

@@ -1,9 +1,9 @@
 # Reads the Open Graph tags of a URL, and its standard.site link tags, for the website card of a
 # post.
 #
-# ⚠️ The card of a social post comes from **the page itself**, and not from Contentful. The URL can be a
-# Short, which has no cover image, or a page on another site. Thus the page that the owner links to
-# is the only thing that knows its own picture and its own summary.
+# ⚠️ The card of a social post comes from the page itself, and not from Contentful. The URL can
+# be a Short, which has no cover image, or a page on another site. Thus only the page knows its
+# own picture and its own summary.
 #
 # It never raises: a page with no tags, or a host that is away, gives a card with the URL alone.
 # Such a card is not `embeddable?`, and the caller then puts the link in the words of the post.
@@ -20,10 +20,10 @@ class OpenGraph < ApplicationService
       super
     end
 
-    # ⚠️ **This is the rule that decides where the link of a post goes.** Bluesky draws a card
-    # from the title, the description, and the picture. A page that gives none of the three makes
-    # an empty box with a host name in it, thus the caller puts the link in the words instead, as
-    # Mastodon does. `Admin::SocialController` and `BlueskyPostJob` both read this.
+    # ⚠️ This is the rule that decides where the link of a post goes. Bluesky draws a card from
+    # the title, the description, and the picture. A page that gives none of the three makes an
+    # empty box with a host name in it, thus the caller puts the link in the words instead, as
+    # Mastodon does. `SocialDraft` and `BlueskyPostJob` both read this.
     # @return [Boolean] True when the page gives enough tags to draw a card.
     def embeddable?
       title.present? || description.present? || image_url.present?
@@ -45,13 +45,11 @@ class OpenGraph < ApplicationService
 
   # How long a read that gave nothing stays in the cache.
   #
-  # ⚠️ `#read` gives `{}` after a failure, which is blank, thus the cache held nothing and a host
-  # that is away was read again at EACH attempt of a job and at each preview. 24 hours of retries
-  # against a host that hangs is many waits of 15 seconds. It is short, because the usual cause is
-  # a host that comes back.
+  # ⚠️ `#read` gives `{}` after a failure, which is blank. Without this TTL the cache holds
+  # nothing, and each attempt of a job and each preview reads a host that is away again, with a
+  # wait of 15 seconds each time. It is short, because the usual cause is a host that comes back.
   EMPTY_CACHE_TTL = 1.minute
 
-  # @param url [String, nil]
   # @return [Boolean] True for an http or https URL.
   def self.http_url?(url)
     uri = URI.parse(url.to_s)
@@ -61,8 +59,7 @@ class OpenGraph < ApplicationService
   end
 
   # Reads the card of a URL.
-  # @param url [String] An http or https URL.
-  # @return [Card] The card. Each field but `url` can be nil.
+  # @return [Card] Each field but `url` can be nil.
   def fetch(url)
     return blank_card(url) unless self.class.http_url?(url)
 
@@ -86,7 +83,8 @@ class OpenGraph < ApplicationService
   private
 
   # Gets the page and reads its tags. It fails soft: the caller then has the URL alone.
-  # @return [Hash] { title:, description:, image_url: }
+  # @return [Hash] { title:, description:, image_url:, document_uri:, publication_uri: }, or {}
+  #   after a failure.
   def read(url)
     page = download(url, max_bytes: MAX_BYTES, keep_head: true,
                          headers: { "User-Agent" => USER_AGENT, "Accept" => "text/html" },
@@ -101,9 +99,8 @@ class OpenGraph < ApplicationService
     {}
   end
 
-  # @param html [String]
   # @param url [String] The page, to make a relative image URL absolute.
-  # @return [Hash]
+  # @return [Hash] Refer to #read.
   def parse(html, url)
     doc = Nokogiri::HTML(html)
 
@@ -118,8 +115,8 @@ class OpenGraph < ApplicationService
 
   # Reads one standard.site `<link rel>` tag.
   #
-  # ⚠️ A crawler of Bluesky runs no JavaScript, thus these tags must come from the server. The build
-  # of `web/` writes both of them into the head of each published post
+  # ⚠️ A crawler of Bluesky runs no JavaScript, thus these tags must come from the server. The
+  # build of `web/` writes both into the head of each published post
   # (`web/source/partials/_head.html.erb`). A page with no such tag gets an ordinary card.
   # @param rel [String] "site.standard.document" or "site.standard.publication".
   # @return [String, nil] The at:// URI, or nil when the page has no such tag.

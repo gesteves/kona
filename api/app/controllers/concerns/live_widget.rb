@@ -13,14 +13,12 @@ module LiveWidget
 
   private
 
-  # Sets the cache policy of a fragment in a page. It separates the freshness in the browser from
-  # the freshness at the edge: the fragment is old for the browser immediately, but the browser can
-  # show its cached copy while it gets a new one from the edge, which is fast. The edge keeps the
-  # fragment fresh for `ttl`.
+  # Sets the cache policy of a fragment in a page. The fragment is old for the browser
+  # immediately, but the browser can show its cached copy while it gets a new one from the edge.
+  # The edge keeps the fragment fresh for `ttl`.
   #
-  # Never write the edge policy as `s-maxage`. That directive stops both stale-while-revalidate and
-  # stale-if-error (RFC 9111 §4.2.4), and those two give the protection that this method needs.
-  # @param ttl [ActiveSupport::Duration] The time that the fragment stays fresh at the edge.
+  # ⚠️ Never write the edge policy as `s-maxage`. That directive stops both stale-while-revalidate
+  # and stale-if-error (RFC 9111 §4.2.4), and those two give the protection that this method needs.
   # @param stale_while_revalidate [ActiveSupport::Duration] The extra time for the browser to get a
   #   new copy.
   # @param edge_stale_while_revalidate [ActiveSupport::Duration] The time that the edge can serve an
@@ -56,13 +54,9 @@ module LiveWidget
   end
 
   # Does the standard steps of a widget action: it sets the cache policy, gets the data, and
-  # renders the view. If the result of the block is blank, it renders the empty "no data" body. An
-  # action with more than one instance variable and more than one exit keeps its own cache_widget
-  # and render_empty calls.
-  # @param view [Symbol] The view to render on a success.
-  # @param ttl [ActiveSupport::Duration] The time that the fragment stays fresh at the edge.
-  # @param cache_opts [Hash] The options that go to cache_widget.
-  # @yieldreturn [Object] The data of the widget. A blank result removes the widget.
+  # renders the view. An action with more than one instance variable and more than one exit keeps
+  # its own cache_widget and render_empty calls.
+  # @yieldreturn [Object] The data of the widget. A blank result renders the empty body.
   def render_widget(view, ttl:, **cache_opts)
     cache_widget(ttl: ttl, **cache_opts)
     return render_empty if yield.blank?

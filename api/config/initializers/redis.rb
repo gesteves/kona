@@ -1,7 +1,7 @@
 require "redis"
 require "connection_pool"
 
-# The shared Redis client. It uses the same REDIS_URL credentials as the web app.
+# The shared Redis client. It reads `config.x.redis_url`, as Sidekiq and Rack::Attack do.
 #
 # ⚠️ This is a pool, and not one client. redis-rb puts each command in a Monitor, thus one shared
 # instance is thread-safe but it runs each command in sequence, across all the threads. The Puma

@@ -5,13 +5,11 @@
   --color-firebrick: #bf0222;
 
   // Web Awesome makes each brand surface from the `--wa-color-brand-NN` set of colors: the fill of
-  // an accent button, a border, the text of a link, and a focus ring. Thus there is no one "brand
-  // color" to set. The layouts put `wa-brand-red` on <html>, which is the correct way in Web Awesome
-  // to change the full set to the red family, and it keeps its hover and quiet steps, whose contrast
-  // Web Awesome measured. This code sets the one step that the *loud* surfaces use, to our exact
-  // firebrick.
+  // an accent button, a border, the text of a link, and a focus ring. The layouts put
+  // `wa-brand-red` on <html>, which changes the full set to the red family and keeps its hover
+  // and quiet steps. This code sets the one step that the loud surfaces use, to our firebrick.
   //
-  // ⚠️ Change `-50` only. A change to the full set would need ten colors that a person selects, and
-  // the palette exists to select them correctly.
+  // ⚠️ Change `-50` only. A change to the full set would need ten colors that a person selects,
+  // and the palette exists to select them correctly.
   --wa-color-brand-50: var(--color-firebrick);
 }

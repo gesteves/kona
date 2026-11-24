@@ -4,8 +4,6 @@
 # when the values do not change. Thus the retry window from the parent class (retry_for: 24.hours) is
 # safe.
 class LocationSyncJob < ApplicationJob
-  # @param latitude [Float]
-  # @param longitude [Float]
   def perform(latitude, longitude)
     # ⚠️ Send the stored location only. Two saves close together, or a retry that runs late, would
     # otherwise put an older location on Intervals.icu after the newer one.

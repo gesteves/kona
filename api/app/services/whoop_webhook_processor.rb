@@ -12,7 +12,7 @@
 # Each write is a PUT of an absolute value that you can do more than one time. Thus the Sidekiq
 # retries are safe.
 class WhoopWebhookProcessor
-  # Goes at the start of each log line from this processor, thus you can find them with grep.
+  # The start of each log line of this processor, for a grep.
   LOG_PREFIX = "Whoop webhook:"
 
   def initialize(whoop: Whoop.new, intervals: Intervals.new, location: Location.new)
@@ -21,7 +21,6 @@ class WhoopWebhookProcessor
     @location = location
   end
 
-  # @param event_type [String] The Whoop webhook event type.
   # @param resource_id [String] The resource UUID of the event: a workout UUID for a workout.*
   #   event, and a *sleep* UUID for both a sleep.* event and a recovery.* event, as the Whoop v2
   #   specification says.
@@ -98,7 +97,6 @@ class WhoopWebhookProcessor
   # gets the cycles one time for the full span, with one extra day at each side, and puts them in
   # groups by their end time in the timezone of the athlete. A cycle that is not complete counts as
   # today.
-  # @param dates [Array<Date>] The dates to refresh.
   def refresh_daily_whoop_strain(*dates)
     return if dates.empty?
 
@@ -193,7 +191,7 @@ class WhoopWebhookProcessor
 
   # Changes a UTC timestamp into a local calendar date with the Whoop timezone_offset. That is the
   # offset at the moment of the event, and not the current offset of the athlete.
-  # @return [Date]
+  # @return [Date, nil] Nil for an offset that the code cannot read.
   def local_date_from_offset(utc_timestamp, offset)
     seconds =
       case offset

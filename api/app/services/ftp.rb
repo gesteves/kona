@@ -18,7 +18,6 @@ class Ftp
   end
 
   # Adds the two sync jobs.
-  # @param watts [Integer] The FTP in watts.
   def self.save(watts)
     IntervalsFtpJob.perform_async(watts)
     StravaFtpJob.perform_async(watts)

@@ -9,7 +9,6 @@ module BayHelper
 
   # Finds the Goodspeed entry that is nearest to the given time, in the `freshness` window. An
   # entry whose time does not parse is not a candidate.
-  # @param goodspeed [OpenStruct, nil] The Goodspeed bay-conditions data.
   # @return [OpenStruct, nil]
   def bay_conditions_at(goodspeed, time, freshness: 30.minutes)
     series = goodspeed&.timeseries
@@ -34,7 +33,6 @@ module BayHelper
   end
 
   # A sentence about the current water temperature of San Francisco Bay, for weather_summary.
-  # @param goodspeed [OpenStruct, nil] The Goodspeed bay-conditions data.
   # @param location [OpenStruct, nil] The current location, from a GoogleMaps result.
   # @return [String, nil] It is nil if the location is not San Francisco, and if there is no recent
   #   entry.

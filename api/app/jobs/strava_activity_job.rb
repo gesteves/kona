@@ -15,7 +15,6 @@ class StravaActivityJob < ApplicationJob
     StravaNameJob.perform_async(strava_id)
   end
 
-  # @param strava_id [String] The Strava activity id.
   # @param event_time [Integer] The Unix time of the event.
   def perform(strava_id, event_time)
     day = Time.at(event_time.to_i).in_time_zone(Location.new.time_zone).to_date

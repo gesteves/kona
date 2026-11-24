@@ -1,10 +1,9 @@
 import { Controller } from "@hotwired/stimulus";
 import { i18nTable, t } from "../lib/i18n";
 
-// This is the only place with the version. The code loads Mapbox GL JS from the CDN of Mapbox and
-// does not put it in the bundle: it is several times the size of the full admin bundle, this is
-// the one page that needs it, and the map cannot work without api.mapbox.com. Thus it adds no new
-// dependency, only a second request to a host that the page must reach.
+// The only place with the version. The code loads Mapbox GL JS from the CDN of Mapbox and not
+// from the bundle: it is several times the size of the admin bundle, and only this page needs
+// it. The map already needs api.mapbox.com, thus the CDN adds no dependency.
 const VERSION = "v3.9.0";
 const SCRIPT_URL = `https://api.mapbox.com/mapbox-gl-js/${VERSION}/mapbox-gl.js`;
 const STYLESHEET_URL = `https://api.mapbox.com/mapbox-gl-js/${VERSION}/mapbox-gl.css`;
@@ -14,33 +13,30 @@ const STYLESHEET_URL = `https://api.mapbox.com/mapbox-gl-js/${VERSION}/mapbox-gl
 const PRECISION = 6;
 
 // The accuracy of the line above the map, approximately 110m. It agrees with
-// LocationPresenter::DISPLAY_PRECISION, thus a pin does not change the format of the coordinates
-// that the server rendered. This applies only to the screen. The app stores PRECISION.
+// LocationPresenter::DISPLAY_PRECISION. It applies to the screen only: the app stores PRECISION.
 const DISPLAY_PRECISION = 3;
 
 // The default size of the Mapbox pin.
 const MARKER_SCALE = 1;
 
-// ⚠️ Mapbox does **not** change its default marker offset ([0, -14]) with `scale`. Thus at each
-// scale but 1, the point of the pin moves away from the coordinate, approximately 15px below it at
-// 2x. This code calculates the offset, thus the two agree and you can change the scale above.
+// ⚠️ Mapbox does not change its default marker offset ([0, -14]) with `scale`. Thus at each
+// scale but 1, the point of the pin moves away from the coordinate. This offset follows the
+// scale.
 const MARKER_OFFSET = [ 0, -14 * MARKER_SCALE ];
 
-// The zoom of the map when a save does not start on the map, that is, an address or a race
-// shortcut. It is near enough to show which building you are in. Geolocation is not in that list:
-// the Mapbox control moves to the reading itself, at a zoom that it makes from the accuracy.
+// The zoom of the map after a stage that does not start on the map: an address or a race
+// shortcut. It is near enough to show which building you are in. Geolocation is not in that
+// list: the Mapbox control moves to the reading itself.
 const LOCATED_ZOOM = 14;
 
-// The saved or unsaved badge. ⚠️ LocationPresenter#state_label and #state_variant also render its
-// "saved" half on the server. The two must agree.
-// ⚠️ Only the VARIANT is here. The words come from `admin.location.state.*`, which
-// `LocationPresenter#state_label` also reads, thus the two cannot become different.
+// The variant of the saved or unsaved badge. ⚠️ `LocationPresenter#state_variant` renders the
+// "saved" half on the server, and the two must agree. The words come from
+// `admin.location.state.*`, which `LocationPresenter#state_label` also reads.
 const STATE_VARIANTS = { saved: "success", unsaved: "warning" };
 
-// This is at the module level, thus the code gets the script one time for each full page load,
-// for any number of Turbo visits through this page. ⚠️ Do not use `content_for :head`: Turbo adds
-// the elements of a new head at the end, thus the script would arrive later and this controller
-// could connect before `mapboxgl` existed. An explicit wait for the load has no such race.
+// At the module level, thus the code gets the script one time for each full page load.
+// ⚠️ Do not use `content_for :head`: Turbo adds the elements of a new head at the end, thus this
+// controller could connect before `mapboxgl` exists.
 let loading = null;
 
 /** @returns {Promise<object>} Mapbox GL JS. The code loads it at the first use. */
@@ -73,10 +69,8 @@ function loadMapbox() {
  * The location picker of the admin: a Mapbox map, and its pin is the location to save.
  *
  * A click on the map, a move of the pin, the Geolocation button, the address box, and the race
- * shortcuts all do the same thing: they **stage** a pair of coordinates. Nothing goes to Redis
- * until you press Save changes. That button, and Undo beside it, which removes the staged pair,
- * are both off when the staged pair is the same as the stored pair. The badge beside the
- * coordinates says which of the two states you are in.
+ * shortcuts all stage a pair of coordinates. Nothing goes to Redis until you press Save changes.
+ * Save and Undo are off when the staged pair is the same as the stored pair.
  *
  * ⚠️ Only the map needs `token`. The address box, the race shortcuts, and Save all go through the
  * server and are useful with no map. Thus no code here can stop early when there is no token.
@@ -101,9 +95,7 @@ export default class extends Controller {
     this.teardown = this.teardown.bind(this);
     document.addEventListener("turbo:before-cache", this.teardown);
 
-    // ⚠️ The words come from the locale file, through the `data-admin-i18n` attribute. `state`
-    // holds the SAME keys that `LocationPresenter#state_label` reads, thus the badge of the server
-    // and the badge of the browser cannot become different.
+    // The words come from the locale file, through `data-admin-i18n`. Refer to STATE_VARIANTS.
     this.i18n = i18nTable(this.element);
 
     // The value in Redis, and the value that the page would write. They are the same at the first
@@ -122,8 +114,7 @@ export default class extends Controller {
       variant: this.hasStateTarget ? (this.stateTarget.getAttribute("variant") ?? "") : ""
     };
 
-    // The name of the stored location. The code keeps it, thus Undo can put the heading back with
-    // no second lookup.
+    // The name of the stored location, thus Undo needs no second lookup.
     this.storedPlace = this.initial.place;
 
     if (this.tokenValue) this.start();
@@ -180,18 +171,16 @@ export default class extends Controller {
   /**
    * The Geolocation button of Mapbox. It stages the location that it finds.
    *
-   * It is on the map, and not beside it, because the control already does the parts that a button
-   * of ours had to copy: it moves to the reading, draws its accuracy circle, and **turns itself
-   * off** where the browser cannot geolocate. Our button could find that only after a press.
+   * It is on the map because the control moves to the reading, draws its accuracy circle, and
+   * turns itself off where the browser cannot geolocate.
    * @returns {object} The control, for addControl.
    */
   geolocation(mapboxgl) {
     const control = new mapboxgl.GeolocateControl({
       positionOptions: { enableHighAccuracy: true, timeout: 10000 },
       // ⚠️ Do not use `trackUserLocation`. In its active-lock mode the control sends an event for
-      // each position update, and each event here is a Redis write and a LocationSyncJob. Thus a
-      // phone on this page would sync itself to Intervals.icu on each small GPS change. One press
-      // must give one reading.
+      // each position update, and each event here moves the pin and starts a lookup. One press must
+      // give one reading.
       trackUserLocation: false
     });
 
@@ -205,11 +194,7 @@ export default class extends Controller {
     return control;
   }
 
-  /**
-   * Geocodes the text in the address box and stages the result. The lookup writes nothing, thus a
-   * search for a place costs the same as a move of the pin.
-   * @param {SubmitEvent} event
-   */
+  /** Geocodes the text in the address box and stages the result. The lookup writes nothing. */
   async search(event) {
     // ⚠️ The form has no action. Without this code, Enter loads the page again.
     event.preventDefault();
@@ -227,10 +212,7 @@ export default class extends Controller {
     this.stage(result.latitude, result.longitude, { fly: true, place: result.place });
   }
 
-  /**
-   * A race shortcut. The coordinates come from Contentful and are on the button.
-   * @param {PointerEvent} event
-   */
+  /** A race shortcut. The coordinates come from Contentful and are on the button. */
   useRace(event) {
     const { latitude, longitude } = event.currentTarget.dataset;
     this.stage(Number(latitude), Number(longitude), { fly: true });
@@ -268,8 +250,8 @@ export default class extends Controller {
     const result = await this.write(staged, this.words("refused"));
     if (!result) return;
 
-    // ⚠️ Compare with `staged`, not with `this.staged`. The pin can move again during the request,
-    // and a mark of *that* pair as stored would turn Save off for a change that is not saved.
+    // ⚠️ Use `staged`, and not `this.staged`. The pin can move again during the request, and a
+    // mark of that pair as stored would turn Save off for a change that is not saved.
     this.stored = staged;
     this.storedPlace = result.place || this.format(staged);
     this.describe(this.storedPlace);
@@ -338,11 +320,7 @@ export default class extends Controller {
     this.stateTarget.variant = variant;
   }
 
-  /**
-   * One line of words from the locale file.
-   * @param {string} key A key below the table of this controller.
-   * @returns {string}
-   */
+  /** @returns {string} The words of one key below the i18n table of this controller. */
   words(key) {
     return t(this.i18n, key);
   }
@@ -365,10 +343,9 @@ export default class extends Controller {
   /**
    * GETs the lookup action, which finds a location and does not store it.
    * @param {object} query An address, or a pair of coordinates.
-   * @param {string} [refusal] The message to show when the server cannot find the location. Omit
-   *   it for the background preview, which has no message that is important enough for the status
-   *   line.
-   * @returns {Promise<object|null>}
+   * @param {string} [refusal] The message for a location that the server cannot find. Omit it for
+   *   the background preview, which shows no message.
+   * @returns {Promise<object|null>} The location, or null after a failure.
    */
   async read(query, refusal) {
     try {
@@ -443,9 +420,8 @@ export default class extends Controller {
   }
 
   /**
-   * The pair in a form that a person reads. The code rounds it only for the screen. The save
-   * keeps PRECISION.
-   * @returns {string}
+   * @returns {string} The pair as a person reads it. Only the screen gets this accuracy: the save
+   *   keeps PRECISION.
    */
   format(pair) {
     return pair.map((value) => Number(value.toFixed(DISPLAY_PRECISION))).join(", ");

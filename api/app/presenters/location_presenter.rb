@@ -1,10 +1,8 @@
-# Presents the current location for the Location page of the admin: the stored location, the
-# value that replaces it if there is one, the values that the map starts with, and the upcoming
-# races that the page offers as one-click shortcuts.
+# Presents the Location page of the admin: the stored location, the value that replaces it, the
+# values that the map starts with, and the upcoming races that the page offers as shortcuts.
 #
-# The caller gives the coordinate pairs and the raw events, and this class does not read them. The
-# controller finds the place name. Thus the view makes no service call. ConnectedAppPresenter has
-# the same rule.
+# The caller gives the coordinate pairs, the place name, and the raw events. Thus the view makes
+# no service call.
 class LocationPresenter
   # For parse_event_date, thus "upcoming" has the same meaning as in the races widget.
   include EventsHelper
@@ -13,9 +11,8 @@ class LocationPresenter
   # the bottom edge does not cut the land.
   WORLD_CENTER = [ 0, 20 ].freeze
 
-  # The code rounds the coordinates on the screen to this number of decimals, which is
-  # approximately 110m. That is sufficient for a "where am I" reading. The code stores the value
-  # from the pin. This applies only to the screen.
+  # The number of decimals of a coordinate on the screen, which is approximately 110m. The code
+  # stores the value from the pin with no rounding.
   DISPLAY_PRECISION = 3
 
   # One upcoming race, with only the data that the shortcut list shows and that its button posts.
@@ -34,10 +31,8 @@ class LocationPresenter
   # @param events [Array<OpenStruct>] All the Contentful events. {#races} selects from them.
   # @param time_zone [String] The IANA timezone that decides which races are ahead.
   # @param map_token [String, nil] The **public** Mapbox token.
-  # @param map_style [String] The URL of the base map style.
   # @param location_zoom [Integer] The zoom for a page with a location.
   # @param world_zoom [Integer] The zoom for a page with no location.
-  # @param save_path [String] The path that Save posts to.
   # @param lookup_path [String] The path where the page finds a staged location. It saves
   #   nothing.
   def initialize(stored:, override:, place:, events:, time_zone:, map_token:, map_style:,
@@ -55,18 +50,15 @@ class LocationPresenter
     @lookup_path = lookup_path
   end
 
-  # The coordinates that apply now. If there is a replacement value, it is that value.
-  # @return [Array(Float, Float), nil]
+  # @return [Array(Float, Float), nil] The coordinates that apply now: the override first.
   def coordinates
     @override || @stored
   end
 
-  # @return [Float, nil]
   def latitude
     coordinates&.first
   end
 
-  # @return [Float, nil]
   def longitude
     coordinates&.last
   end
@@ -76,10 +68,8 @@ class LocationPresenter
     coordinates&.map { |value| value.round(DISPLAY_PRECISION) }&.join(", ")
   end
 
-  # The heading: the name that the weather widget would show. If there is no name, it gives the
-  # coordinates and not a placeholder. A geocode that finds nothing is what the widget would show
-  # as a blank, and this page must not be blank about it.
-  # @return [String]
+  # The heading: the name that the weather widget would show, or the coordinates when the geocode
+  # finds no name. This page must not be blank where the widget is blank.
   def heading
     @place.presence || summary || I18n.t("admin.location.empty_heading")
   end
@@ -92,12 +82,11 @@ class LocationPresenter
     summary
   end
 
-  # The state of the tag at the first render. It is always "saved" when there is a location,
-  # because nothing can be staged before the page loads.
+  # The state of the tag at the first render. Nothing can be staged before the page loads, thus a
+  # location is always "saved".
   #
-  # ⚠️ location_map_controller.js renders each state after this one, and it reads the SAME
-  # `admin.location.state.*` keys through `admin_i18n_data`. Thus the two cannot become different.
-  # @return [String]
+  # ⚠️ location_map_controller.js renders each later state, and it reads the same
+  # `admin.location.state.*` keys through `admin_i18n_data`.
   def state_label
     I18n.t("admin.location.state.#{set? ? "saved" : "not_set"}")
   end
@@ -115,14 +104,12 @@ class LocationPresenter
     @override&.join(", ")
   end
 
-  # @return [Boolean] True if there is any value.
   def set?
     coordinates.present?
   end
 
   # ⚠️ When this is true, a pin still writes to Redis but changes nothing that a widget reads,
   # because Location uses the env var first. The page says so and does not look like it works.
-  # @return [Boolean]
   def overridden?
     @override.present?
   end
@@ -138,7 +125,6 @@ class LocationPresenter
     set? ? [ longitude, latitude ] : WORLD_CENTER
   end
 
-  # @return [Integer]
   def zoom
     set? ? @location_zoom : @world_zoom
   end
@@ -146,9 +132,9 @@ class LocationPresenter
   # The races that are ahead, the soonest first. They are the "I'm at this one" shortcuts of the
   # page.
   #
-  # ⚠️ This is not EventsHelper#upcoming_races, on purpose. That is the *selection* of the widget,
-  # with a maximum of three or four races. Each confirmed race that is ahead belongs here. The code
-  # removes a race with no coordinates and does not show a button that cannot move the map.
+  # ⚠️ This is not EventsHelper#upcoming_races, on purpose. That is the selection of the widget,
+  # with a maximum of three or four races, and each confirmed race that is ahead belongs here. The
+  # code removes a race with no coordinates, because its button cannot move the map.
   # @return [Array<Race>]
   def races
     @races ||= @events.filter_map { |event| race(event) }.sort_by(&:date)

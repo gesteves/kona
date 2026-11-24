@@ -6,10 +6,10 @@ namespace :redis do
   # ⚠️ These tasks name each key from a constant, and they use no SCAN. Refer to
   # `standard_site:migrate_fingerprints` for the one place that a SCAN is permitted, and why.
   #
-  # ⚠️ **The file holds each secret exactly as Redis holds it, that is, ENCRYPTED with
-  # `secret_key_base`.** Thus an import needs the SAME `RAILS_MASTER_KEY`. With a different key,
+  # ⚠️ The file holds each secret exactly as Redis holds it: encrypted with `secret_key_base`. Thus
+  # an import needs the same `RAILS_MASTER_KEY`. With a different key,
   # `EncryptedCredentials.decrypt` gives nil, each card says "not connected", and nothing raises.
-  # ⚠️ **The file is still sensitive. Keep it off the repository and out of a shared drive.**
+  # ⚠️ The file is still sensitive. Keep it off the repository and out of a shared drive.
 
   # The Redis hashes to export, as [label, key] pairs.
   # ⚠️ These are locals and not methods, on purpose. A `def` inside a namespace defines a private
@@ -29,9 +29,8 @@ namespace :redis do
 
   # The plain string keys to export.
   #
-  # ⚠️ The Whoop refresh token has no expiry and no other copy, and it is the one key that the
-  # comment of `redis/fly.toml` named first. `Whoop#durable_keys` gives the names, thus a change
-  # to a key there cannot leave this file behind.
+  # ⚠️ The Whoop refresh token has no expiry and no other copy. `Whoop#durable_keys` gives the
+  # names, thus a change to a key there cannot leave this file behind.
   durable_strings = lambda do
     [
       [ "location",           Location::LOCATION_CACHE_KEY ],
@@ -41,7 +40,6 @@ namespace :redis do
     ]
   end
 
-  # The path of the dump file.
   dump_path = lambda do
     ENV["FILE"].presence || Rails.root.join("tmp", "redis-durable.json").to_s
   end

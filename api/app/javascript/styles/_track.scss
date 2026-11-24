@@ -61,10 +61,9 @@
 // The zoom dialog.
 //
 // ⚠️ Use a wide box and an image with no width, and not `--width: fit-content`. The image has
-// `max-inline-size: 100%`, thus `fit-content` uses the container and not the render, and the dialog
-// becomes a few hundred pixels wide. With no width on the image, the image draws at its true size
-// and the two maximum values only make it smaller. It never becomes larger and unclear on a large
-// screen.
+// `max-inline-size: 100%`, thus `fit-content` uses the container and not the render, and the
+// dialog becomes a few hundred pixels wide. With no width, the image draws at its true size and
+// the two maximum values only make it smaller.
 .map-zoom {
   --width: 95vw;
 

@@ -24,7 +24,6 @@ module MarkdownHelper
   # Changes a Markdown string into plain text: it removes the tags and decodes the entities. This
   # code comes from the `sanitize` helper of the static site. It renders the HTML first, thus the
   # Markdown syntax for a link, for emphasis, and for a list becomes words and not markup.
-  # @param text [String, nil]
   # @return [String, nil]
   def markdown_to_plain_text(text)
     return if text.blank?
@@ -35,7 +34,6 @@ module MarkdownHelper
 
   # Applies the SmartyPants typography, that is, curly quotation marks and em dashes, to a plain
   # string. It renders no Markdown block. The app uses it for text such as an event title.
-  # @param text [String, nil]
   # @return [String, nil]
   def smartypants(text)
     return if text.blank?
@@ -45,7 +43,6 @@ module MarkdownHelper
   # The text of a heading, with the typography and with no markup. ⚠️ SmartyPants is a typography
   # pass and not an escape: a `<` or a `&` in a title goes through as it is. Sanitize removes each
   # element and escapes the text, thus the result is safe in an element. web has a copy.
-  # @param text [String, nil] The title.
   # @return [String, nil]
   def heading_text(text)
     return if text.blank?

@@ -1,27 +1,25 @@
 # Presents the Social media page: the draft, and the networks that can take a post.
 #
-# ⚠️ The caller gives the state of each network, and this class does not read it, exactly as
-# ConnectedAppPresenter needs. Thus the view makes no service call.
+# ⚠️ The caller gives the state of each network, and this class does not read it. Thus the view
+# makes no service call.
 class SocialPresenter
-  # The maximum length of the body, in graphemes. It is the limit of Bluesky, which is the shortest
-  # of the three. ⚠️ The view writes this number into the markup and social_controller.js reads it
-  # there. Do not write it again in the JavaScript or in a stylesheet.
+  # The maximum length of the body, in graphemes: the limit of Bluesky, the shortest of the three.
+  # ⚠️ The view writes this number into the markup and social_post_controller.js reads it there.
+  # Do not write it again in the JavaScript or in a stylesheet.
   BODY_LIMIT = 300
 
   # The length at which the count line changes to the warning color.
   WARN_AT = 270
 
-  # The one network with rich text. ⚠️ A Markdown link becomes a facet there: the words carry the
-  # address and the URL uses none of the 300 characters. Mastodon and Threads post plain words,
-  # thus a link there would reach a reader as its own syntax with the address gone. The composer
-  # unticks and disables those two rows, and `SocialDraftValidator#markdown_network_error`
-  # refuses a request that ticks one anyway.
+  # The one network with rich text. ⚠️ A Markdown link becomes a facet there, and the URL uses none
+  # of the 300 characters. Mastodon and Threads post plain words, thus a link there would reach a
+  # reader as its own syntax with no address. The composer disables those two rows, and
+  # `SocialDraftValidator#markdown_network_error` refuses a request that ticks one anyway.
   MARKDOWN_NETWORK = "bluesky".freeze
 
-  # The most photos on one post of each network. A network that is absent takes none. ⚠️ The limit
-  # is per POST, but a network takes the draft only when EACH post fits. The composer unticks and
-  # disables a row whose limit is below the largest post, and
-  # `SocialDraftValidator#photos_network_error` refuses a request that ticks one anyway.
+  # The most photos on one post of each network. A network that is absent takes none. ⚠️ A network
+  # takes the draft only when each post fits. The composer disables a row whose limit is below the
+  # largest post, and `SocialDraftValidator#photos_network_error` refuses a request that ticks one.
   PHOTO_LIMITS = {
     "bluesky" => Bluesky::MAX_IMAGES,
     "mastodon" => Mastodon::MAX_MEDIA_ATTACHMENTS,
@@ -30,8 +28,8 @@ class SocialPresenter
 
   # The most photos on one post, and the limit of one alt text. ⚠️ The view writes both into the
   # markup and social_post_controller.js reads them there.
-  # ⚠️ MAX_PHOTOS is the limit of BLUESKY and not the largest limit. The Bluesky row has no
-  # `data-max-photos`, thus the composer could not turn it off for a count that it refuses.
+  # ⚠️ MAX_PHOTOS is the limit of Bluesky and not the largest limit. The Bluesky row has no
+  # `data-max-photos`, thus the composer cannot turn it off for a count that it refuses.
   # One alt text goes to each network, thus its limit is the smallest one.
   MAX_PHOTOS = Bluesky::MAX_IMAGES
   ALT_LIMIT = [
@@ -75,17 +73,14 @@ class SocialPresenter
     %w[bluesky mastodon threads].index_with { |key| I18n.t("admin.social.mention_placeholder.#{key}") }
   end
 
-  # One row of the mention map: the token that the owner wrote, and what that person is called at
-  # each network.
-  #
-  # ⚠️ The map is THREAD-LEVEL. There is one map for the whole draft, thus a token means the same
-  # person in every post of it.
+  # One row of the mention map: the token that the owner wrote, and the name of that person at
+  # each network. ⚠️ There is one map for the whole draft, thus a token means the same person in
+  # each post.
   Mention = Data.define(:token, :values) do
     def initialize(token:, values: {})
       super(token: token.to_s, values: values.to_h.transform_keys(&:to_s))
     end
 
-    # @param key [String] A network key.
     # @return [String] The field of that network: a handle, plain words, or an empty string.
     def value(key) = values[key.to_s].to_s
   end
@@ -98,10 +93,8 @@ class SocialPresenter
 
     def connected? = connected
 
-    # @return [Boolean] True for the one network that takes a Markdown link.
     def markdown? = key == MARKDOWN_NETWORK
 
-    # @return [Integer] The most photos on one post of this network.
     def max_photos = PHOTO_LIMITS.fetch(key, 0)
 
     # @return [Boolean] True when too many photos can turn this row off, thus it needs a hint line
@@ -110,7 +103,6 @@ class SocialPresenter
 
     # The line below the name, for a network that is connected. The view renders its own line, with
     # a link, for a network that is not connected.
-    # @return [String]
     def account_line
       if account.present?
         I18n.t("admin.social.account.named", account: account)
@@ -122,29 +114,27 @@ class SocialPresenter
 
   # @return [Array<Network>] The three networks, in a stable order.
   attr_reader :networks
-  # @return [Array<Post>] Each post of the thread, in order. There is always at least one, thus the
-  #   view renders one empty block on a first load.
+  # @return [Array<Post>] Each post of the thread, in order. There is always at least one.
   attr_reader :posts
   # @return [Array<Mention>] One row for each token of the draft, in the order of the form.
   attr_reader :mentions
 
   # @param networks [Array<Network>] The rows that the controller made.
-  # @param posts [Array<Hash>, nil] The thread to put back, as `[{ text:, link:, photos: }, …]`. ⚠️ A failed
-  #   submit renders this page again, thus the owner must not lose what they wrote. Nil, the first
-  #   load, gives one empty post.
+  # @param posts [Array<Hash>, nil] The thread to put back, as `[{ text:, link:, photos: }, …]`.
+  #   ⚠️ A failed submit renders this page again, thus the owner must not lose what they wrote.
+  #   Nil, the first load, gives one empty post.
   # @param selected [Array<String>, nil] The network keys to tick. ⚠️ Nil, the first load, ticks
-  #   each connected network: the owner posts to all of them nearly always, and the page must not
-  #   ask for three clicks each time. An array is the choice of the owner, and an empty one ticks
-  #   nothing.
+  #   each connected network, because the owner posts to all of them nearly always. An array is
+  #   the choice of the owner, and an empty one ticks nothing.
   # @param scheduled [Boolean] True to open the schedule fields again.
   # @param date [String, nil] The date to put back, as YYYY-MM-DD.
   # @param time [String, nil] The time to put back, as HH:mm.
-  # @param topic [String, nil] The Threads topic to put back. ⚠️ It belongs to the DRAFT and not to
-  #   one post: Meta takes one topic for each post, and every post of a thread carries this one.
+  # @param topic [String, nil] The Threads topic to put back. ⚠️ It belongs to the draft and not to
+  #   one post: Meta takes one topic for each post, and each post of a thread carries this one.
   # @param mentions [Array<Hash>, nil] The mention map to put back, as
-  #   `[{ token:, values: { "bluesky" => … } }, …]`. ⚠️ Nil gives NO row, and not one empty row:
-  #   a row for nothing would ask the owner to name a person that they did not write about. The
-  #   browser adds a row when it finds a token.
+  #   `[{ token:, values: { "bluesky" => … } }, …]`. ⚠️ Nil gives no row, and not one empty row:
+  #   an empty row would ask the owner to name a person that they did not write about. The browser
+  #   adds a row when it finds a token.
   # @param alt_text [Boolean] True when Claude can write the alt text of a photo, thus each tile
   #   renders its Generate control. ⚠️ The caller reads the configuration, and this class does not.
   def initialize(networks:, posts: nil, mentions: nil, selected: nil,
@@ -160,22 +150,18 @@ class SocialPresenter
     @topic = topic.to_s
   end
 
-  # @return [Boolean] True when the schedule fields are open.
   def scheduled? = @scheduled
 
   # @return [Boolean] True when each tile renders its Generate control.
   def alt_text? = @alt_text
 
-  # @return [String] The date field, as YYYY-MM-DD.
   attr_reader :date
-  # @return [String] The time field, as HH:mm.
   attr_reader :time
-  # @return [String] The Threads topic field.
   attr_reader :topic
 
-  # The first day that the date field offers. ⚠️ It is in the zone of the **server**, thus a browser
+  # The first day that the date field offers. ⚠️ It is in the zone of the server, thus a browser
   # that is a day ahead can still pick its own today. The action checks that the moment is in the
-  # future, and that check is the one that matters.
+  # future.
   # @return [String] YYYY-MM-DD.
   def min_date = Time.use_zone(TimeZoneResolver.default) { Time.zone.today.to_fs(:iso8601) }
 
@@ -187,19 +173,18 @@ class SocialPresenter
 
   # The networks that a mention row asks about.
   #
-  # ⚠️ **A network with no account gets NO field.** That is different from the "Post to" list, which
-  # keeps a disabled row to say why one of three names cannot take a post. Here there is nothing to
-  # say: a field for an account that cannot take a post is only noise.
+  # ⚠️ A network with no account gets no field. The "Post to" list keeps a disabled row to say why
+  # a network cannot take a post, and here there is nothing to say.
   #
-  # ⚠️ Each row renders the SAME list, thus the order of `mentions[][…]` cannot drift between two
-  # rows. Refer to the ⚠️ in _mention.html.erb.
+  # ⚠️ Each row renders the same list, thus the order of `mentions[][…]` is the same in each row.
+  # Refer to the ⚠️ in _mention.html.erb.
   # @return [Array<Network>]
   def mention_networks = networks.select(&:connected?)
 
-  # The Bluesky field of each mention, by key, with each blank one dropped.
+  # The Bluesky field of each mention, by key, with no blank one.
   #
-  # ⚠️ The COUNT reads this one, and not the map of another network. Bluesky has the shortest limit
-  # and the longest handles, thus its text is the one that decides if a draft fits.
+  # ⚠️ The count reads this map, and not the map of another network. Bluesky has the shortest limit
+  # and the longest handles, thus its text decides if a draft fits.
   # @return [Hash{String => String}]
   def bluesky_values
     @bluesky_values ||= @mentions.each_with_object({}) do |mention, map|
@@ -208,15 +193,14 @@ class SocialPresenter
     end
   end
 
-  # ⚠️ Each post block carries this in a data attribute, thus the count that the SERVER rendered and
-  # the first count of the browser are the same number. Refer to social_post_controller.js.
-  # @return [String]
+  # ⚠️ Each post block carries this in a data attribute, thus the browser counts with the same map
+  # as the server. Refer to social_post_controller.js.
   def bluesky_values_json = bluesky_values.to_json
 
+  # ⚠️ The steps and their order are the ones of `SocialDraft#text_for`. Thus the count that the
+  # server renders and the first count of the browser are the same number.
   # @param post [Post]
-  # @return [Integer] The graphemes that Bluesky will count for that post, after the handles go in.
-  # ⚠️ The steps and their order are the ones of `SocialDraft#text_for`. Thus the count
-  # that the server renders and the first count of the browser are the same number.
+  # @return [Integer] The graphemes that Bluesky counts for that post, after the handles go in.
   def bluesky_length(post)
     Bluesky.post_length(
       Typography.apply(SocialMentions.substitute(post.text, values: bluesky_values,
@@ -224,13 +208,12 @@ class SocialPresenter
     )
   end
 
-  # @param key [String] A network key.
-  # @return [String, nil]
+  # @return [String, nil] The example of that network.
   def mention_placeholder(key) = self.class.mention_placeholders[key.to_s]
 
   # ⚠️ The server renders the field hidden when the Threads row is not ticked, thus it does not
-  # show for a moment before the Stimulus controller runs. `social#applyTopic` follows each change
-  # after that, and it reads the same rule.
+  # show for a moment before the Stimulus controller runs. `social#applyTopic` reads the same rule
+  # at each later change.
   # @return [Boolean] True when the topic field shows.
   def topic?
     network = networks.find { |row| row.key == TOPIC_NETWORK }
@@ -245,30 +228,23 @@ class SocialPresenter
     topic.blank? || TOPICS.include?(topic) ? TOPICS : TOPICS + [ topic ]
   end
 
-  # @return [Integer]
   def max_posts = MAX_POSTS
 
-  # @return [Integer]
   def max_photos = MAX_PHOTOS
 
-  # @return [Integer]
   def alt_limit = ALT_LIMIT
 
-  # @param key [String] A network key.
   # @return [Boolean] True when the row is ticked.
   def selected?(key) = @selected.include?(key.to_s)
 
-  # @return [Integer]
   def body_limit = BODY_LIMIT
 
-  # @return [Integer]
   def warn_at = WARN_AT
 
   private
 
   # ⚠️ There is always at least one post, thus the view renders one empty block on a first load and
   # after a refusal that emptied the form.
-  # @param posts [Array<Hash>, nil]
   # @return [Array<Post>]
   def build_posts(posts)
     built = Array(posts).map { |post| Post.new(text: post[:text], link: post[:link], photos: post[:photos]) }

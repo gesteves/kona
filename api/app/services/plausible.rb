@@ -29,12 +29,10 @@ class Plausible < ApplicationService
 
   # The pageviews of each article page over a date range.
   #
-  # ⚠️ Each query here is ONE query for the full site, and it is never one query for each article.
-  # Plausible permits 600 calls each hour, and the 5-minute cache limits each different query body
-  # to 12 calls each hour. Thus each shared key costs 12 calls each hour, and a key for each
-  # article would grow with the number of articles and go past the limit. Do not add a query for
-  # each article, and do not make the TTL shorter, until you do that calculation again.
-  #
+  # ⚠️ Each query here is ONE query for the full site, and never one query for each article.
+  # Plausible permits 600 calls each hour, and the 5-minute cache limits each query body to 12 calls
+  # each hour. A key for each article would grow with the number of articles and go past the limit.
+  # Do that calculation again before you make the TTL shorter.
   # @param date_range [String, Array] A Plausible date range: "all", or a [from, to] pair.
   # @return [Hash, nil] { path => pageviews }, or nil if the query is not available. That is what
   #   shows the difference between "the analytics are down" and "nobody read the page".
@@ -67,6 +65,7 @@ class Plausible < ApplicationService
   #
   # ⚠️ The metric is the visitors and not the pageviews. It counts a reader one time however many
   # times they load the page, thus a reload cannot raise it.
+  #
   # ⚠️ The answer has one row for each day and each page with traffic: approximately 100 days by 50
   # pages today, below the page limit of `query`. Read the warning of `query` before you make
   # `days` much larger.
@@ -116,15 +115,15 @@ class Plausible < ApplicationService
   end
 
   # Today in the zone of the site, which is the zone that Plausible reports each day in.
-  # @return [Date]
   def site_today
     Time.now.in_time_zone(TimeZoneResolver.default).to_date
   end
 
   # Does a Plausible query. The request body is the cache key.
-  # @return [Hash, nil] The parsed response, or nil if it is not available.
+  #
   # ⚠️ One page only. `limit` is far above the number of pages of this site, and the code writes a
   # warning when an answer reaches it: a row past the limit would score zero with no message.
+  # @return [Hash, nil] The parsed response, or nil if it is not available.
   def query(metrics: [], date_range: "all", dimensions: [ "event:page" ], filters: nil, order_by: nil, offset: 0, limit: 10000)
     return if @access_token.blank? || @site_id.blank?
 
@@ -138,10 +137,8 @@ class Plausible < ApplicationService
       pagination: { offset: offset, limit: limit }
     }.compact
 
-    # ⚠️ empty_expires_in is the wait for the rate limit, and not a cache. Plausible permits 600
-    # calls each hour, and post_json returns nil for each non-2xx. Thus without it, each subsequent
-    # request after a 429 would query again with no limit. The rate-limit failure would then remove
-    # its own protection.
+    # ⚠️ empty_expires_in is the wait for the rate limit, and not a cache. post_json returns nil
+    # for each non-2xx. Thus without it, each request after a 429 would query again with no limit.
     cached_json(generate_cache_key(body), expires_in: 5.minutes, empty_expires_in: 1.minute) do
       headers = {
         "Authorization" => "Bearer #{@access_token}",
@@ -182,8 +179,8 @@ class Plausible < ApplicationService
     totals.each_with_object(Hash.new(0)) { |(path, values), out| out[path] = values[metric].to_i }
   end
 
-  # Plausible gives clean URLs, but the code adds an index.html at the end to the same path. Thus
-  # the two forms give one total, and one of them does not go unused.
+  # Plausible gives clean URLs. The code also removes an `index.html` at the end, thus the two
+  # forms of one page give one total.
   #
   # ⚠️ It also adds the slash at the end. ArticleAttributes.path always writes one, thus a path
   # from Plausible with no slash would never join to an article and would count as zero.
@@ -201,9 +198,9 @@ class Plausible < ApplicationService
     nil
   end
 
-  # ⚠️ This is a digest of the query, and not the query in a URL-safe form. That form removed the
-  # regex characters from a filter such as ARTICLE_PATH_FILTER. Thus two different queries could
-  # give the same key and each one could get the result of the other.
+  # ⚠️ This is a digest of the query, and not the query in a URL-safe form. That form removes the
+  # regex characters of a filter such as ARTICLE_PATH_FILTER. Thus two different queries could
+  # give the same key, and each one could get the result of the other.
   def generate_cache_key(body)
     "plausible:query:#{cache_version(body.to_json)}"
   end
