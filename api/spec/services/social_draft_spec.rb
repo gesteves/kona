@@ -110,7 +110,7 @@ RSpec.describe SocialDraft do
     it "puts the link in the text for a page with no og: tags" do
       allow(open_graph).to receive(:fetch).with(link).and_return(card(link, title: nil))
 
-      expect(draft.bluesky_text({ text: "Read this", link: link })).to eq(Bluesky.compose(text: "Read this", url: link))
+      expect(draft.bluesky_text({ text: "Read this", link: link })).to eq(SocialText.compose(text: "Read this", url: link))
     end
 
     it "reads each page one time for the whole draft" do

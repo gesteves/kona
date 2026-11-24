@@ -27,8 +27,8 @@ RSpec.describe SocialDraftValidator do
   it "refuses a draft with no post, and one with too many" do
     expect(error_of(posts: [])).to eq(message("empty"))
 
-    many = Array.new(SocialPresenter::MAX_POSTS + 1) { |i| post("Post #{i}") }
-    expect(error_of(posts: many)).to eq(message("too_many_posts", count: SocialPresenter::MAX_POSTS))
+    many = Array.new(SocialDraft::MAX_POSTS + 1) { |i| post("Post #{i}") }
+    expect(error_of(posts: many)).to eq(message("too_many_posts", count: SocialDraft::MAX_POSTS))
   end
 
   # ⚠️ Each form is a complete sentence: a draft of one post says "That post", and a thread names
@@ -89,10 +89,10 @@ RSpec.describe SocialDraftValidator do
     end
 
     it "refuses an alt text past its limit" do
-      alt = "a" * (SocialPresenter::ALT_LIMIT + 1)
+      alt = "a" * (SocialNetwork::ALT_LIMIT + 1)
 
       expect(error_of(posts: [ post("A photo", photos: [ stored ], alts: [ alt ]) ]))
-        .to eq(message("alt_too_long.single", index: 1, count: alt.length, limit: SocialPresenter::ALT_LIMIT))
+        .to eq(message("alt_too_long.single", index: 1, count: alt.length, limit: SocialNetwork::ALT_LIMIT))
     end
 
     # ⚠️ The 24-hour draft TTL removed it. Without this check the job fails the post later.

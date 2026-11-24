@@ -30,7 +30,7 @@ class BlueskyPostJob < SocialPostJob
     # Mastodon. An embed from such a page is an empty box with a host name in it. `SocialDraft`
     # reads the same `embeddable?` rule, thus the count on the page holds this link as well.
     embed = card if card&.embeddable?
-    text = Bluesky.compose(text: post["text"], url: (post["link"] if card && embed.nil?))
+    text = SocialText.compose(text: post["text"], url: (post["link"] if card && embed.nil?))
 
     # ⚠️ The page measured at the submit had a card, and a scheduled post can run days later. A
     # page that lost its og: tags puts the link in the words, and the words can then pass 300. The

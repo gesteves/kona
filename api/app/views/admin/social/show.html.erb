@@ -154,7 +154,7 @@
 
           ⚠️ The field stays in the form while it is hidden, thus a topic that the owner wrote stays
           after an untick. The action reads it only while the row is ticked. %>
-      <% if network.key == SocialPresenter::TOPIC_NETWORK %>
+      <% if network.topic? %>
         <div class="social__topic" data-social-target="topicField"
              data-network="<%= network.key %>"
              <%= "hidden" unless @social.topic? %>>

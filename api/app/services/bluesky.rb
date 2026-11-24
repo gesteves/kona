@@ -28,7 +28,7 @@ class Bluesky < ApplicationService
   MAX_BLOB_BYTES = 976_560
 
   # The most photos on one post. The schema of `app.bsky.embed.gallery` takes 20, and the clients
-  # of Bluesky permit 10. ⚠️ `SocialPresenter::MAX_PHOTOS` is this number.
+  # of Bluesky permit 10. ⚠️ `SocialNetwork::MAX_PHOTOS` is this number.
   MAX_IMAGES = 10
   # The most photos that `app.bsky.embed.images` takes. A post with more needs the gallery embed.
   MAX_IMAGES_EMBED = 4
@@ -146,17 +146,6 @@ class Bluesky < ApplicationService
     # `…/Kona_(Hawaii)` keeps its bracket and `(see …/a)` gives up the one that closes the aside.
     opener = URL_WRAPPERS[last]
     opener.present? && url.count(opener) >= url.count(last)
-  end
-
-  # The text that one post will hold.
-  #
-  # ⚠️ The link is in the words only when the page gives no card, that is, when
-  # `OpenGraph::Card#embeddable?` is false. An embed keeps the URL out of the 300 characters.
-  # @param text [String, nil] The body of the post.
-  # @param url [String, nil] The link to add below the body.
-  # @return [String]
-  def self.compose(text:, url: nil)
-    SocialText.compose(text: text, url: url)
   end
 
   # @param handle [String] The handle of the account.
@@ -356,6 +345,54 @@ class Bluesky < ApplicationService
 
     publication = strong_ref(card.publication_uri) if card.publication_uri.present?
     [ document, publication ].compact
+  end
+
+  # Splits an `at://` URI into its three parts.
+  # @param uri [String, nil]
+  # @return [Array(String, String, String), nil] [did, collection, rkey], or nil for a URI with
+  #   another shape.
+  def parse_at_uri(uri)
+    match = uri.to_s.match(%r{\Aat://(?<did>[^/]+)/(?<collection>[^/]+)/(?<rkey>[^/?\#]+)\z})
+    return if match.nil?
+
+    [ match[:did], match[:collection], match[:rkey] ]
+  end
+
+  # Reads one record and makes a `com.atproto.repo.strongRef` of it.
+  #
+  # ⚠️ A strongRef needs the CID, and an `at://` URI does not hold one, thus the code must read
+  # the record. The CID changes at each write, thus do not cache this for a long time.
+  # @param uri [String] An at:// URI.
+  # @return [Hash, nil] `{ "uri" =>, "cid" => }`, or nil when the record cannot be read.
+  def strong_ref(uri)
+    did, collection, rkey = parse_at_uri(uri)
+    return if did.blank?
+
+    service = service_for(did)
+    return if service.blank?
+
+    record = get_json("#{service}/xrpc/com.atproto.repo.getRecord",
+                      query: { repo: did, collection: collection, rkey: rkey },
+                      timeout: REQUEST_TIMEOUT)
+    return if record.blank? || record[:cid].blank?
+
+    { "uri" => record[:uri].presence || uri, "cid" => record[:cid] }
+  rescue StandardError => e
+    report_upstream_error(e, context: "#{at_proto_label} getRecord")
+    nil
+  end
+
+  # The host that holds a repo.
+  #
+  # ⚠️ A PDS answers `getRecord` for its own repos only, thus a DID that is not ours needs its DID
+  # document first. `did:plc` resolves at the directory, and each other method gives nil.
+  # @return [String, nil]
+  def service_for(did)
+    return @service_url if did == @did && @service_url.present?
+    return unless did.start_with?("did:plc:")
+
+    doc = get_json("https://plc.directory/#{did}", symbolize: false, timeout: REQUEST_TIMEOUT)
+    pds_endpoint_from_did_doc(doc)
   end
 
   # Downloads the og:image of the link and uploads it as a blob. Each failure gives nil, and the

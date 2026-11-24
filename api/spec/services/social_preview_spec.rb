@@ -111,7 +111,7 @@ RSpec.describe SocialPreview do
       it "puts the link in the words of the Mastodon row" do
         post = post_of("mastodon", **params)
 
-        expect(post[:text]).to eq(Mastodon.compose(text: "Read this", url: link))
+        expect(post[:text]).to eq(SocialText.compose(text: "Read this", url: link))
         expect(post[:segments]).to include({ text: link, url: link })
       end
 

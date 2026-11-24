@@ -178,7 +178,7 @@ class Mastodon < ApplicationService
       raise ApplicationJob::PermanentError, "Mastodon takes #{MAX_MEDIA_ATTACHMENTS} photos at the most"
     end
 
-    status = self.class.compose(text: text, url: url)
+    status = SocialText.compose(text: text, url: url)
     raise ApplicationJob::PermanentError, "The post is empty" if status.blank? && photos.empty?
 
     posted = posted_status(idempotency_key)
@@ -204,18 +204,6 @@ class Mastodon < ApplicationService
     }
     remember_status(idempotency_key, result)
     result
-  end
-
-  # The status that this instance will receive. Mastodon is the one network whose text holds the
-  # link.
-  #
-  # ⚠️ `#post!` and the preview of the Social media page both call this. Without one method the
-  # preview would show a text that the post does not send.
-  # @param text [String, nil] The body of the post.
-  # @param url [String, nil] The link to add below the body.
-  # @return [String]
-  def self.compose(text:, url: nil)
-    SocialText.compose(text: text, url: url)
   end
 
   # The length that this instance counts for a post.

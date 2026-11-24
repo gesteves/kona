@@ -19,7 +19,7 @@ class SocialDraftValidator
   # @return [String, nil] The reason to refuse, or nil when the draft is good.
   def error
     return t("empty") if posts.empty?
-    return t("too_many_posts", count: SocialPresenter::MAX_POSTS) if posts.length > SocialPresenter::MAX_POSTS
+    return t("too_many_posts", count: SocialDraft::MAX_POSTS) if posts.length > SocialDraft::MAX_POSTS
 
     posts.each_with_index do |post, index|
       message = post_error(post, index)
@@ -89,15 +89,15 @@ class SocialDraftValidator
     return nil if photos.empty?
 
     return post_message("photos_and_link", index) if post[:link].present?
-    if photos.length > SocialPresenter::MAX_PHOTOS
-      return post_message("too_many_photos", index, limit: SocialPresenter::MAX_PHOTOS)
+    if photos.length > SocialNetwork::MAX_PHOTOS
+      return post_message("too_many_photos", index, limit: SocialNetwork::MAX_PHOTOS)
     end
 
     photos.each do |photo|
       count = SocialText.graphemes(photo[:alt])
-      next if count <= SocialPresenter::ALT_LIMIT
+      next if count <= SocialNetwork::ALT_LIMIT
 
-      return post_message("alt_too_long", index, count: count, limit: SocialPresenter::ALT_LIMIT)
+      return post_message("alt_too_long", index, count: count, limit: SocialNetwork::ALT_LIMIT)
     end
 
     store = SocialPhotos.new
@@ -150,7 +150,7 @@ class SocialDraftValidator
   def markdown_network_error
     return nil unless draft.markdown?
 
-    others = selected_networks - [ SocialPresenter::MARKDOWN_NETWORK ]
+    others = selected_networks.reject { |network| SocialNetwork.fetch(network).markdown? }
     return nil if others.empty?
 
     t("markdown_network", networks: draft.names_of(others))
@@ -172,7 +172,7 @@ class SocialDraftValidator
   # ticked, and a value that the owner left there must not refuse the draft.
   # @return [String, nil]
   def topic_error
-    return nil unless selected_networks.include?(SocialPresenter::TOPIC_NETWORK)
+    return nil unless selected_networks.any? { |network| SocialNetwork.fetch(network).topic? }
     return nil if draft.topic.blank? || Threads.valid_topic?(draft.topic)
 
     t("bad_topic", limit: Threads::TOPIC_MAX_CHARACTERS)
@@ -190,9 +190,9 @@ class SocialDraftValidator
         other = SocialMentions.mistaken_network(row[:values][network], network: network)
         next if other.nil?
 
-        return t("mistaken_network", network: SocialDraft.network_name(network),
+        return t("mistaken_network", network: SocialNetwork.fetch(network).name,
                                      token: row[:token],
-                                     other: SocialDraft.network_name(other))
+                                     other: SocialNetwork.fetch(other).name)
       end
     end
 

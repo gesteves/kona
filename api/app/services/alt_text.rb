@@ -31,7 +31,7 @@ module AltText
 
   # @param image [String] The bytes of the picture.
   # @param media_type [String] Its content type. The photos of a draft are always JPEG.
-  # @return [String, nil] The alt text, at most `SocialPresenter::ALT_LIMIT` long, or nil when
+  # @return [String, nil] The alt text, at most `SocialNetwork::ALT_LIMIT` long, or nil when
   #   there is no configuration, when the picture is blank, and on an error.
   def generate(image:, media_type: "image/jpeg")
     return if image.blank? || !configured?
@@ -51,11 +51,11 @@ module AltText
   end
 
   # ⚠️ The prompt asks for less than 1,000 characters, and the field takes
-  # `SocialPresenter::ALT_LIMIT` graphemes. This is the guard for an answer that ignores the
+  # `SocialNetwork::ALT_LIMIT` graphemes. This is the guard for an answer that ignores the
   # prompt: the action would otherwise refuse the draft.
   def truncate(text)
     return if text.blank?
 
-    text.scan(/\X/).first(SocialPresenter::ALT_LIMIT).join
+    text.scan(/\X/).first(SocialNetwork::ALT_LIMIT).join
   end
 end

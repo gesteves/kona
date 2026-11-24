@@ -26,6 +26,8 @@ module SocialText
   end
 
   # The words, then the link below them.
+  # ⚠️ `Mastodon#post!`, `BlueskyPostJob`, and `SocialDraft` all call this. Thus the count and the
+  # preview of the page use the text that the post sends.
   def compose(text:, url: nil)
     [ text.to_s.strip, url.to_s.strip ].reject(&:blank?).join("\n\n")
   end

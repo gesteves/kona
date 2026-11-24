@@ -48,7 +48,7 @@ module Admin
       # below it when it succeeds, thus the rest of a thread needs no time of its own.
       draft.selected_networks.each do |network|
         payload = draft.payload(network, keys)
-        job = SocialDraft::NETWORKS.fetch(network)[:job]
+        job = SocialNetwork.fetch(network).job
         at ? job.perform_at(at, payload) : job.perform_async(payload)
       end
 
@@ -126,12 +126,12 @@ module Admin
     # `StandardSite#connected?` has that same rule, and its comment gives the reason: an upstream
     # failure must not go into the path of a page load.
     #
-    # ⚠️ Each key of `SocialDraft::NETWORKS` needs a `<key>_status` method below.
+    # ⚠️ Each key of `SocialNetwork::ALL` needs a `<key>_status` method below.
     # @return [Array<SocialPresenter::Network>]
     def social_networks
-      @social_networks ||= SocialDraft::NETWORKS.keys.map do |key|
-        connected, account, notice = send(:"#{key}_status")
-        SocialPresenter::Network.new(key: key, name: SocialDraft.network_name(key), connected: connected,
+      @social_networks ||= SocialNetwork.all.map do |network|
+        connected, account, notice = send(:"#{network.key}_status")
+        SocialPresenter::Network.new(key: network.key, name: network.name, connected: connected,
                                     account: account, notice: notice)
       end
     end

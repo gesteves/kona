@@ -6,39 +6,10 @@ class SocialPresenter
   # The maximum length of the body, in graphemes: the limit of Bluesky, the shortest of the three.
   # ⚠️ The view writes this number into the markup and social_post_controller.js reads it there.
   # Do not write it again in the JavaScript or in a stylesheet.
-  BODY_LIMIT = 300
+  BODY_LIMIT = Bluesky::MAX_GRAPHEMES
 
   # The length at which the count line changes to the warning color.
   WARN_AT = 270
-
-  # The one network with rich text. ⚠️ A Markdown link becomes a facet there, and the URL uses none
-  # of the 300 characters. Mastodon and Threads post plain words, thus a link there would reach a
-  # reader as its own syntax with no address. The composer disables those two rows, and
-  # `SocialDraftValidator#markdown_network_error` refuses a request that ticks one anyway.
-  MARKDOWN_NETWORK = "bluesky".freeze
-
-  # The most photos on one post of each network. A network that is absent takes none. ⚠️ A network
-  # takes the draft only when each post fits. The composer disables a row whose limit is below the
-  # largest post, and `SocialDraftValidator#photos_network_error` refuses a request that ticks one.
-  PHOTO_LIMITS = {
-    "bluesky" => Bluesky::MAX_IMAGES,
-    "mastodon" => Mastodon::MAX_MEDIA_ATTACHMENTS,
-    "threads" => Threads::MAX_CAROUSEL_ITEMS
-  }.freeze
-
-  # The most photos on one post, and the limit of one alt text. ⚠️ The view writes both into the
-  # markup and social_post_controller.js reads them there.
-  # ⚠️ MAX_PHOTOS is the limit of Bluesky and not the largest limit. The Bluesky row has no
-  # `data-max-photos`, thus the composer cannot turn it off for a count that it refuses.
-  # One alt text goes to each network, thus its limit is the smallest one.
-  MAX_PHOTOS = Bluesky::MAX_IMAGES
-  ALT_LIMIT = [
-    Bluesky::MAX_ALT_GRAPHEMES, Mastodon::MAX_DESCRIPTION_CHARACTERS, Threads::MAX_ALT_TEXT_CHARACTERS
-  ].min
-
-  # The one network that takes a topic. ⚠️ `topic_tag` is a parameter of Meta and it has no
-  # equivalent at Bluesky or Mastodon, thus the field shows only while that row is ticked.
-  TOPIC_NETWORK = "threads".freeze
 
   # The options of the topic field: the interests of the owner in the Threads app. ⚠️ Meta gives no
   # endpoint that lists the topics, thus the list is here. Each one is a value that goes to Meta,
@@ -47,10 +18,6 @@ class SocialPresenter
     "IronmanTriathlon", "Triathlon", "Cycling Threads", "Running Threads", "Swimming Threads",
     "Fitness Threads"
   ].freeze
-
-  # The most posts in one thread. ⚠️ It is a guard against a runaway form and not a rule of any
-  # network: Bluesky and Mastodon set no limit, and the limit of Threads is a rate of 250 each day.
-  MAX_POSTS = 25
 
   # One photo of a post: the id that `SocialPhotos` made, and its alt text.
   Photo = Data.define(:id, :alt) do
@@ -70,7 +37,7 @@ class SocialPresenter
   # takes plain words, for a person with no account there, and the hint of the section says so.
   # @return [Hash{String=>String}] Each network key, and its example.
   def self.mention_placeholders
-    %w[bluesky mastodon threads].index_with { |key| I18n.t("admin.social.mention_placeholder.#{key}") }
+    SocialNetwork.keys.index_with { |key| I18n.t("admin.social.mention_placeholder.#{key}") }
   end
 
   # One row of the mention map: the token that the owner wrote, and the name of that person at
@@ -93,13 +60,16 @@ class SocialPresenter
 
     def connected? = connected
 
-    def markdown? = key == MARKDOWN_NETWORK
+    # What the network of this row takes. Refer to SocialNetwork.
+    delegate :markdown?, :topic?, to: :network
 
-    def max_photos = PHOTO_LIMITS.fetch(key, 0)
+    def max_photos = network.photo_limit
 
     # @return [Boolean] True when too many photos can turn this row off, thus it needs a hint line
     #   for that reason.
-    def photo_limited? = max_photos < MAX_PHOTOS
+    def photo_limited? = max_photos < SocialNetwork::MAX_PHOTOS
+
+    def network = SocialNetwork.fetch(key)
 
     # The line below the name, for a network that is connected. The view renders its own line, with
     # a link, for a network that is not connected.
@@ -216,9 +186,9 @@ class SocialPresenter
   # at each later change.
   # @return [Boolean] True when the topic field shows.
   def topic?
-    network = networks.find { |row| row.key == TOPIC_NETWORK }
+    network = networks.find(&:topic?)
 
-    network&.connected? && selected?(TOPIC_NETWORK) || false
+    (network&.connected? && selected?(network.key)) || false
   end
 
   # ⚠️ The combobox shows a value only through an option that matches it. Without the extra option,
@@ -228,11 +198,11 @@ class SocialPresenter
     topic.blank? || TOPICS.include?(topic) ? TOPICS : TOPICS + [ topic ]
   end
 
-  def max_posts = MAX_POSTS
+  def max_posts = SocialDraft::MAX_POSTS
 
-  def max_photos = MAX_PHOTOS
+  def max_photos = SocialNetwork::MAX_PHOTOS
 
-  def alt_limit = ALT_LIMIT
+  def alt_limit = SocialNetwork::ALT_LIMIT
 
   # @return [Boolean] True when the row is ticked.
   def selected?(key) = @selected.include?(key.to_s)

@@ -64,12 +64,12 @@ RSpec.describe AltText do
     # answer past that would make the action refuse the draft.
     it "makes an answer no longer than the alt text limit, in graphemes" do
       allow(client).to receive(:messages).and_return(
-        instance_double(Anthropic::Resources::Messages, create: message_with("👨‍👩‍👧‍👦" * (SocialPresenter::ALT_LIMIT + 5)))
+        instance_double(Anthropic::Resources::Messages, create: message_with("👨‍👩‍👧‍👦" * (SocialNetwork::ALT_LIMIT + 5)))
       )
 
       text = described_class.generate(image: jpeg)
 
-      expect(SocialText.graphemes(text)).to eq(SocialPresenter::ALT_LIMIT)
+      expect(SocialText.graphemes(text)).to eq(SocialNetwork::ALT_LIMIT)
     end
 
     it "returns nil for an empty answer" do

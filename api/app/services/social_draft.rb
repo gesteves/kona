@@ -6,15 +6,9 @@
 # ⚠️ All three read the same object, and each value here is memoized. Thus the preview and the
 # check cannot use a different text from the one that goes out.
 class SocialDraft
-  # Each network that the page can post to, in the order of the page. `:job` posts to it.
-  # ⚠️ This is the one list: a network that is not here cannot take a post. The controller needs a
-  # `<key>_status` method for each key.
-  # ⚠️ `limit` is here because the preview and the check both read it.
-  NETWORKS = {
-    "bluesky"  => { job: BlueskyPostJob,  limit: Bluesky::MAX_GRAPHEMES },
-    "mastodon" => { job: MastodonPostJob, limit: Mastodon::DEFAULT_MAX_CHARACTERS },
-    "threads"  => { job: ThreadsPostJob,  limit: Threads::MAX_CHARACTERS }
-  }.freeze
+  # The most posts in one thread. ⚠️ It is a guard against a runaway form and not a rule of any
+  # network: Bluesky and Mastodon set no limit, and the limit of Threads is a rate of 250 each day.
+  MAX_POSTS = 25
 
   # The seconds that the card reads of one request can take together. Refer to #card_for.
   CARD_READ_BUDGET = 8
@@ -24,14 +18,11 @@ class SocialDraft
   DATE_PATTERN = /\A\d{4}-\d{2}-\d{2}\z/
   TIME_PATTERN = /\A\d{2}:\d{2}(:\d{2})?\z/
 
-  # @return [String] The name of the network with that key, for a message.
-  def self.network_name(key) = I18n.t("admin.networks.#{key}")
-
   # @return [Array<SocialPresenter::Network>] Each network of the page, with its state.
   attr_reader :networks
 
   # @param params [ActionController::Parameters] The parameters of the request.
-  # @param networks [Array<SocialPresenter::Network>] Each network of NETWORKS, with its state. The
+  # @param networks [Array<SocialPresenter::Network>] Each network of SocialNetwork, with its state. The
   #   caller reads that state from Redis, and this class makes no request for it.
   def initialize(params, networks:)
     @params = params
@@ -47,7 +38,7 @@ class SocialDraft
     @selected_networks ||= begin
       ticked = Array(@params[:networks]).map(&:to_s)
       connected = networks.select(&:connected?).map(&:key)
-      ticked & connected & NETWORKS.keys
+      ticked & connected & SocialNetwork.keys
     end
   end
 
@@ -79,7 +70,7 @@ class SocialDraft
   # The mention map of this draft, as the form sent it. A row with no token is dropped.
   #
   # ⚠️ The map is THREAD-LEVEL: a token in post 1 and in post 3 is the same person.
-  # ⚠️ The form sends `mentions[][token]` and one field for each key of NETWORKS, and all of them
+  # ⚠️ The form sends `mentions[][token]` and one field for each key of SocialNetwork, and all of them
   # must render for every row, in the same order. It is the rule of `posts[][text]`.
   # @return [Array<Hash>] `[{ token:, values: { "bluesky" => … } }, …]`, in the order of the form.
   def mention_rows
@@ -91,7 +82,7 @@ class SocialDraft
       token = row[:token].to_s.strip
       next if token.blank?
 
-      { token: token, values: NETWORKS.keys.to_h { |key| [ key, row[key].to_s.strip ] } }
+      { token: token, values: SocialNetwork.keys.to_h { |key| [ key, row[key].to_s.strip ] } }
     end
   end
 
@@ -129,7 +120,7 @@ class SocialDraft
   # ⚠️ It is THREAD-LEVEL, as #markdown? is: the largest post decides the whole draft.
   # @return [Boolean] True when each post of the draft fits the photo limit of that network.
   def takes_photos?(network)
-    most_photos <= SocialPresenter::PHOTO_LIMITS.fetch(network, 0)
+    most_photos <= SocialNetwork.find(network)&.photo_limit.to_i
   end
 
   # The text of one post, as that network will get it.
@@ -160,7 +151,7 @@ class SocialDraft
   # @param post [Hash]
   # @return [String]
   def bluesky_text(post)
-    Bluesky.compose(text: text_for("bluesky", post[:text]), url: bluesky_link_in_text(post))
+    SocialText.compose(text: text_for("bluesky", post[:text]), url: bluesky_link_in_text(post))
   end
 
   # ⚠️ It reads a link that is http or https only. `SocialDraftValidator` refuses each other
@@ -184,12 +175,12 @@ class SocialDraft
   def composed(network, post)
     text = text_for(network, post[:text])
 
-    if network == SocialPresenter::MARKDOWN_NETWORK
+    if SocialNetwork.fetch(network).markdown?
       rendered = MarkdownLinks.parse(bluesky_text(post))
       return [ rendered.text, Bluesky.link_ranges(rendered.text, rendered.links) ]
     end
 
-    text = Mastodon.compose(text: text, url: post[:link]) if network == "mastodon"
+    text = SocialText.compose(text: text, url: post[:link]) if SocialNetwork.fetch(network).link == :text
     [ text, Bluesky.link_ranges(text) ]
   end
 
@@ -209,7 +200,7 @@ class SocialDraft
   end
 
   # @return [Integer] The most characters of one post at that network.
-  def limit_of(network) = NETWORKS.fetch(network)[:limit]
+  def limit_of(network) = SocialNetwork.fetch(network).length_limit
 
   # @return [Boolean] True when a post is past the limit of that network.
   def over_limit?(network, post)
@@ -248,10 +239,10 @@ class SocialDraft
                 "link" => post[:link] }
       # ⚠️ Each post of a thread carries the topic, and not the first one alone. Meta takes one
       # topic for each post, and no documentation says that a reply inherits it from its root.
-      entry["topic"] = topic if network == SocialPresenter::TOPIC_NETWORK && topic.present?
+      entry["topic"] = topic if SocialNetwork.fetch(network).topic? && topic.present?
       # ⚠️ The photos go only to a network that takes them. `SocialDraftValidator` already
       # refused each other network that the owner ticked.
-      if SocialPresenter::PHOTO_LIMITS.key?(network) && post[:photos].any?
+      if SocialNetwork.fetch(network).photo_limit.positive? && post[:photos].any?
         entry["photos"] = post[:photos].map { |photo| { "id" => photo[:id], "alt" => photo[:alt] } }
       end
       entry

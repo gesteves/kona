@@ -8,14 +8,6 @@ require "uri"
 #
 # The caller gives each path as a callable, thus this class uses no route helper.
 class SocialPreview
-  # The network whose preview shows the link below the words.
-  #
-  # ⚠️ Bluesky is absent because the panel draws its card, and Mastodon is absent because
-  # `Mastodon.compose` puts the link in the text, thus it is already a segment there. Threads
-  # makes an attachment that Meta renders and this app cannot draw, thus the panel shows the
-  # address itself.
-  LINK_SHOWN = "threads".freeze
-
   # @param photo_path [#call] Gives the path of a stored photo from its id.
   # @param image_path [#call] Gives the path of the proxy of a card picture from the URL of the
   #   page.
@@ -112,17 +104,19 @@ class SocialPreview
   # `SocialDraft#payload` sends it.
   # @return [String, nil]
   def topic_of(network)
-    return nil unless network == SocialPresenter::TOPIC_NETWORK && @draft.topic.present?
+    return nil unless SocialNetwork.fetch(network).topic? && @draft.topic.present?
 
     @draft.topic
   end
 
-  # ⚠️ It is not part of the text and it uses none of the characters of that network: Threads
-  # makes an attachment of it. The panel shows it below the words, because a post with a link
-  # that nothing shows reads as a post with no link.
+  # The link of a network that makes an attachment of it, which this app cannot draw. ⚠️ It is not
+  # part of the text and it uses none of the characters of that network. The panel shows it below
+  # the words, because a post with a link that nothing shows reads as a post with no link.
+  # Bluesky is absent because the panel draws its card, and Mastodon because the link is in its
+  # text.
   # @return [String, nil]
   def link_of(network, post)
-    return nil unless network == LINK_SHOWN && post[:link].present?
+    return nil unless SocialNetwork.fetch(network).link == :attachment && post[:link].present?
 
     post[:link]
   end
@@ -134,7 +128,7 @@ class SocialPreview
   # renders a preview of its own, thus this app has nothing to show for it.
   # @return [Hash, nil]
   def card_of(network, post)
-    return nil unless network == "bluesky" && post[:link].present?
+    return nil unless SocialNetwork.fetch(network).link == :card && post[:link].present?
     return nil unless OpenGraph.http_url?(post[:link])
     # ⚠️ A page with no og: tags gets no card at all, thus the panel draws none. Its link is in
     # the words of the post, which the row above already shows.
@@ -146,7 +140,7 @@ class SocialPreview
   # The photos of a post, for the row of each network that takes them.
   # @return [Array<Hash>, nil] `[{ path:, alt: }, …]`, or nil for each other network.
   def photos_of(network, post)
-    return nil unless SocialPresenter::PHOTO_LIMITS.key?(network) && post[:photos].any?
+    return nil unless SocialNetwork.fetch(network).photo_limit.positive? && post[:photos].any?
 
     post[:photos].map { |photo| { path: @photo_path.call(photo[:id]), alt: photo[:alt] } }
   end

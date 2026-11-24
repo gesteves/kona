@@ -485,12 +485,12 @@ RSpec.describe "Admin social media", type: :request do
 
         it "refuses a thread past the limit" do
           post "/social", params: {
-            posts: Array.new(SocialPresenter::MAX_POSTS + 1) { |i| { text: "Post #{i}" } },
+            posts: Array.new(SocialDraft::MAX_POSTS + 1) { |i| { text: "Post #{i}" } },
             networks: [ "bluesky" ]
           }
 
           expect(response).to have_http_status(:unprocessable_content)
-          expect(response.body).to include(I18n.t("admin.social.errors.too_many_posts", count: SocialPresenter::MAX_POSTS))
+          expect(response.body).to include(I18n.t("admin.social.errors.too_many_posts", count: SocialDraft::MAX_POSTS))
           expect(BlueskyPostJob.jobs).to be_empty
         end
 
@@ -1405,13 +1405,13 @@ RSpec.describe "Admin social media", type: :request do
         end
       end
 
-      # ⚠️ The composition is Mastodon.compose, which Mastodon#post! calls. Without one method the
+      # ⚠️ The composition is SocialText.compose, which Mastodon#post! calls. Without one method the
       # preview would show a text that the post does not send.
       it "composes the Mastodon text the way that the service does" do
         body = preview(posts: [ { text: "A long day.", link: url } ])
 
         expect(rows(body)["mastodon"]["text"])
-          .to eq(Mastodon.compose(text: "A long day.", url: url))
+          .to eq(SocialText.compose(text: "A long day.", url: url))
       end
 
       describe "the counts" do
@@ -1678,8 +1678,8 @@ RSpec.describe "Admin social media", type: :request do
         expect(response.body).to include('data-social-post-target="photoTemplate"')
         expect(response.body).to include('name="posts[][photos][]"')
         expect(response.body).to include('name="posts[][alts][]"')
-        expect(response.body).to include(%(data-social-post-max-photos-value="#{SocialPresenter::MAX_PHOTOS}"))
-        expect(response.body).to include(%(data-social-post-alt-limit-value="#{SocialPresenter::ALT_LIMIT}"))
+        expect(response.body).to include(%(data-social-post-max-photos-value="#{SocialNetwork::MAX_PHOTOS}"))
+        expect(response.body).to include(%(data-social-post-alt-limit-value="#{SocialNetwork::ALT_LIMIT}"))
         expect(response.body).not_to include("<button")
       end
 
@@ -1786,11 +1786,11 @@ RSpec.describe "Admin social media", type: :request do
       end
 
       it "gives each network the photos, up to the most that the composer takes" do
-        ids = Array.new(SocialPresenter::MAX_PHOTOS) { first }
+        ids = Array.new(SocialNetwork::MAX_PHOTOS) { first }
         post_photos(photos: ids, alts: ids.map { "" }, networks: %w[bluesky threads])
 
         expect(response).to redirect_to(social_path)
-        expect(ThreadsPostJob.jobs.first["args"].first.first["photos"].length).to eq(SocialPresenter::MAX_PHOTOS)
+        expect(ThreadsPostJob.jobs.first["args"].first.first["photos"].length).to eq(SocialNetwork::MAX_PHOTOS)
       end
 
       it "gives the Threads job the photos and the topic" do
@@ -1809,19 +1809,19 @@ RSpec.describe "Admin social media", type: :request do
       end
 
       it "refuses more photos than the most" do
-        ids = Array.new(SocialPresenter::MAX_PHOTOS + 1) { first }
+        ids = Array.new(SocialNetwork::MAX_PHOTOS + 1) { first }
         post_photos(photos: ids, alts: ids.map { "" })
 
         expect(response).to have_http_status(:unprocessable_content)
-        expect(flash[:alert]).to eq(I18n.t("admin.social.errors.too_many_photos.single", limit: SocialPresenter::MAX_PHOTOS))
+        expect(flash[:alert]).to eq(I18n.t("admin.social.errors.too_many_photos.single", limit: SocialNetwork::MAX_PHOTOS))
       end
 
       it "refuses an alt text past its limit, and counts graphemes" do
-        post_photos(photos: [ first ], alts: [ "👨‍👩‍👧‍👦" * (SocialPresenter::ALT_LIMIT + 1) ])
+        post_photos(photos: [ first ], alts: [ "👨‍👩‍👧‍👦" * (SocialNetwork::ALT_LIMIT + 1) ])
 
         expect(response).to have_http_status(:unprocessable_content)
         expect(flash[:alert]).to eq(I18n.t("admin.social.errors.alt_too_long.single",
-                                           count: SocialPresenter::ALT_LIMIT + 1, limit: SocialPresenter::ALT_LIMIT))
+                                           count: SocialNetwork::ALT_LIMIT + 1, limit: SocialNetwork::ALT_LIMIT))
       end
 
       it "refuses a photo that is gone, and names the post of a thread" do
@@ -1871,7 +1871,7 @@ RSpec.describe "Admin social media", type: :request do
       end
 
       it "renders the file input disabled at the most photos, and live below it" do
-        ids = Array.new(SocialPresenter::MAX_PHOTOS) { first }
+        ids = Array.new(SocialNetwork::MAX_PHOTOS) { first }
         post_photos(photos: ids, alts: ids.map { "" }, networks: [])
         expect(response).to have_http_status(:unprocessable_content)
         expect(open_tag("wa-file-input", "social-post__file-input")).to include("disabled")

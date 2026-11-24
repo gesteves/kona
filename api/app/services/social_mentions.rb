@@ -75,7 +75,7 @@ class SocialMentions
     # @param text [String, nil] The body that the owner wrote.
     # @param values [Hash{String => String}] The field of this network, by key. A blank value and a
     #   key that is absent are the same thing.
-    # @param network [String] A network key of SocialDraft::NETWORKS.
+    # @param network [String] A key of SocialNetwork.
     # @return [String]
     def substitute(text, values:, network:)
       text = text.to_s
