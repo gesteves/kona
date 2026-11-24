@@ -1,5 +1,6 @@
 import { Controller } from "@hotwired/stimulus";
 import { i18nTable, t } from "../lib/i18n";
+import { csrfHeader } from "../lib/csrf";
 
 // The only place with the version. The code loads Mapbox GL JS from the CDN of Mapbox and not
 // from the bundle: it is several times the size of the admin bundle, and only this page needs
@@ -376,7 +377,7 @@ export default class extends Controller {
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
           Accept: "application/json",
-          "X-CSRF-Token": document.querySelector("meta[name=csrf-token]")?.content ?? ""
+          ...csrfHeader()
         },
         body: new URLSearchParams({ latitude: pair[0], longitude: pair[1] })
       });

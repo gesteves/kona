@@ -74,6 +74,9 @@ class Mastodon < ApplicationService
   # @return [String, nil] The "@user@instance" name of the connected account.
   def handle = @credentials.handle
 
+  # @return [String, nil] The name of the connected account, as the admin pages show it.
+  def account_label = handle
+
   # Registers this app on the instance and stores the client that it gives.
   # @param instance [String] A bare hostname, from .normalize_instance.
   # @param redirect_uri [String] The callback URL of this app.

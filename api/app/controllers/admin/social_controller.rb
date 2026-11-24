@@ -141,12 +141,12 @@ module Admin
     # "Not connected." of the view.
     def bluesky_status
       service = StandardSite.new
-      [ service.connected?, ("@#{service.handle}" if service.handle.present?), nil ]
+      [ service.connected?, service.account_label, nil ]
     end
 
     def mastodon_status
       service = Mastodon.new
-      [ service.connected?, service.handle, nil ]
+      [ service.connected?, service.account_label, nil ]
     end
 
     # ⚠️ A Threads account with an expired token is connected and cannot post: `usable?` is the
@@ -154,7 +154,7 @@ module Admin
     def threads_status
       service = Threads.new
       notice = t("admin.social.status.threads_expired") if service.expired?
-      [ service.usable?, ("@#{service.username}" if service.username.present?), notice ]
+      [ service.usable?, service.account_label, notice ]
     end
 
     # ⚠️ `alt_text:` is one env read, and no HTTP request, for the reason that #social_networks

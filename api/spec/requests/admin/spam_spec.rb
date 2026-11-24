@@ -164,7 +164,7 @@ RSpec.describe "Admin spam quarantine", type: :request do
       )
       expect(response).to have_http_status(:see_other)
       expect(response).to redirect_to("/spam")
-      expect(flash[:notice]).to eq(I18n.t("admin.spam_flash.released"))
+      expect(flash[:notice]).to eq(I18n.t("admin.spam.flash.released"))
     end
 
     # An entry with no reason is an Akismet mark.
@@ -196,7 +196,7 @@ RSpec.describe "Admin spam quarantine", type: :request do
 
       expect(ContactMailJob.jobs).to be_empty
       expect(response).to have_http_status(:see_other)
-      expect(flash[:alert]).to eq(I18n.t("admin.spam_flash.gone"))
+      expect(flash[:alert]).to eq(I18n.t("admin.spam.flash.gone"))
     end
   end
 
@@ -211,7 +211,7 @@ RSpec.describe "Admin spam quarantine", type: :request do
       expect(ContactMailJob.jobs).to be_empty
       expect(response).to have_http_status(:see_other)
       expect(response).to redirect_to("/spam")
-      expect(flash[:notice]).to eq(I18n.t("admin.spam_flash.deleted"))
+      expect(flash[:notice]).to eq(I18n.t("admin.spam.flash.deleted"))
     end
   end
 

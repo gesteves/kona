@@ -78,6 +78,10 @@ en:
           to reach the course map renderer, the settings pages, and the Sidekiq queue."
 
     spam:
+      flash:
+        deleted: "Message deleted."
+        gone: "That message is no longer in the queue."
+        released: "Message released — it's on its way to your inbox."
       index:
         # The badge and the release button of a card follow the check that marked the message.
         badge:
@@ -97,12 +101,6 @@ en:
         show_full: "Show full message"
         submitted: "Submitted"
         user_agent: "User agent"
-
-    # The flash messages of the Spam page.
-    spam_flash:
-      deleted: "Message deleted."
-      gone: "That message is no longer in the queue."
-      released: "Message released — it's on its way to your inbox."
 
     # The name of each network. ⚠️ Connected apps and the Social media page both read these, thus a
     # name is in one place.

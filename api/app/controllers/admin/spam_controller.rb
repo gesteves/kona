@@ -21,7 +21,7 @@ module Admin
     # an Akismet mark it also tells Akismet that the mark was incorrect. Claude has no such report.
     def not_spam
       message = SpamQuarantine.new.take(params[:id])
-      return redirect_to(spam_path, status: :see_other, alert: t("admin.spam_flash.gone")) if message.nil?
+      return redirect_to(spam_path, status: :see_other, alert: t("admin.spam.flash.gone")) if message.nil?
 
       context = message["context"] || {}
 
@@ -39,13 +39,13 @@ module Admin
         true
       )
 
-      redirect_to spam_path, status: :see_other, notice: t("admin.spam_flash.released")
+      redirect_to spam_path, status: :see_other, notice: t("admin.spam.flash.released")
     end
 
     # DELETE /spam/:id
     def destroy
       SpamQuarantine.new.delete(params[:id])
-      redirect_to spam_path, status: :see_other, notice: t("admin.spam_flash.deleted")
+      redirect_to spam_path, status: :see_other, notice: t("admin.spam.flash.deleted")
     end
   end
 end

@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus";
+import { csrfHeader } from "../lib/csrf";
 
 const DEBOUNCE = 400;
 
@@ -85,7 +86,7 @@ export default class extends Controller {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
-        "X-CSRF-Token": document.querySelector("meta[name=csrf-token]")?.content ?? ""
+        ...csrfHeader()
       },
       body: `${query}&_method=patch`,
       signal: this.aborter.signal

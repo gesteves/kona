@@ -137,7 +137,7 @@ RSpec.describe "Admin home", type: :request do
         post "/spam/missing/not-spam"
         follow_redirect!
 
-        expect(toast_items).to eq([ [ "danger", I18n.t("admin.spam_flash.gone") ] ])
+        expect(toast_items).to eq([ [ "danger", I18n.t("admin.spam.flash.gone") ] ])
       end
 
       it "renders an empty stack, and never a callout, when there is nothing to say" do

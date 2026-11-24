@@ -234,6 +234,9 @@ class StandardSite < ApplicationService
   # @return [String, nil]
   attr_reader :handle
 
+  # @return [String, nil] The name of the connected account, as the admin pages show it.
+  def account_label = ("@#{handle}" if handle.present?)
+
   # Tells if an account is connected: the app holds both Bluesky credentials. This does not do a
   # live createSession, on purpose. The Connected apps page shows this on each load, and a PDS
   # request here would put an upstream failure in the path of the admin navigation.

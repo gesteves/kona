@@ -18,6 +18,11 @@ class TrainerRoad < ApplicationService
 
   def connected? = @calendar_url.present?
 
+  # ⚠️ A calendar feed names no account, and a request for the name of the calendar would put an
+  # upstream failure in the path of an admin page.
+  # @return [nil]
+  def account_label = nil
+
   # Checks the feed of this instance and stores its URL.
   #
   # ⚠️ It gets the feed and parses it before it stores the URL. A URL with a typing error, that the

@@ -65,6 +65,9 @@ class Strava < ApplicationService
 
   def athlete_name = @credentials.athlete_name
 
+  # @return [String, nil] The name of the connected account, as the admin pages show it.
+  def account_label = athlete_name
+
   # @return [Hash, nil] `{ code:, at: }` of the last refused refresh, or nil when the token is good.
   def refresh_error = @credentials.refresh_error
 

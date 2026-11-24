@@ -212,6 +212,9 @@ class Whoop < ApplicationService
     email
   end
 
+  # @return [String, nil] The name of the connected account, as the admin pages show it.
+  def account_label = account_email
+
   # @return [Boolean] True if an account is connected now. The refresh token *is* the connection.
   def connected?
     return false unless configured?

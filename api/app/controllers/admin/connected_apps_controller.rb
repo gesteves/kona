@@ -5,85 +5,67 @@ module Admin
     # GET /connected-apps
     #
     # ⚠️ A card is on the page only when its integration can operate. Whoop, Threads, and Strava
-    # need credentials in the environment, thus without those the page hides the card and offers
-    # no action that cannot work. For Bluesky, Mastodon, and TrainerRoad the credentials are the
-    # connection, thus those cards are always here and the list is never empty.
+    # need credentials in the environment, thus without those their method gives nil, and the page
+    # hides the card and offers no action that cannot work. For Bluesky, Mastodon, and TrainerRoad
+    # the credentials are the connection, thus those cards are always here and the list is never
+    # empty.
     def show
       @apps = [ bluesky_app, mastodon_app, strava_app, threads_app, trainer_road_app, whoop_app ].compact
     end
 
     private
 
-    def bluesky_app
-      service = StandardSite.new
+    def bluesky_app = card(:bluesky, StandardSite.new, connect_path: bluesky_connection_path)
 
-      ConnectedAppPresenter.new(
-        name: t("admin.networks.bluesky"),
-        description: card_description(
-          connected: service.connected?,
-          account: ("@#{service.handle}" if service.handle.present?),
-          summary: t("admin.connected_apps.summary.bluesky")
-        ),
-        connected: service.connected?,
-        connect_path: bluesky_connection_path,
-        disconnect_path: bluesky_connection_path
-      )
-    end
+    def mastodon_app = card(:mastodon, Mastodon.new, connect_path: mastodon_connection_path)
 
-    def mastodon_app
-      service = Mastodon.new
+    def trainer_road_app = card(:trainer_road, TrainerRoad.new, connect_path: trainer_road_connection_path)
 
-      ConnectedAppPresenter.new(
-        name: t("admin.networks.mastodon"),
-        description: card_description(
-          connected: service.connected?,
-          account: service.handle,
-          summary: t("admin.connected_apps.summary.mastodon")
-        ),
-        connected: service.connected?,
-        connect_path: mastodon_connection_path,
-        disconnect_path: mastodon_connection_path
-      )
-    end
-
-    # @return [ConnectedAppPresenter, nil] Nil without the Strava app credentials, thus the page
-    #   hides the card.
     def strava_app
       service = Strava.new
       return unless service.configured?
 
-      ConnectedAppPresenter.new(
-        name: t("admin.networks.strava"),
-        description: card_description(
-          connected: service.connected?,
-          account: service.athlete_name,
-          summary: t("admin.connected_apps.summary.strava")
-        ),
-        connected: service.connected?,
-        connect_path: strava_authorize_path,
-        disconnect_path: strava_connection_path,
-        error: (refresh_error_message(service.refresh_error, name: t("admin.networks.strava"),
-                                      consequence: t("admin.connected_apps.strava.consequence")) if service.connected?)
-      )
+      card(:strava, service, connect_path: strava_authorize_path, disconnect_path: strava_connection_path) do
+        refresh_error_message(:strava, service.refresh_error)
+      end
     end
 
-    # @return [ConnectedAppPresenter, nil] Nil without the Meta app credentials, thus the page
-    #   hides the card.
     def threads_app
       service = Threads.new
       return unless service.configured?
 
+      card(:threads, service, connect_path: threads_authorize_path, disconnect_path: threads_connection_path) do
+        threads_error_message(service)
+      end
+    end
+
+    def whoop_app
+      service = Whoop.new
+      return unless service.configured?
+
+      card(:whoop, service, connect_path: whoop_authorize_path, disconnect_path: whoop_connection_path) do
+        refresh_error_message(:whoop, service.refresh_error)
+      end
+    end
+
+    # One card of the page. The name and the summary come from the locale file, below the key.
+    # @param key [Symbol] The key of the app in `admin.networks` and `admin.connected_apps.summary`.
+    # @param service [#connected?, #account_label] The service of the app.
+    # @param disconnect_path [String] The same path as `connect_path` for an app with a form.
+    # @yieldreturn [String, nil] The error sentence of a connected app. The block runs only for a
+    #   connected app.
+    # @return [ConnectedAppPresenter]
+    def card(key, service, connect_path:, disconnect_path: connect_path)
+      connected = service.connected?
+
       ConnectedAppPresenter.new(
-        name: t("admin.networks.threads"),
-        description: card_description(
-          connected: service.connected?,
-          account: ("@#{service.username}" if service.username.present?),
-          summary: t("admin.connected_apps.summary.threads")
-        ),
-        connected: service.connected?,
-        connect_path: threads_authorize_path,
-        disconnect_path: threads_connection_path,
-        error: threads_error_message(service)
+        name: t("admin.networks.#{key}"),
+        description: card_description(connected: connected, account: service.account_label,
+                                      summary: t("admin.connected_apps.summary.#{key}")),
+        connected: connected,
+        connect_path: connect_path,
+        disconnect_path: disconnect_path,
+        error: (yield if connected && block_given?)
       )
     end
 
@@ -104,50 +86,8 @@ module Admin
           t("admin.connected_apps.threads.expired")
         end
       else
-        refresh_error_message(service.refresh_error, name: t("admin.networks.threads"),
-                              consequence: t("admin.connected_apps.threads.consequence"))
+        refresh_error_message(:threads, service.refresh_error)
       end
-    end
-
-    # ⚠️ This card names no account: a feed has none, and the rule at #card_description stops a
-    # request for the name of the calendar.
-    def trainer_road_app
-      service = TrainerRoad.new
-
-      ConnectedAppPresenter.new(
-        name: t("admin.networks.trainer_road"),
-        description: card_description(
-          connected: service.connected?,
-          account: nil,
-          summary: t("admin.connected_apps.summary.trainer_road")
-        ),
-        connected: service.connected?,
-        connect_path: trainer_road_connection_path,
-        disconnect_path: trainer_road_connection_path
-      )
-    end
-
-    # @return [ConnectedAppPresenter, nil] Nil without the Whoop OAuth credentials, thus the page
-    #   hides the card.
-    def whoop_app
-      service = Whoop.new
-      return unless service.configured?
-
-      connected = service.connected?
-
-      ConnectedAppPresenter.new(
-        name: t("admin.networks.whoop"),
-        description: card_description(
-          connected: connected,
-          account: service.account_email,
-          summary: t("admin.connected_apps.summary.whoop")
-        ),
-        connected: connected,
-        connect_path: whoop_authorize_path,
-        disconnect_path: whoop_connection_path,
-        error: (refresh_error_message(service.refresh_error, name: t("admin.networks.whoop"),
-                                      consequence: t("admin.connected_apps.whoop.consequence")) if connected)
-      )
     end
 
     # The one line of a card. A connected app names its account, thus the page says which account
@@ -171,16 +111,16 @@ module Admin
     # Whoop, Threads, and Strava each keep their tokens in Redis after the service refuses them.
     # Thus `connected?` alone cannot show whether an integration works, and the scheduled refresh
     # job would continue to fail below a green badge.
+    # @param key [Symbol] The key of the app.
     # @param error [Hash, nil] The `{ code:, at: }` of the last refused refresh.
-    # @param consequence [String] What stays broken until the owner reconnects.
     # @return [String, nil] A sentence for the card, or nil when the last refresh was successful.
-    def refresh_error_message(error, name:, consequence:)
+    def refresh_error_message(key, error)
       return if error.blank?
 
       date = formatted_date(Time.zone.parse(error[:at].to_s))
-      key = date ? "on_date" : "plain"
-      t("admin.connected_apps.refresh_error.#{key}",
-        name: name, code: error[:code], date: date, consequence: consequence)
+      t("admin.connected_apps.refresh_error.#{date ? 'on_date' : 'plain'}",
+        name: t("admin.networks.#{key}"), code: error[:code], date: date,
+        consequence: t("admin.connected_apps.#{key}.consequence"))
     end
 
     # @return [String, nil] The date to name in a sentence, or nil with no time.
