@@ -25,7 +25,7 @@ module EventsHelper
     return false if event.blank? || !event.going
     window = event_daylight_window(event_weather)
     return window.cover?(Time.current) if window
-    daytime?(nil, time_zone) && today?(event, time_zone)
+    Forecast.new(nil, time_zone).daytime? && today?(event, time_zone)
   end
 
   # @return [Range, nil] The sunrise..sunset window of the event day, or nil if there are no sun

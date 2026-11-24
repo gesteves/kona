@@ -41,6 +41,35 @@ class EventWeatherPresenter
     @bay = at && bay_conditions_at(@goodspeed, at)
   end
 
+  # ⚠️ The bay checks test each field, and not `bay` alone. Goodspeed omits some readings, and one
+  # field that is absent must remove its own line and not give the full widget a 500.
+  # @return [Boolean] True when the bay entry has a water temperature.
+  def water_temperature?
+    bay.present? && bay.water_temp_c.present?
+  end
+
+  # @return [Boolean] True when the bay entry has the speed and the bearing of the current.
+  def bay_current?
+    bay.present? && bay.current_speed_ms.present? && bay.current_bearing_deg.present?
+  end
+
+  # The direction that the current comes from, in degrees. The bearing of Goodspeed is the
+  # direction that the current goes to, and the arrow of the widget turns as a wind arrow does.
+  # @return [Numeric]
+  def bay_current_from
+    (bay.current_bearing_deg + 180) % 360
+  end
+
+  # @return [Numeric] The humidity of the forecast, in percent. Call it only with a humidity.
+  def humidity_percent
+    forecast.humidity * 100
+  end
+
+  # @return [Numeric] The chance of precipitation, in percent. Call it only with a chance.
+  def precipitation_percent
+    forecast.precipitation_chance * 100
+  end
+
   # @return [OpenStruct, nil] The air-quality reading of the event.
   def aqi
     event.aqi

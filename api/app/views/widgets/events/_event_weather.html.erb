@@ -51,14 +51,14 @@
           <% if event_forecast.humidity.present? %>
             <span class="event__weather-stat">
               <%= raw icon_svg("classic", "light", "droplet-percent") %>
-              <%= number_to_percentage(event_forecast.humidity * 100, precision: 0) %>
+              <%= number_to_percentage(event_weather.humidity_percent, precision: 0) %>
               humidity
             </span>
           <% end %>
           <% if event_forecast.precipitation_chance.present? %>
             <span class="event__weather-stat">
               <%= raw icon_svg("classic", "light", "raindrops") %>
-              <%= number_to_percentage(event_forecast.precipitation_chance * 100, precision: 0) %>
+              <%= number_to_percentage(event_weather.precipitation_percent, precision: 0) %>
               chance of <%= event_weather.precipitation_label %>
             </span>
           <% end %>
@@ -85,23 +85,20 @@
       <% end %>
     <% end %>
     <% bay = event_weather.bay %>
-    <%# ⚠️ There is a check for each field, and not one check on `bay`. Goodspeed omits some
-        readings, and the arithmetic below makes one field that is absent into a NoMethodError,
-        which gives the full widget a 500. %>
-    <% show_water_temp = bay.present? && bay.water_temp_c.present? %>
-    <% show_current = bay.present? && bay.current_speed_ms.present? && bay.current_bearing_deg.present? %>
-    <% if show_water_temp || show_current %>
+    <%# ⚠️ The presenter checks each field of `bay`, and not `bay` alone. Refer to
+        EventWeatherPresenter#water_temperature?. %>
+    <% if event_weather.water_temperature? || event_weather.bay_current? %>
       <div class="event__weather-stat-group">
-        <% if show_water_temp %>
+        <% if event_weather.water_temperature? %>
           <span class="event__weather-stat">
             <%= raw icon_svg("classic", "light", "water-temperature") %>
             <%= format_temperature(bay.water_temp_c) %>
             water
           </span>
         <% end %>
-        <% if show_current %>
+        <% if event_weather.bay_current? %>
           <span class="event__weather-stat">
-            <span class="event__weather-wind-direction" style="--wind-direction: <%= (bay.current_bearing_deg + 180) % 360 %>;" title="<%= wind_direction(bay.current_bearing_deg) %>">
+            <span class="event__weather-wind-direction" style="--wind-direction: <%= event_weather.bay_current_from %>;" title="<%= wind_direction(bay.current_bearing_deg) %>">
               <%= raw icon_svg("classic", "light", "arrow-down") %>
             </span>
             <%= format_bay_current_speed(bay.current_speed_ms) %>

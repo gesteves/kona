@@ -20,7 +20,7 @@ module Widgets
       country = safely("GoogleMaps") { gmaps.country_code }
       weather = safely("WeatherKit") { WeatherKit.new(location.latitude, location.longitude, time_zone, country).data }
 
-      return render_empty unless helpers.weather_data_is_current?(weather, time_zone)
+      return render_empty unless Forecast.new(weather, time_zone).current?
 
       # The other six upstream calls do not depend on each other, thus they run at the same time.
       # With a cold cache, that is the difference between the total of their times and the time of

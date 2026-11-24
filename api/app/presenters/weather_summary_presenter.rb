@@ -1,10 +1,8 @@
 # Makes the text summary of the current-weather widget. It holds the rules (is the weather good or
-# bad, and is it the indoor season) and the methods that make each sentence. WeatherHelper keeps
-# the small format and selection methods.
-# This object holds the weather data of the request, and it gives that data to each helper
-# function that it calls.
+# bad, and is it the indoor season) and the methods that make each sentence. Forecast selects the
+# data, and WeatherHelper keeps the small format methods.
 class WeatherSummaryPresenter
-  include WeatherHelper   # forecast selection + condition/temperature/wind formatting
+  include WeatherHelper   # condition/temperature/wind formatting
   include MarkupHelper    # units_tag
   include UnitsHelper     # unit conversions + ActiveSupport::NumberHelper
   include TimeHelper      # meridiem_abbr (via format_time)
@@ -20,37 +18,22 @@ class WeatherSummaryPresenter
   include ActionView::Helpers::TagHelper
 
   def initialize(weather: nil, location: nil, air_quality: nil, pollen: nil, events: nil, goodspeed: nil, workouts: nil, time_zone: nil)
-    @weather = weather
+    @time_zone = time_zone.presence || TimeZoneResolver.default
+    @weather = Forecast.new(weather, @time_zone)
     @location = location
     @air_quality = air_quality
     @pollen = pollen
     @events = events
     @goodspeed = goodspeed
     @workouts = workouts
-    @time_zone = time_zone.presence || TimeZoneResolver.default
   end
 
-  # Keeps the forecast of today for the request. More than one sentence needs it, and each
-  # selection parses two timestamps for each day. WeatherHelper keeps no value, because each of its
-  # functions uses only its arguments.
-  #
-  # ⚠️ The value goes on `todays_forecast` itself, and not on a method around it. sunrise, sunset,
-  # daytime?, evening?, and rest_of_day_forecast each call it, and a method around it would cover
-  # only the direct callers. Each other weather object goes to the original method.
-  def todays_forecast(weather = @weather)
-    return super unless weather.equal?(@weather)
-    return @todays_forecast if defined?(@todays_forecast)
+  # @return [Forecast] The weather of the request: now, today, the sun times, and the time of day.
+  attr_reader :weather
 
-    @todays_forecast = super
-  end
-  alias today todays_forecast
-
-  def rest_of_day
-    return @rest_of_day if defined?(@rest_of_day)
-    @rest_of_day = rest_of_day_forecast(@weather, @time_zone)
-  end
-
-  # The same rule for the events: race_day? calls todays_race.
+  # Keeps the race of today for the request, because race_day? calls todays_race and more than
+  # one sentence calls race_day?. ⚠️ The value goes on `todays_race` itself, and not on a method
+  # around it, which would cover only the direct callers.
   def todays_race(events = @events, time_zone = @time_zone)
     return super unless events.equal?(@events) && time_zone == @time_zone
     return @todays_race if defined?(@todays_race)
@@ -79,17 +62,17 @@ class WeatherSummaryPresenter
   # The icon id for the current conditions, for the header of the widget. It knows the day and the
   # night.
   def icon
-    weather_icon(current_weather(@weather)&.condition_code, :auto, weather: @weather, time_zone: @time_zone)
+    weather_icon(weather.current&.condition_code, weather.daytime? ? :day : :night)
   end
 
   # The weather alerts that apply now. The code removes the copies and puts them in order for the
   # screen.
   def alerts
-    weather_alerts(@weather)
+    weather.alerts
   end
 
   def race_day
-    "**It's race day!**" if race_day?(@events, @time_zone) && !evening?(@weather, @time_zone)
+    "**It's race day!**" if race_day?(@events, @time_zone) && !weather.evening?
   end
 
   # ⚠️ The place name and the race title go through heading_text. The summary renders as Markdown
@@ -98,7 +81,7 @@ class WeatherSummaryPresenter
     location = "I'm currently in **#{heading_text(location_name)}**"
     race = todays_race(@events, @time_zone)
     the = race&.title&.downcase&.start_with?("ironman") ? "" : "the"
-    location << ", racing #{the} **#{heading_text(race.title)}**" if race_day?(@events, @time_zone) && !evening?(@weather, @time_zone)
+    location << ", racing #{the} **#{heading_text(race.title)}**" if race_day?(@events, @time_zone) && !weather.evening?
     location
   end
 
@@ -109,11 +92,11 @@ class WeatherSummaryPresenter
   end
 
   def smooth
-    "Man, it's a hot one!" if !race_day?(@events, @time_zone) && hot? && daytime?(@weather, @time_zone)
+    "Man, it's a hot one!" if !race_day?(@events, @time_zone) && hot? && weather.daytime?
   end
 
   def currently
-    current = current_weather(@weather)
+    current = weather.current
     # The temperature is the content of the sentence. Without it there is nothing to say, thus the
     # code removes the full sentence and does not write "with a temperature of".
     temperature = format_temperature(current&.temperature)
@@ -129,7 +112,7 @@ class WeatherSummaryPresenter
   end
 
   def wind
-    current = current_weather(@weather)
+    current = weather.current
     direction = wind_direction(current&.wind_direction)
     # ⚠️ Do the check before the format. WeatherKit omits some fields, and a wind speed that is
     # absent must give no sentence. A nil speed becomes 0 knots, which is Beaufort 0, thus this
@@ -169,25 +152,25 @@ class WeatherSummaryPresenter
 
   def forecast
     text = []
-    text << "#{today_or_tonight(@weather, @time_zone)}'s forecast #{format_forecasted_condition(rest_of_day.condition_code).downcase}"
+    text << "#{weather.today_or_tonight}'s forecast #{format_forecasted_condition(weather.rest_of_day.condition_code).downcase}"
     # This uses the readings that are available. Without the check, a day forecast with one of the
     # two values absent would read "with a high of  and a low of 12°C".
     temperatures = []
-    temperatures << "a high of #{format_temperature(today.temperature_max)}" if !evening?(@weather, @time_zone) && today.temperature_max.present?
-    temperatures << "a low of #{format_temperature(today.temperature_min)}" if today.temperature_min.present?
+    temperatures << "a high of #{format_temperature(weather.today.temperature_max)}" if !weather.evening? && weather.today.temperature_max.present?
+    temperatures << "a low of #{format_temperature(weather.today.temperature_min)}" if weather.today.temperature_min.present?
     text << "with #{temperatures.join(' and ')}" if temperatures.any?
     text.join(", ")
   end
 
   def precipitation
-    precipitation_type = rest_of_day.precipitation_type.to_s.downcase
-    chance = rest_of_day.precipitation_chance.to_f
+    precipitation_type = weather.rest_of_day.precipitation_type.to_s.downcase
+    chance = weather.rest_of_day.precipitation_chance.to_f
     return if chance.zero? || precipitation_type.blank? || precipitation_type == "clear"
 
-    snowfall = rest_of_day.snowfall_amount.to_f
+    snowfall = weather.rest_of_day.snowfall_amount.to_f
     percentage_string = number_to_percentage(chance * 100, precision: 0)
     text = []
-    text << "There's #{with_indefinite_article(percentage_string)} chance of #{format_precipitation_type(rest_of_day.precipitation_type)} later #{today_or_tonight(@weather, @time_zone).downcase}"
+    text << "There's #{with_indefinite_article(percentage_string)} chance of #{format_precipitation_type(weather.rest_of_day.precipitation_type)} later #{weather.today_or_tonight.downcase}"
     text << "with #{format_precipitation_amount(snowfall)} expected" if precipitation_type == "snow" && snowfall > 0
     text.join(", ")
   end
@@ -200,24 +183,24 @@ class WeatherSummaryPresenter
     @location_name = format_location(@location)
   end
 
-  # ⚠️ The sun times are absent above the polar circles, and weather_data_is_current? does not
+  # ⚠️ The sun times are absent above the polar circles, and Forecast#current? does not
   # test them. Remove the line, and do not remove the full widget.
   def sunrise_or_sunset
     now = Time.now
-    todays_sunrise = sunrise(@weather, @time_zone)
-    todays_sunset = sunset(@weather, @time_zone)
+    todays_sunrise = weather.sunrise
+    todays_sunset = weather.sunset
     return if todays_sunrise.blank? || todays_sunset.blank?
 
     # The exact times: "Sunset will be at 7:45" holds until 7:45, and not until 7:00.
     return "Sunrise will be at #{format_time(todays_sunrise)}" if now < todays_sunrise
     return "Sunset will be at #{format_time(todays_sunset)}" if now < todays_sunset
 
-    tomorrow = tomorrows_sunrise(@weather, @time_zone)
+    tomorrow = weather.tomorrows_sunrise
     "Sunrise will be at #{format_time(tomorrow)}" if tomorrow.present?
   end
 
   def activities
-    return unless daytime?(@weather, @time_zone)
+    return unless weather.daytime?
 
     if race_day?(@events, @time_zone)
       return good_weather? ? "Good weather for racing!" : "Tough weather for racing!"
@@ -246,17 +229,17 @@ class WeatherSummaryPresenter
   end
 
   def bad_weather?
-    current = current_weather(@weather)
+    current = weather.current
 
     # The code changes the value and does not read a method on it. WeatherKit omits some fields,
     # for example the snowfall on a dry day and the gusts on some forecast days, and a field that is
     # absent must not stop the widget.
     aqi = @air_quality&.aqi.to_i
     current_temperature = (current.temperature_apparent || current.temperature).to_f
-    high_temperature = today.temperature_max.to_f
-    low_temperature = today.temperature_min.to_f
-    precipitation_chance = rest_of_day.precipitation_chance.to_f
-    snowfall = rest_of_day.snowfall_amount.to_f
+    high_temperature = weather.today.temperature_max.to_f
+    low_temperature = weather.today.temperature_min.to_f
+    precipitation_chance = weather.rest_of_day.precipitation_chance.to_f
+    snowfall = weather.rest_of_day.snowfall_amount.to_f
     beaufort = beaufort_number(kph_to_knots(current.wind_speed.to_f))
 
     return true if aqi > 100
@@ -266,7 +249,7 @@ class WeatherSummaryPresenter
     return true if precipitation_chance >= 0.5
     return true if beaufort >= 4
     return true if snowfall > 0
-    CONDITIONS.dig(current.condition_code&.to_sym, :adverse_weather) || CONDITIONS.dig(today.condition_code&.to_sym, :adverse_weather)
+    CONDITIONS.dig(current.condition_code&.to_sym, :adverse_weather) || CONDITIONS.dig(weather.today.condition_code&.to_sym, :adverse_weather)
   end
 
   def good_weather?
@@ -274,14 +257,14 @@ class WeatherSummaryPresenter
   end
 
   def hot?
-    current = current_weather(@weather)
+    current = weather.current
     current.temperature.to_f >= 30 || current.temperature_apparent.to_f >= 30
   end
 
   # With no apparent temperature there is nothing to show beside the true temperature. Thus the
   # code hides it and does not round a nil.
   def hide_apparent_temperature?
-    current = current_weather(@weather)
+    current = weather.current
     return true if current.temperature.blank? || current.temperature_apparent.blank?
 
     celsius_temp = current.temperature.round

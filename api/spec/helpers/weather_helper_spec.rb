@@ -1,7 +1,7 @@
 require "rails_helper"
 
-# The tests for the selection methods and the format methods of the weather helper. The text summary
-# and its rules moved to WeatherSummaryPresenter (refer to weather_summary_presenter_spec).
+# The tests for the format methods of the weather helper. The selection of the data is in Forecast
+# (refer to forecast_spec), and the text summary is in WeatherSummaryPresenter.
 #
 # Most of the tests make a weather object whose forecast window, sunrise, and sunset are times from
 # the current time. Thus they agree with each other and the test does not stop the clock. The
@@ -216,96 +216,6 @@ RSpec.describe WeatherHelper, type: :helper do
   end
 
   # ---------------------------------------------------------------------------
-  # The availability of the weather data
-  # ---------------------------------------------------------------------------
-  describe "weather data presence" do
-    it "exposes current weather and today's forecast and reports currency" do
-      weather = build_weather
-      expect(helper.current_weather(weather).condition_code).to eq("PartlyCloudy")
-      expect(helper.todays_forecast(weather).temperature_max).to eq(24.0)
-      expect(helper.weather_data_is_current?(weather, time_zone)).to be(true)
-    end
-
-    it "is stale when there's no weather" do
-      expect(helper.weather_data_is_current?(nil, time_zone)).to be(false)
-    end
-
-    it "returns the daytime forecast during the day and the overnight one in the evening" do
-      weather = build_weather(rest_of_day: { condition_code: "Rain" }, overnight: { condition_code: "Cloudy" })
-
-      allow(helper).to receive(:evening?).and_return(false)
-      expect(helper.rest_of_day_forecast(weather, time_zone).condition_code).to eq("Rain")
-
-      allow(helper).to receive(:evening?).and_return(true)
-      expect(helper.rest_of_day_forecast(weather, time_zone).condition_code).to eq("Cloudy")
-    end
-
-    it "finds tomorrow's forecast" do
-      expect(helper.tomorrows_forecast(build_weather).temperature_max).to eq(22.0)
-    end
-
-    # ⚠️ The controller reads weather_data_is_current? before its `safely` blocks, thus a raise here
-    # is a 500 on the widget.
-    it "is stale, and does not raise, when a forecast time is absent or broken" do
-      weather = build_weather
-      weather.forecast_daily.days.first.forecast_start = nil
-      weather.forecast_daily.days.last.forecast_start = "not a time"
-
-      expect(helper.weather_data_is_current?(weather, time_zone)).to be(false)
-      expect(helper.tomorrows_forecast(weather)).to be_nil
-    end
-  end
-
-  # ---------------------------------------------------------------------------
-  # The time of day
-  # ---------------------------------------------------------------------------
-  describe "#daytime? / #evening?" do
-    it "is daytime between sunrise and sunset" do
-      weather = build_weather # sunrise 5h ago, sunset in 5h
-      expect(helper.daytime?(weather, time_zone)).to be(true)
-      expect(helper.evening?(weather, time_zone)).to be(false)
-    end
-
-    it "is evening (and not daytime) once the sun has set" do
-      weather = build_weather(sunset: Time.current - 1.hour)
-      expect(helper.daytime?(weather, time_zone)).to be(false)
-      expect(helper.evening?(weather, time_zone)).to be(true)
-    end
-
-    it "falls back to clock hours in the given timezone when there's no weather" do
-      # The timezone is America/Denver, which is UTC-6 in June. Thus the code reads the local hour
-      # in Denver, and not the hour of the machine. 18:00 UTC is 12:00 MDT, which is daytime.
-      travel_to(Time.utc(2026, 6, 3, 18, 0, 0)) do
-        expect(helper.daytime?(nil, time_zone)).to be(true)
-        expect(helper.evening?(nil, time_zone)).to be(false)
-      end
-
-      # 04:00 UTC is 22:00 MDT, which is the evening of the previous day.
-      travel_to(Time.utc(2026, 6, 4, 4, 0, 0)) do
-        expect(helper.daytime?(nil, time_zone)).to be(false)
-        expect(helper.evening?(nil, time_zone)).to be(true)
-      end
-    end
-
-    it "says Today during the day and Tonight in the evening" do
-      expect(helper.today_or_tonight(build_weather, time_zone)).to eq("Today")
-
-      weather = build_weather(sunset: Time.current - 1.hour)
-      expect(helper.today_or_tonight(weather, time_zone)).to eq("Tonight")
-    end
-  end
-
-  describe "#sunrise / #sunset / #tomorrows_sunrise" do
-    it "returns zoned times from the forecast" do
-      weather = build_weather
-      expect(helper.sunrise(weather, time_zone)).to be_a(ActiveSupport::TimeWithZone)
-      expect(helper.sunset(weather, time_zone)).to be_a(ActiveSupport::TimeWithZone)
-      expect(helper.tomorrows_sunrise(weather, time_zone)).to be_a(ActiveSupport::TimeWithZone)
-      expect(helper.tomorrows_sunrise(weather, time_zone)).to be > helper.sunrise(weather, time_zone)
-    end
-  end
-
-  # ---------------------------------------------------------------------------
   # The icon and the alerts
   # ---------------------------------------------------------------------------
   describe "#weather_icon" do
@@ -318,32 +228,12 @@ RSpec.describe WeatherHelper, type: :helper do
       expect(helper.weather_icon("Clear", :night)).to eq("moon-stars")
     end
 
-    it "auto-selects by daytime" do
-      allow(helper).to receive(:daytime?).and_return(true)
-      expect(helper.weather_icon("Clear", :auto)).to eq("sun")
-      allow(helper).to receive(:daytime?).and_return(false)
-      expect(helper.weather_icon("Clear", :auto)).to eq("moon-stars")
+    it "gives the day icon with no variant" do
+      expect(helper.weather_icon("Clear")).to eq("sun")
     end
 
     it "falls back to a question-mark cloud for unknown conditions" do
       expect(helper.weather_icon("Nonsense")).to eq("cloud-question")
-    end
-  end
-
-  describe "#weather_alerts" do
-    it "is empty without alerts" do
-      expect(helper.weather_alerts(build_weather)).to eq([])
-    end
-
-    it "keeps the lowest-precedence alert per token, sorted by precedence" do
-      weather = build_weather(alerts: [
-        { token: "flood", precedence: 3, description: "Flood B" },
-        { token: "flood", precedence: 1, description: "Flood A" },
-        { token: "heat", precedence: 5, description: "Heat" }
-      ])
-
-      alerts = helper.weather_alerts(weather)
-      expect(alerts.map(&:description)).to eq([ "Flood A", "Heat" ])
     end
   end
 end

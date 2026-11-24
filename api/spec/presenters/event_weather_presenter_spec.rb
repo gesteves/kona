@@ -90,4 +90,39 @@ RSpec.describe EventWeatherPresenter do
       expect(presenter.bay).to be_nil
     end
   end
+  describe "the display rules of the bay readings and the forecast" do
+    subject(:presenter) { described_class.new(build_event(location_components: sf_components)) }
+
+    def with_bay(**fields)
+      allow(presenter).to receive(:bay).and_return(DeepOstruct.wrap(fields))
+    end
+
+    it "shows the water temperature and the current only with each of their fields" do
+      with_bay(water_temp_c: 13.5, current_speed_ms: 0.4)
+
+      expect(presenter.water_temperature?).to be(true)
+      expect(presenter.bay_current?).to be(false)
+    end
+
+    it "shows neither with no bay entry" do
+      allow(presenter).to receive(:bay).and_return(nil)
+
+      expect(presenter.water_temperature?).to be(false)
+      expect(presenter.bay_current?).to be(false)
+    end
+
+    it "turns the bearing of the current into the direction that it comes from" do
+      with_bay(current_speed_ms: 0.4, current_bearing_deg: 270)
+
+      expect(presenter.bay_current?).to be(true)
+      expect(presenter.bay_current_from).to eq(90)
+    end
+
+    it "gives the humidity and the chance of precipitation in percent" do
+      allow(presenter).to receive(:forecast).and_return(DeepOstruct.wrap(humidity: 0.5, precipitation_chance: 0.25))
+
+      expect(presenter.humidity_percent).to eq(50.0)
+      expect(presenter.precipitation_percent).to eq(25.0)
+    end
+  end
 end

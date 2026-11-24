@@ -1,98 +1,14 @@
-# The functions that select a forecast and that format a value. Each method takes the data as an
-# argument. CONDITIONS and BEAUFORT come from config/initializers/weather_data.rb.
+# The functions that format a weather value. Each method takes the data as an argument. CONDITIONS
+# and BEAUFORT come from config/initializers/weather_data.rb.
 #
-# The text summary and its rules are in WeatherSummaryPresenter, which includes this module.
+# Forecast selects the data, and the text summary and its rules are in WeatherSummaryPresenter,
+# which includes this module.
 module WeatherHelper
-  include TimeHelper # parse_time
-
   PRECIPITATION_METRIC_UNITS = {
     unit: "mm",
     ten: "cm",
     thousand: "m"
   }.freeze
-
-  # Checks the exact parts of the data that the summary uses. A check of todays_forecast alone is
-  # not sufficient: rest_of_day_forecast changes to the overnight forecast in the evening. Thus a
-  # payload with no overnight data would pass this check and then stop the evening summary.
-  def weather_data_is_current?(weather, time_zone)
-    current_weather(weather).present? && todays_forecast(weather).present? && rest_of_day_forecast(weather, time_zone).present?
-  end
-
-  def current_weather(weather)
-    weather&.current_weather
-  end
-
-  # ⚠️ The forecast times go through parse_time, which gives nil for a value that is absent or
-  # broken. `Time.parse` raises on those, and the widget then gives a 500 in place of an empty
-  # body: the controller calls this before its `safely` blocks.
-  def todays_forecast(weather)
-    now = Time.now
-    weather&.forecast_daily&.days&.find do |d|
-      start_at = parse_time(d.forecast_start)
-      end_at = parse_time(d.forecast_end)
-      d.rest_of_day_forecast.present? && start_at && end_at && start_at <= now && end_at >= now
-    end
-  end
-
-  def rest_of_day_forecast(weather, time_zone)
-    forecast = todays_forecast(weather)
-    evening?(weather, time_zone) ? forecast&.overnight_forecast : forecast&.rest_of_day_forecast
-  end
-
-  def tomorrows_forecast(weather)
-    now = Time.now
-    weather&.forecast_daily&.days&.find do |d|
-      start_at = parse_time(d.forecast_start)
-      start_at && start_at > now
-    end
-  end
-
-  def sunrise(weather, time_zone)
-    forecast = todays_forecast(weather)
-    parse_time(forecast&.sunrise)&.in_time_zone(time_zone)
-  end
-
-  def tomorrows_sunrise(weather, time_zone)
-    forecast = tomorrows_forecast(weather)
-    parse_time(forecast&.sunrise)&.in_time_zone(time_zone)
-  end
-
-  def sunset(weather, time_zone)
-    forecast = todays_forecast(weather)
-    parse_time(forecast&.sunset)&.in_time_zone(time_zone)
-  end
-
-  # Tells if it is daytime: between the sunrise and the sunset of today, when the payload has those
-  # two times. In all other conditions, it tests the clock against 6am and 6pm.
-  def daytime?(weather, time_zone)
-    now = Time.current.in_time_zone(time_zone)
-    if weather.present?
-      sunrise_time = sunrise(weather, time_zone)
-      sunset_time = sunset(weather, time_zone)
-      return now.hour >= 6 && now.hour < 18 unless sunrise_time && sunset_time
-      # The exact times. An hour that starts before the sunset is not the evening.
-      now >= sunrise_time && now < sunset_time
-    else
-      now.hour >= 6 && now.hour < 18
-    end
-  end
-
-  # Tells if it is evening: after the sunset of today, when the payload has that time. In all other
-  # conditions, it tests the clock against 6pm.
-  def evening?(weather, time_zone)
-    now = Time.current.in_time_zone(time_zone)
-    if weather.present?
-      sunset_time = sunset(weather, time_zone)
-      return now.hour >= 18 unless sunset_time
-      now >= sunset_time
-    else
-      now.hour >= 18
-    end
-  end
-
-  def today_or_tonight(weather, time_zone)
-    evening?(weather, time_zone) ? "Tonight" : "Today"
-  end
 
   def format_current_condition(condition_code)
     return "it's out there" if condition_code.blank?
@@ -246,27 +162,14 @@ module WeatherHelper
     meridiem_abbr(remove_widows(time.strftime("%-I:%M %p")))
   end
 
-  # The icon id for a condition code. :auto selects the day icon or the night icon from the given
-  # weather and timezone (refer to #daytime?). :day and :night select one directly and need
-  # neither.
-  def weather_icon(condition_code, variant = :auto, weather: nil, time_zone: nil)
+  # The icon id for a condition code.
+  # @param variant [Symbol] :day or :night, for a code that has an icon for each.
+  def weather_icon(condition_code, variant = :day)
     condition = CONDITIONS[condition_code&.to_sym]
     return "cloud-question" if condition.blank?
     return condition[:icon] if condition[:icon].is_a?(String)
-    if variant == :auto
-      daytime?(weather, time_zone) ? condition[:icon][:day] : condition[:icon][:night]
-    elsif variant == :day
-      condition[:icon][:day]
-    elsif variant == :night
-      condition[:icon][:night]
-    end
-  end
 
-  def weather_alerts(weather)
-    return [] if weather&.weather_alerts&.alerts.blank?
-    alerts = weather.weather_alerts.alerts.group_by { |alert| alert.token }
-                    .map { |_token, grouped_alerts| grouped_alerts.min_by { |alert| alert.precedence } }
-    alerts.sort_by { |alert| alert.precedence }
+    condition[:icon][variant]
   end
 
   def aqi_icon(aqi)

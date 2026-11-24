@@ -21,7 +21,7 @@ RSpec.describe EventsHelper, type: :helper do
   let(:time_zone) { "America/Denver" }
 
   before do
-    allow(helper).to receive(:daytime?).and_return(true)
+    allow_any_instance_of(Forecast).to receive(:daytime?).and_return(true)
     allow(helper).to receive(:icon_svg) { |family, style, id| %(<svg data-icon="#{family}-#{style}-#{id}"></svg>).html_safe }
   end
 
@@ -113,7 +113,7 @@ RSpec.describe EventsHelper, type: :helper do
     end
 
     it "is false at night even when the event is today and confirmed" do
-      allow(helper).to receive(:daytime?).and_return(false)
+      allow_any_instance_of(Forecast).to receive(:daytime?).and_return(false)
       expect(helper.in_progress?(build_event(days_from_today: 0), time_zone)).to be(false)
     end
 
@@ -129,7 +129,7 @@ RSpec.describe EventsHelper, type: :helper do
       it "uses the event's daylight window over the fallback clock — in progress within it" do
         # The stub for daytime?, which is the second method, gives false. Thus a true result can
         # come only from the sunrise to sunset window of the event, with now between the two.
-        allow(helper).to receive(:daytime?).and_return(false)
+        allow_any_instance_of(Forecast).to receive(:daytime?).and_return(false)
         in_progress = helper.in_progress?(build_event(days_from_today: 0), time_zone, event_weather: build_event_weather)
         expect(in_progress).to be(true)
       end
@@ -229,7 +229,7 @@ RSpec.describe EventsHelper, type: :helper do
     end
 
     it "is muted (not highlighted) for a tracking link on today's race at night" do
-      allow(helper).to receive(:daytime?).and_return(false)
+      allow_any_instance_of(Forecast).to receive(:daytime?).and_return(false)
       tag = helper.event_live_tracking_tag(build_event(days_from_today: 0, tracking_url: "https://track.example.com"), time_zone)
       expect(tag).to include('data-icon="classic-light-signal-stream"')
       expect(tag).not_to include("entry__highlight")
@@ -238,7 +238,7 @@ RSpec.describe EventsHelper, type: :helper do
     it "highlights based on the featured race's fetched weather window, not the fallback clock" do
       # The second method would say night, but the sun of the event is up. Thus the race is live and
       # the indicator moves.
-      allow(helper).to receive(:daytime?).and_return(false)
+      allow_any_instance_of(Forecast).to receive(:daytime?).and_return(false)
       event = build_event(days_from_today: 0, tracking_url: "https://track.example.com")
       tag = helper.event_live_tracking_tag(event, time_zone, event_weather: build_event_weather)
       expect(tag).to include("entry__highlight entry__highlight--live")

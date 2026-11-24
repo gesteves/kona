@@ -248,7 +248,7 @@ RSpec.describe "Weather", type: :request do
     end
   end
 
-  # ⚠️ Each group above removes a full *part* of the data, and weather_data_is_current? finds that.
+  # ⚠️ Each group above removes a full *part* of the data, and Forecast#current? finds that.
   # These examples remove one field from a part that is available, and that method does not find it.
   # Thus the arithmetic of the format methods is the first code that gets the nil. Each of these gave
   # a 500 before the checks moved before the format code.

@@ -85,7 +85,7 @@ One row for each feature: where a request or an event comes in, and each file th
 
 | Feature | Comes in at | Jobs | Services | Presenter and views | Admin JS |
 | --- | --- | --- | --- | --- | --- |
-| Weather widget | `GET /widgets/weather/current` → `Widgets::WeatherController` | — | `Location`, `GoogleMaps`, `TimeZoneResolver`, `WeatherKit`, `AirQuality` (`PurpleAir`, then `GoogleAirQuality`), `GooglePollen`, `Goodspeed`, `Events`, `TrainerRoad` | `WeatherSummaryPresenter`, `WeatherHelper`, `widgets/weather`, `config/conditions.yml`, `config/beaufort.yml` | — |
+| Weather widget | `GET /widgets/weather/current` → `Widgets::WeatherController` | — | `Location`, `GoogleMaps`, `TimeZoneResolver`, `WeatherKit`, `Forecast`, `AirQuality` (`PurpleAir`, then `GoogleAirQuality`), `GooglePollen`, `Goodspeed`, `Events`, `TrainerRoad` | `WeatherSummaryPresenter`, `WeatherHelper`, `widgets/weather`, `config/conditions.yml`, `config/beaufort.yml` | — |
 | Upcoming races and race-day weather | `GET /widgets/events/upcoming` → `Widgets::EventsController` | — | `Events`, `RaceDayWeather` (`GoogleMaps`, `WeatherKit`, `GoogleAirQuality`, `Goodspeed`) | `UpcomingRacesPresenter`, `EventWeatherPresenter`, `EventsHelper`, `widgets/events` | — |
 | Activity stats widget | `GET /widgets/activity-stats` → `Widgets::ActivityStatsController` | — | `Intervals` | `widgets/activity_stats` | — |
 | Whoop widget | `GET /widgets/whoop` → `Widgets::WhoopController` | `WhoopTokenRefreshJob` (cron) | `Whoop`, `WhoopCredentials`, `TrainerRoad` | `WhoopPresenter`, `widgets/whoop` | — |
