@@ -20,16 +20,12 @@ class StandardSite < ApplicationService
   #
   # ⚠️ This is content-addressed and not time-ordered, on purpose: the same entry must always give
   # the same rkey. `.new_tid` from AtProto is the time-ordered one, for a record with no natural key.
-  # @param seed [String]
   # @return [String] A 13-character TID.
   def self.tid(seed)
     encode_tid(Digest::SHA256.hexdigest(seed.to_s).to_i(16) & ((1 << 63) - 1))
   end
 
-  # Makes a site.standard.theme.color#rgb value.
-  # @param r [Integer] Red channel, 0-255.
-  # @param g [Integer] Green channel, 0-255.
-  # @param b [Integer] Blue channel, 0-255.
+  # Makes a site.standard.theme.color#rgb value from three channels, each 0-255.
   # @return [Hash]
   def self.rgb(r, g, b)
     { "$type" => "site.standard.theme.color#rgb", "r" => r, "g" => g, "b" => b }
@@ -58,8 +54,7 @@ class StandardSite < ApplicationService
   # One Redis hash of the sync fingerprints: the field is "<collection>:<rkey>", and the value is
   # the fingerprint of the last sync.
   # ⚠️ It is one hash, and not one key for each record, on purpose. Thus the code can count the
-  # records and can find an entry whose Contentful entry is gone. No other code here reads the full
-  # keyspace, and this Redis also holds the Sidekiq queues, thus a SCAN would be the first one.
+  # records and find an old entry with no SCAN. This Redis also holds the Sidekiq queues.
   FINGERPRINTS_KEY = "standard_site:fingerprints"
 
   # A check on a Contentful sys.id before it becomes a record key.
@@ -73,14 +68,11 @@ class StandardSite < ApplicationService
   # The limits of the text fields of the two lexicons, in grapheme clusters.
   MAX_NAME_GRAPHEMES = 500
   MAX_DESCRIPTION_GRAPHEMES = 3000
-  # ⚠️ `tags` has a limit **for each item**, and nothing capped one. A long tag makes the whole
-  # record invalid, thus one tag takes the document away with it.
+  # ⚠️ `tags` has a limit for each item. A long tag makes the whole record invalid.
   MAX_TAG_GRAPHEMES = 128
 
   # Makes the at:// URI of the publication. This is the only source of the format. The sync
   # paths and the /api/standard-site endpoint use it.
-  # @param did [String]
-  # @return [String]
   def self.publication_uri(did)
     "at://#{did}/#{PUBLICATION_COLLECTION}/#{PUBLICATION_RKEY}"
   end
@@ -195,9 +187,8 @@ class StandardSite < ApplicationService
     log("backfill starting")
     site = fetch_site
     return log_skip("backfill", "no site data") if site.blank?
-    # ⚠️ The check comes FIRST, before anything writes. `#do_sync_publication` puts the URL of THIS
-    # site into the publication record, thus a check after it reads what we wrote and can never
-    # fail — and the publication of the other site is already gone.
+    # ⚠️ The check comes FIRST, before anything writes. `#do_sync_publication` puts the URL of
+    # this site into the publication record, thus a check after it can never fail.
     unless own_repo?
       return log("backfill: the publication in this repo belongs to another site; stopping", :skipped)
     end
@@ -209,9 +200,8 @@ class StandardSite < ApplicationService
     # Stop before the delete step, thus a temporary fetch error cannot delete all the live records.
     return log_skip("backfill", "article fetch failed; not pruning") if items.nil?
 
-    # ⚠️ The jobs are SPACED and not queued at one time. A PDS counts the writes of an account, and
-    # 3 points for a make against 5,000 each hour is 1,666 records each hour. The corpus is small
-    # today and it grows, and a backfill that reaches that limit gets a 429 for each job after it.
+    # ⚠️ The jobs are SPACED and not queued at one time, because a PDS counts the writes of an
+    # account. Refer to AtProto::WRITE_POINTS_PER_HOUR.
     spacing = AtProto.seconds_between_writes
     current = []
     publishable_posts(items.map { |item| decorate_post(item) }).each do |post|
@@ -256,10 +246,9 @@ class StandardSite < ApplicationService
   # Checks a credential pair: it opens a session with the pair, then stores the pair if the
   # session opens. The same step caches the DID that the session finds.
   #
-  # ⚠️ The fingerprint of the publication record must go away when the DID changes. Document
-  # fingerprints include the at:// URI of the publication, which contains the DID, thus they
-  # become invalid by themselves. The fingerprint of the publication record does not. An old one
-  # would report :unchanged for all time and never sync to the new repo.
+  # ⚠️ The fingerprint of the publication record must go away when the DID changes. With an old
+  # one, the sync reports :unchanged for all time and never writes to the new repo. A document
+  # fingerprint includes the DID, thus it becomes invalid by itself.
   # @return [Boolean] Whether the credentials opened a session and were stored.
   def connect!
     return false unless valid_credentials?
@@ -395,7 +384,6 @@ class StandardSite < ApplicationService
     log("#{subject} skipped (#{reason})", :skipped)
   end
 
-  # @param entry_id [String, nil]
   # @return [Boolean] True if the id can be an AT Protocol record key.
   def eligible?(entry_id)
     entry_id.present? && ENTRY_ID_PATTERN.match?(entry_id.to_s)
@@ -634,14 +622,12 @@ class StandardSite < ApplicationService
     true
   end
 
-  # Says whether the repo holds the publication of THIS site.
+  # Says whether the repo holds the publication of THIS site. It answers true for a repo with no
+  # publication record, which is a first run.
   #
-  # ⚠️ `PUBLICATION_RKEY` is `tid("self")`, thus it is the same 13 characters in each installation of
-  # this code. Two sites that share one account overwrite each other's publication record, and each
-  # backfill then deletes the documents of the other one as orphans. A `site.standard.document`
-  # holds no field that names its site, thus nothing can undo that. This turns it into a message.
-  #
-  # It answers true for a repo with no publication record, which is a first run.
+  # ⚠️ `PUBLICATION_RKEY` is the same 13 characters in each installation of this code. Two sites
+  # that share one account overwrite the publication record of each other, and each backfill then
+  # deletes the documents of the other one as orphans. Nothing can undo that.
   # @return [Boolean]
   def own_repo?
     record = get_own_record(PUBLICATION_COLLECTION, PUBLICATION_RKEY)

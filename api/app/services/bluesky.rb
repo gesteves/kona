@@ -1,8 +1,7 @@
 # Posts to Bluesky, as the account that Connected apps holds.
 #
-# ⚠️ This is not `StandardSite`. That class writes `site.standard.*` records, which are a mirror of
-# the blog, and this one writes an `app.bsky.feed.post`, which is a post that a reader sees in a
-# feed. The two share the account, the session, and the blob upload, through `AtProto`.
+# ⚠️ This is not `StandardSite`, which writes the `site.standard.*` mirror of the blog. This class
+# writes an `app.bsky.feed.post`, and the two share the account and the session through `AtProto`.
 #
 # @see https://atproto.com/blog/create-post
 class Bluesky < ApplicationService
@@ -10,45 +9,39 @@ class Bluesky < ApplicationService
 
   COLLECTION = "app.bsky.feed.post".freeze
 
-  # The limit of a post, in grapheme clusters. ⚠️ `SocialPresenter::BODY_LIMIT` is the same number on
-  # the admin page, and `spec/services/bluesky_spec.rb` pins the two together.
+  # The limit of a post, in grapheme clusters. ⚠️ `SocialPresenter::BODY_LIMIT` is the same number
+  # on the admin page.
   MAX_GRAPHEMES = 300
 
-  # The limit of a post in BYTES. ⚠️ `app.bsky.feed.post#text` has two limits, and this is the
-  # second one. 300 family emoji is 300 graphemes and approximately 7,500 bytes: the PDS refuses
-  # that record, thus a check of the graphemes alone permits a post that can never go out, and
-  # `BlueskyPostJob` then tries it again for 24 hours.
+  # The limit of a post in bytes, which is the second limit of `app.bsky.feed.post#text`.
+  # ⚠️ Emoji-heavy words pass the grapheme limit and fail this one, and the PDS then refuses the
+  # record.
   MAX_BYTES = 3_000
 
   # The limits of one `app.bsky.richtext.facet#tag`. ⚠️ A tag past one of them makes the full
-  # record invalid, thus a long hashtag takes the post away with it.
+  # record invalid.
   MAX_TAG_GRAPHEMES = 64
   MAX_TAG_BYTES = 640
 
-  # The largest blob that a PDS takes for a card thumbnail. A record with a larger one fails at
-  # `putRecord` and not at the upload, thus the reason arrives late and reads as "blob too big".
-  # ⚠️ This is the `thumb` of `app.bsky.embed.external`, and not the limit of a photo. A photo
-  # is a different lexicon field with a limit of its own, MAX_IMAGE_BYTES below.
+  # The largest blob that a PDS takes for a card thumbnail. ⚠️ This is the `thumb` of
+  # `app.bsky.embed.external`, and not the limit of a photo, which is MAX_IMAGE_BYTES.
   MAX_BLOB_BYTES = 976_560
 
-  # The most photos on one post. `app.bsky.embed.gallery` takes 20 in its schema, and the clients
-  # of Bluesky enforce 10 in their authoring UI. ⚠️ `SocialPresenter::MAX_PHOTOS` is this number.
+  # The most photos on one post. The schema of `app.bsky.embed.gallery` takes 20, and the clients
+  # of Bluesky permit 10. ⚠️ `SocialPresenter::MAX_PHOTOS` is this number.
   MAX_IMAGES = 10
-  # The most photos that `app.bsky.embed.images` takes. ⚠️ A post with more needs the gallery
-  # embed, and a post with this many or fewer keeps the images embed: a client from before the
-  # gallery embed renders that one and nothing for a gallery.
+  # The most photos that `app.bsky.embed.images` takes. A post with more needs the gallery embed.
   MAX_IMAGES_EMBED = 4
   # The largest blob of one photo, from `app.bsky.embed.images#image` and
   # `app.bsky.embed.gallery#image`.
   MAX_IMAGE_BYTES = 2_000_000
   # The limit of the alt text of one photo, from the client of Bluesky. The lexicon has none.
   MAX_ALT_GRAPHEMES = 2000
-  # The most bytes of an og:image that this class downloads. ⚠️ The picture belongs to a page that
-  # the owner linked to, and the worker is a 512MB VM at concurrency 5. A picture past this limit
-  # loses the thumbnail and never the post.
+  # The most bytes of an og:image that this class downloads. ⚠️ The worker is a 512MB VM. A
+  # picture past this limit loses the thumbnail and never the post.
   MAX_CARD_IMAGE_BYTES = 10 * 1024 * 1024
-  # The types of an og:image that go up with no change. ⚠️ Each other type goes through the shrink
-  # and comes out as a JPEG. An SVG is a document that can hold a script, and
+  # The types of an og:image that go up with no change. Each other type goes through the shrink
+  # and comes out as a JPEG. ⚠️ An SVG can hold a script, and
   # `Admin::SocialController#preview_image` sends these bytes from the admin host.
   CARD_IMAGE_TYPES = %w[image/jpeg image/png image/webp image/gif].freeze
 
@@ -61,17 +54,15 @@ class Bluesky < ApplicationService
 
   # An @handle, from the sample in the AT Protocol documentation.
   MENTION_PATTERN = /(?:^|[$|\W])(@(?:[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)/
-  # A bare URL: each character up to a space, and `.trim_url` then removes what belongs to the
+  # A bare URL: each character up to a space. `.trim_url` then removes what belongs to the
   # sentence.
-  #
-  # ⚠️ A list of the permitted characters got two cases wrong, and each one made a link to the
-  # WRONG page and not a short one: `…/Kona_(Hawaii)` lost the bracket that it opened, and a path
-  # with a character outside ASCII — `https://example.com/日本` — became `https://example.com/`.
+  # ⚠️ Do not change this into a list of the permitted characters. Such a list cuts
+  # `…/Kona_(Hawaii)` and a path outside ASCII, and each one then links to the wrong page.
   URL_PATTERN = %r{(?:^|[$|\W])(https?://\S+)}
 
-  # The characters that an address can end with. ⚠️ Each character after the last one of these
-  # belongs to the sentence and not to the address: a full stop, a comma, a quotation mark that
-  # closes. `\p{Alnum}` and not `a-z0-9`, thus a path outside ASCII ends where it must.
+  # The characters that an address can end with. Each character after the last one of these
+  # belongs to the sentence. ⚠️ It uses `\p{Alnum}` and not `a-z0-9`, thus a path outside ASCII
+  # ends where it must.
   URL_TERMINAL = /[\p{Alnum}\-_~\/\#@$&*+=%]/
 
   # The characters that close something that holds the address. One of them ends an address only
@@ -81,13 +72,10 @@ class Bluesky < ApplicationService
   # Bluesky client.
   TAG_EXCLUDED = "\u00AD\u2060\u200A\u200B\u200C\u200D\u20E2".freeze
 
-  # A #hashtag, from the rule of the Bluesky client, thus a facet covers the same characters that a
-  # reader sees tagged.
-  #
-  # ⚠️ It does not use `\w`. Ruby reads `\w` as ASCII, thus "#café" gave the tag "caf" and a facet
-  # over one part of a word. It needs one character that is not a digit and not punctuation, which
-  # is what keeps "#1" a number, and it starts at a space or at the start of the text, as the
-  # client does.
+  # A #hashtag, from the rule of the Bluesky client, thus a facet covers the same characters that
+  # a reader sees tagged.
+  # ⚠️ It does not use `\w`, which is ASCII in Ruby and cuts "#café" to "caf". It needs one
+  # character that is not a digit and not punctuation, which keeps "#1" a number.
   TAG_PATTERN = /(?:^|\s)([#＃](?!\uFE0F)[^\s#{TAG_EXCLUDED}]*[^\d\s\p{P}#{TAG_EXCLUDED}]+[^\s#{TAG_EXCLUDED}]*)/
 
   TAG_PREFIX = /\A[#＃]/
@@ -95,24 +83,18 @@ class Bluesky < ApplicationService
   # The client removes the punctuation at the end of a tag, thus "#trail." tags "trail".
   TRAILING_PUNCTUATION = /\p{P}+\z/
 
-  # The number of grapheme clusters in a post.
+  # The number of grapheme clusters in a post, as Bluesky counts them. `social_post_controller.js`
+  # counts the same way in the browser.
   #
-  # ⚠️ Bluesky counts graphemes, and `String#length` counts UTF-16 code units. One emoji is 1 there
-  # and 2 or more here. `social_post_controller.js` counts the same way in the browser, with
-  # `Intl.Segmenter`.
-  #
-  # ⚠️ **It counts the text that the RECORD will hold, thus it renders the Markdown first.** The
-  # address of a link is in a facet and not in the text, thus `[my post](https://example.com/a)` is
-  # 7 characters and not 30. A count of the words that the owner typed would refuse a draft that
-  # Bluesky takes.
+  # ⚠️ It renders the Markdown first, because the record holds the rendered text. The address of
+  # a link is in a facet, thus `[my post](https://example.com/a)` is 7 characters and not 30.
   # @param text [String, nil]
   # @return [Integer]
   def self.post_length(text)
     SocialText.graphemes(MarkdownLinks.render(text))
   end
 
-  # ⚠️ It reads the GRAPHEMES and the BYTES. The lexicon has both limits, and emoji-heavy words
-  # pass the first one and fail the second one.
+  # ⚠️ It reads the graphemes and the bytes, because the lexicon has both limits.
   # @param text [String, nil]
   # @return [Boolean] True when the text fits in one post and is not empty.
   def self.valid_post_length?(text)
@@ -123,12 +105,8 @@ class Bluesky < ApplicationService
 
   # Each link of a post, in order, as CHARACTER offsets into the plain text.
   #
-  # ⚠️ **This is the ONE list.** `#build_facets` makes a facet from each entry, and the preview of
-  # the Social media page renders each entry as an `<a>`. Thus the dialog cannot show a link that
-  # the post does not make, and it cannot miss one that it does.
-  #
-  # ⚠️ A bare URL inside the words of a Markdown link is not a second link. `[https://a](https://b)`
-  # would otherwise get two facets over one range, and a client renders that as a broken link.
+  # ⚠️ This is the one list: `#build_facets` makes a facet from each entry, and the preview of the
+  # Social media page renders each entry as an `<a>`. Thus the two cannot disagree.
   # @param text [String, nil] The PLAIN text, which `MarkdownLinks.render` makes.
   # @param markdown [Array<MarkdownLinks::Link>] The links that the Markdown made, from the same
   #   parse that made the text.
@@ -139,9 +117,8 @@ class Bluesky < ApplicationService
     bare = []
 
     SocialText.url_ranges(text).each do |range|
-      # ⚠️ Compare the FULL range and not its start alone. In `https://example.test/[docs](url)`
-      # the bare address continues into the words of the link, and two link facets over one range
-      # make a client render a broken link.
+      # ⚠️ A bare URL that touches a Markdown link is not a second link: two link facets over one
+      # range make a client render a broken link. Compare the full range, and not its start alone.
       next if taken.any? { |other| range.begin < other.end && other.begin < range.end }
 
       # `SocialText.url_ranges` removed the punctuation of the sentence already.
@@ -153,11 +130,6 @@ class Bluesky < ApplicationService
 
   # Removes the punctuation of the sentence from the end of an address, as the client of Bluesky
   # does.
-  #
-  # ⚠️ A closing bracket comes off only when the address holds no opening one. Thus
-  # `…/Kona_(Hawaii)` keeps its bracket and `(see …/a)` gives up the one that closes the aside.
-  # @param url [String]
-  # @return [String]
   def self.trim_url(url)
     url = url.to_s
     url = url[0...-1] while url.present? && !url_ends_here?(url)
@@ -178,10 +150,8 @@ class Bluesky < ApplicationService
 
   # The text that one post will hold.
   #
-  # ⚠️ **The link is in the WORDS only when the page gives no card**, that is, when
-  # `OpenGraph::Card#embeddable?` is false. An embed keeps the URL out of the 300 characters, thus
-  # a page with og: tags never comes here with a `url`. `Mastodon.compose` is the same method, and
-  # a Mastodon status always holds its link.
+  # ⚠️ The link is in the words only when the page gives no card, that is, when
+  # `OpenGraph::Card#embeddable?` is false. An embed keeps the URL out of the 300 characters.
   # @param text [String, nil] The body of the post.
   # @param url [String, nil] The link to add below the body.
   # @return [String]
@@ -189,10 +159,9 @@ class Bluesky < ApplicationService
     SocialText.compose(text: text, url: url)
   end
 
-  # Makes the public URL of a post from its record key.
   # @param handle [String] The handle of the account.
   # @param rkey [String] The record key.
-  # @return [String]
+  # @return [String] The public URL of the post.
   def self.post_url(handle, rkey)
     "https://bsky.app/profile/#{handle}/post/#{rkey}"
   end
@@ -212,26 +181,24 @@ class Bluesky < ApplicationService
   # Publishes one post.
   #
   # ⚠️ The caller gives the `rkey`, and this method uses `putRecord` and not `createRecord`. Thus a
-  # second attempt of the same job replaces the same record and does not add a second post.
-  # `createRecord` makes a new key each time, and each retry there is a new post in the feed.
-  # Use `Bluesky.new_tid` to make that key **before** you add the job.
+  # second attempt of the same job replaces the same record and does not add a second post. Make
+  # the key with `Bluesky.new_tid` before you add the job.
   #
   # @param rkey [String] The record key, from `Bluesky.new_tid`.
-  # @param text [String] The body of the post, as plain text.
+  # @param text [String] The body of the post.
   # @param card [OpenGraph::Card, nil] The card of the link, from `OpenGraph#fetch`. Nil gives a
-  #   post with no card at all. ⚠️ **Give a card that is `embeddable?` only.** A card with no
-  #   title, no description, and no picture renders as an empty box, thus the caller puts that link
-  #   in `text` with `Bluesky.compose` and sends no card.
+  #   post with no card. ⚠️ Give a card that is `embeddable?` only: a card with no title, no
+  #   description, and no picture renders as an empty box.
   # @param reply [Hash, nil] `{ "root" =>, "parent" => }`, each a reference from an earlier call.
-  #   ⚠️ The **root** is the first post of the thread, and the **parent** is the one just above.
-  #   The caller carries the root through the chain and never makes it again.
+  #   The root is the first post of the thread, and the parent is the post above this one.
   # @param photos [Array<Hash>] `[{ bytes:, width:, height:, alt: }, …]`, each a JPEG below
-  #   MAX_IMAGE_BYTES. ⚠️ **A post takes photos OR a card, and not both**: the record holds one
-  #   embed. The caller gives one of the two.
+  #   MAX_IMAGE_BYTES. ⚠️ A post takes photos or a card, and not both: the record holds one embed.
   # @return [Hash] `{ "uri" =>, "cid" =>, "url" => }`. The next post of a thread names this one with
   #   the `uri` and the `cid`.
-  # @raise [RuntimeError] When the credentials, the length, the session, a photo upload, or the
-  #   write fails. It raises on purpose: `BlueskyPostJob` then does the work again.
+  # @raise [ApplicationJob::PermanentError] When no account is connected, or when the text or the
+  #   photos do not fit. The job does not run again.
+  # @raise [RuntimeError] When the session, a photo upload, or the write fails. `BlueskyPostJob`
+  #   then does the work again.
   def post!(rkey:, text:, card: nil, reply: nil, photos: [])
     raise ArgumentError, "A post takes a card or photos, and not both" if card.present? && photos.present?
     raise ApplicationJob::PermanentError, "Bluesky is not connected" unless valid_credentials?
@@ -239,22 +206,18 @@ class Bluesky < ApplicationService
     raise ApplicationJob::PermanentError, "A post takes at most #{MAX_IMAGES} photos" if photos.length > MAX_IMAGES
     raise "Could not open a Bluesky session" unless open_session(handle: @handle, app_password: @app_password)
 
-    # ⚠️ **The Markdown is rendered HERE, and not in the action.** The record holds the plain words
-    # and the address of each link is in a facet, thus the two must be made from one parse. The
-    # action sends the words that the owner wrote, and each retry of the job renders them again.
+    # ⚠️ The Markdown is rendered here, and not in the action. The plain words and the facet of
+    # each link must come from one parse.
     post = MarkdownLinks.parse(text)
 
     record = {
       "$type" => COLLECTION,
       "text" => post.text,
       "langs" => LANGS,
-      # ⚠️ MILLISECONDS. `iso8601` with no argument gives whole seconds, and two posts of one thread
-      # go out inside the same second: both then carry the same createdAt. The AppView sorts an
-      # author feed by that value, and the root of the thread went missing from the Posts tab while
-      # its reply stayed. Each other client writes milliseconds, and `StandardSite` does as well.
+      # ⚠️ Milliseconds: two posts of one thread go out inside the same second, and the AppView
+      # sorts an author feed by this value.
       # ⚠️ The time comes from the record key, thus each attempt writes the same bytes and the CID
-      # does not change. A new CID would make the `parent` of a published reply point at a version
-      # that is gone.
+      # does not change. A new CID would break the `parent` of a reply that is already published.
       "createdAt" => (self.class.tid_time(rkey) || Time.now).utc.iso8601(3)
     }
     facets = build_facets(post.text, links: post.links)
@@ -273,13 +236,11 @@ class Bluesky < ApplicationService
 
   # Gets the picture of a website card, ready to go up as a blob.
   #
-  # ⚠️ **This is public because the Social media preview proxies it.** The admin cannot show an `og:image`
-  # from another host directly: the CSP of the admin has `img-src :self`. Thus the preview asks this
-  # app for the picture, and it then shows **the exact bytes that this class uploads** and not the
-  # original file.
+  # ⚠️ This is public because the Social media preview proxies it: the CSP of the admin has
+  # `img-src :self`. Thus the preview shows the exact bytes that this class uploads.
   #
-  # Each step fails soft, on purpose: a picture past `MAX_CARD_IMAGE_BYTES`, a body that is not an
-  # image, and a decode that fails each give nil. A card with no picture still renders.
+  # Each step fails soft: a picture past `MAX_CARD_IMAGE_BYTES`, a body that is not an image, and
+  # a decode that fails each give nil. A card with no picture still renders.
   # @param url [String, nil] The og:image.
   # @return [Hash, nil] `{ body:, content_type: }`, or nil after any failure.
   def card_image(url)
@@ -294,10 +255,8 @@ class Bluesky < ApplicationService
     bytes = picture[:body]
     mime = picture[:content_type].to_s.split(";").first.to_s.strip.downcase
 
-    # ⚠️ A host with no content type, or a 200 that is an HTML error page, must not go up as a
-    # picture. The shrink decodes the bytes with libvips, thus it is also the check that they are
-    # an image. It runs for an oversized picture for the same reason as before: a blob past the
-    # limit fails at putRecord.
+    # ⚠️ The shrink decodes the bytes with libvips, thus it is also the check that they are an
+    # image. A host with no content type, or a 200 that is an HTML error page, must not go up.
     bytes, mime = shrink(bytes) if !CARD_IMAGE_TYPES.include?(mime) || bytes.bytesize > MAX_BLOB_BYTES
     return if bytes.blank? || bytes.bytesize > MAX_BLOB_BYTES
 
@@ -309,12 +268,10 @@ class Bluesky < ApplicationService
 
   # Asks the PDS if a handle exists.
   #
-  # ⚠️ **It answers true ONLY for a definite refusal.** A PDS that is away, slow, or broken gives
-  # false and the draft goes out. An outage there must never stop a post to Mastodon and Threads.
-  #
-  # ⚠️ `#resolve_handle` cannot answer this question: it gives nil for "the PDS does not know that
-  # handle" AND for "the PDS did not answer". Thus the Social media action needs this method, and
-  # fail-open is the branch that falls through and not a rescue that a person can delete.
+  # ⚠️ It answers true only for a definite refusal. A PDS that is away, slow, or broken gives
+  # false, thus an outage there never stops a post to Mastodon and Threads.
+  # ⚠️ `#resolve_handle` cannot answer this question: it gives nil for "no such handle" and for
+  # "no answer".
   # @param handle [String, nil] A handle, with no "@".
   # @return [Boolean]
   def handle_missing?(handle)
@@ -334,14 +291,9 @@ class Bluesky < ApplicationService
   # @return [String] The name of this client in each log line of AtProto.
   def at_proto_label = "bluesky"
 
-  # Makes the website card of the link.
-  #
-  # ⚠️ The link of a post is this card, and it is **not** in the text. Thus the URL does not use
-  # part of the 300 characters. ⚠️ The caller gives an `embeddable?` card only: a page with no
-  # tags makes an empty box, and the link goes in the words instead. A card with no thumbnail still
-  # renders, thus a failure of the image
-  # loses the picture only and never the post.
-  # @param card [OpenGraph::Card, nil]
+  # Makes the website card of the link. The link is this card and is not in the text, thus the
+  # URL uses none of the 300 characters. A failure of the image loses the picture only.
+  # @param card [OpenGraph::Card, nil] An `embeddable?` card. Refer to #post!.
   # @return [Hash, nil] An app.bsky.embed.external, or nil with no card.
   def build_card(card)
     return if card.blank? || card.url.blank?
@@ -361,14 +313,12 @@ class Bluesky < ApplicationService
 
   # Makes the embed of the photos.
   #
-  # ⚠️ **Two embed types.** `app.bsky.embed.images` takes MAX_IMAGES_EMBED photos at the most, and
-  # `app.bsky.embed.gallery` takes more. A post that fits the first one keeps it: a client from
-  # before the gallery embed renders that one and nothing for a gallery. Each item of a gallery is
-  # a union member and carries its `$type`; an item of the images embed is a plain ref and does not.
+  # ⚠️ Two embed types. A post of MAX_IMAGES_EMBED photos or fewer keeps `app.bsky.embed.images`,
+  # because an old client renders nothing for `app.bsky.embed.gallery`. Each item of a gallery
+  # carries its `$type`, and an item of the images embed does not.
   #
-  # ⚠️ **It RAISES when one upload fails**, and the post then does not go out. A post with three
-  # of its four photos is not the post that the owner wrote, and the job does the work again.
-  # `AtProto#upload_blob` gives nil for a failure and raises for nothing but a 401 and a 429.
+  # ⚠️ It raises when one upload fails, and the job does the work again. A post with three of its
+  # four photos is not the post that the owner wrote.
   # @param photos [Array<Hash>] `[{ bytes:, width:, height:, alt: }, …]`
   # @return [Hash] An app.bsky.embed.images or an app.bsky.embed.gallery.
   def build_images_embed(photos)
@@ -389,38 +339,30 @@ class Bluesky < ApplicationService
     end
   end
 
-  # The standard.site records of the page, as strongRefs.
+  # The standard.site records of the page, as strongRefs: the document first, then the
+  # publication.
   #
-  # ⚠️ **This is what makes Bluesky render the standard.site card and not the ordinary one.** The
-  # embed stays an `app.bsky.embed.external`, and `associatedRefs` is what it adds: the document
-  # first, then the publication.
-  #
-  # It **falls back with no message**, on purpose. A page that publishes no `<link rel>` tag, a
-  # record that this app cannot read, and a DID with a method that it cannot resolve each give an
-  # empty list, and Bluesky then renders the ordinary card from the og: tags. A link to another site
-  # is the usual reason.
+  # ⚠️ `associatedRefs` is what makes Bluesky render the standard.site card and not the ordinary
+  # one. A page with no `<link rel>` tag, or a record that this app cannot read, gives an empty
+  # list, and Bluesky then renders the ordinary card.
   # @param card [OpenGraph::Card]
-  # @return [Array<Hash>] The refs, in the order that the documentation gives.
+  # @return [Array<Hash>]
   # @see https://github.com/bluesky-social/atproto/discussions/4978
   def associated_refs(card)
     document = strong_ref(card.document_uri) if card.document_uri.present?
-    # ⚠️ The publication alone is not a card. That tag is on each page of the site, and the document
-    # is the thing that names one article. Thus with no document this adds nothing.
+    # ⚠️ The publication alone is not a card: that tag is on each page of the site. Thus with no
+    # document this adds nothing.
     return [] if document.blank?
 
     publication = strong_ref(card.publication_uri) if card.publication_uri.present?
     [ document, publication ].compact
   end
 
-  # Downloads the og:image of the link and uploads it as a blob.
+  # Downloads the og:image of the link and uploads it as a blob. Each failure gives nil, and the
+  # card then renders with no thumbnail.
   #
   # ⚠️ This is not `AtProto#upload_image_blob`, which asks the Contentful Images API for a smaller
-  # copy. The picture here belongs to the page that the owner linked to, which can be another site
-  # and can be a Short, which has no cover image at all.
-  #
-  # Each step fails soft, on purpose: a picture past `MAX_CARD_IMAGE_BYTES`, a body that is not an
-  # image, and a picture that stays past the blob limit after the shrink each give nil, and the card
-  # then renders with no thumbnail.
+  # copy. The picture here can belong to another site.
   # @param url [String, nil] The og:image.
   # @return [Hash, nil] The blob, or nil after any failure.
   def upload_card_image(url)
@@ -442,22 +384,17 @@ class Bluesky < ApplicationService
 
   # Makes the rich-text facets of the body: each link, each mention, and each hashtag.
   #
-  # ⚠️ **Each offset comes from the PLAIN text that the record holds**, and never from the words
-  # that the owner typed. `#post!` renders the Markdown one time and gives that text to this method
-  # with the links of the same parse.
-  #
-  # ⚠️ The links come first, and a mention or a tag inside a link is not a facet. A URL such as
-  # `…/profile/@me.bsky.social` or `…/#section` would otherwise get two facets over one range, and
-  # a client renders that as a broken link.
+  # ⚠️ Each offset comes from the PLAIN text that the record holds, and never from the words that
+  # the owner typed.
   # @param text [String] The plain text.
   # @param links [Array<MarkdownLinks::Link>] The links that the Markdown made.
   # @return [Array<Hash>]
   def build_facets(text, links: [])
     facets = self.class.link_ranges(text, links).map { |link| link_facet(text, link) }
 
-    # ⚠️ Each kind gives way to the kinds before it, thus no two facets cover one byte. A mention
-    # comes before a tag because `#tag.@example.com` matches the two patterns, and a mention is
-    # the more specific claim.
+    # ⚠️ Each kind gives way to the kinds before it, thus no two facets cover one byte: two facets
+    # over one range make a client render a broken link. A mention comes before a tag because
+    # `#tag.@example.com` matches the two patterns.
     facets += mention_facets(text, skip: byte_ranges(facets))
     facets += tag_facets(text, skip: byte_ranges(facets))
 
@@ -471,11 +408,8 @@ class Bluesky < ApplicationService
     facets.map { |facet| facet["index"]["byteStart"]...facet["index"]["byteEnd"] }
   end
 
-  # ⚠️ The offsets of the record are in **bytes** of the UTF-8 text, and `MarkdownLinks::Link`
-  # holds characters. One accented letter is 1 character and 2 bytes, thus a character offset moves
-  # the highlight of each facet after it.
-  # @param text [String]
-  # @param link [MarkdownLinks::Link]
+  # ⚠️ The offsets of the record are in bytes of the UTF-8 text, and `MarkdownLinks::Link` holds
+  # characters. One accented letter is 1 character and 2 bytes.
   # @return [Hash] One app.bsky.richtext.facet#link.
   def link_facet(text, link)
     {
@@ -502,10 +436,8 @@ class Bluesky < ApplicationService
 
   # One app.bsky.richtext.facet#tag for each #hashtag.
   #
-  # ⚠️ It does not use `#scan_facets`. The facet of a tag can be SHORTER than its match: the client
-  # removes the punctuation at the end, thus "#trail." tags "trail" and the facet must become
-  # shorter with it, or it covers a character that the tag does not hold.
-  # @param text [String]
+  # ⚠️ It does not use `#scan_facets`, because the facet of a tag can be shorter than its match:
+  # "#trail." tags "trail", and the facet must not cover the full stop.
   # @param skip [Array<Range>] The byte ranges to leave alone.
   # @return [Array<Hash>]
   def tag_facets(text, skip: [])
@@ -534,14 +466,11 @@ class Bluesky < ApplicationService
     facets
   end
 
-  # Finds each match of the first group of a pattern and makes a facet from it.
-  #
-  # ⚠️ The offsets are in **bytes** of the UTF-8 text, and not in characters. One accented letter
-  # is 1 character and 2 bytes, thus a character offset moves the highlight of each facet after it.
-  # @param text [String]
+  # Finds each match of the first group of a pattern and makes a facet from it, with byte
+  # offsets. Refer to #link_facet.
   # @param pattern [Regexp] A pattern whose first group is the thing to mark.
-  # @param skip [Array<Range>] Byte ranges. A match that starts inside one is not a facet, and the
-  #   block does not run for it.
+  # @param skip [Array<Range>] Byte ranges. A match that touches one is not a facet, and the block
+  #   does not run for it.
   # @return [Array<Hash>] The facets. The block returns nil to drop one.
   def scan_facets(text, pattern, skip: [])
     facets = []
@@ -563,20 +492,16 @@ class Bluesky < ApplicationService
     facets
   end
 
-  # ⚠️ It compares the FULL range, and not the start byte alone. A mention or a tag that starts
-  # before a link and continues into it is an overlap, and two facets over one range make a client
-  # render a broken link.
-  # @param byte_start [Integer]
+  # ⚠️ It compares the full range, and not the start byte alone: a mention that starts before a
+  # link and continues into it is an overlap.
   # @param byte_end [Integer] The end of the range, not included.
-  # @param skip [Array<Range>] The byte ranges to avoid.
-  # @return [Boolean] True when the range touches one of them.
+  # @return [Boolean] True when the range touches one of `skip`.
   def overlaps?(byte_start, byte_end, skip)
     skip.any? { |range| byte_start < range.end && range.begin < byte_end }
   end
 
-  # ⚠️ The DID of a handle stays in Redis for a day. A thread names one person in many posts, a
-  # retry of a job resolves each mention again, and the submit checks each handle as well. A handle
-  # that moves to another DID inside that day tags the old account, and that is rare.
+  # The time that the DID of a handle stays in Redis. ⚠️ A handle that moves to another DID
+  # inside that time tags the old account, and that is rare.
   DID_CACHE_TTL = 1.day
 
   # @param handle [String] A handle, with no "@".
@@ -597,9 +522,8 @@ class Bluesky < ApplicationService
   # @return [String] The Redis key of the DID of a handle.
   def did_key(handle) = "bluesky:did:#{handle.to_s.downcase}"
 
-  # ⚠️ The timeout is here, thus the two callers above share it. #handle_missing? runs in a request
-  # and more than one time, and RESOLVE_TIMEOUT is short for that reason.
-  # @param handle [String]
+  # ⚠️ The timeout is here, thus the two callers share it. #handle_missing? runs in a request,
+  # and RESOLVE_TIMEOUT is short for that reason.
   # @return [HTTParty::Response]
   def resolve_handle_response(handle)
     HTTParty.get("#{pds_url}/xrpc/com.atproto.identity.resolveHandle",

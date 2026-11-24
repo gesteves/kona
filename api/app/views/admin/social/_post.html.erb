@@ -1,18 +1,13 @@
 <%# One post of the thread: the words, the count, an optional link, and the card that each network
     will render for that link.
 
-    ⚠️ **Both fields must render for every block, in the same order.** The names are `posts[][text]`
-    and `posts[][link]`, and Rails starts a new hash when a key repeats. A block that omits one
-    field would move each pair below it by one. There is no index in the name, on purpose: an index
-    needs renumbering in the browser at each add and each remove. The tiles of the photos come
-    AFTER those two fields, and `text` must stay the first field of a block.
-
-    ⚠️ Each block is its own `social-post` controller. That is what keeps the count, the spinner,
-    and the preview of one post away from the others.
+    ⚠️ Both fields must render for every block, in the same order. The names are `posts[][text]`
+    and `posts[][link]`, and Rails starts a new hash when a key repeats. There is no index in the
+    name, on purpose: an index needs renumbering in the browser at each add and each remove. The
+    tiles of the photos come AFTER those two fields, and `text` must stay the first field.
 %>
-<%# ⚠️ The Bluesky map is a plain data attribute and NOT a Stimulus value. A value arrives through
-    a MutationObserver, thus it is not synchronous, and `social#canPost` reads the count line that
-    this block writes. The button would then follow the keystroke before the current one. %>
+<%# ⚠️ The Bluesky map is a plain data attribute and NOT a Stimulus value. Refer to
+    `blueskyMentions` in social_post_controller.js. %>
 <div class="social-post" data-social-target="post" data-controller="social-post"
      data-admin-i18n="<%= admin_i18n_data("admin.js.social_post", shared: "admin.js.shared") %>"
      data-social-post-bluesky-mentions="<%= mentions_json %>"
@@ -33,10 +28,8 @@
   <div class="social-post__body">
     <%# ⚠️ The HANDLE carries `draggable`, and never the block. A draggable block takes the pointer
         away from the fields inside it, thus a person could not select the words of their own post.
-        ⚠️ It is a real button and it takes the keyboard: the arrow keys move the post. A drag needs
-        a pointer, and this page must work without one. It is hidden while there is one post.
-        It sits in the gutter column of the grid, beside the label of the field. Refer to
-        _social.scss. %>
+        ⚠️ It is a real button, thus the arrow keys move the post with no pointer. It is hidden
+        while there is one post. %>
     <wa-button class="social-post__handle" appearance="plain" size="small" draggable="true"
                data-social-target="handle"
                data-action="dragstart->social#dragStart dragend->social#dragEnd
@@ -46,11 +39,9 @@
     </wa-button>
 
     <%# ⚠️ The icon is in the DEFAULT slot and not in `start`. With `start` and no label, the button
-        keeps the width of a label that is not there and the icon sits off to one side.
-        ⚠️ `<wa-button>` makes a square icon button only for a `<wa-icon>` child, and this app never
-        uses that element (it needs a kit code that this configuration has not). Thus _social.scss
-        gives the square. It is hidden while there is one post: a thread of one has nothing to
-        remove. %>
+        keeps the width of a label that is not there.
+        ⚠️ `<wa-button>` makes a square icon button only for a `<wa-icon>` child, which this app
+        never uses. Thus _social.scss gives the square. It is hidden while there is one post. %>
     <wa-button class="social-post__remove" appearance="plain" size="small"
                data-social-target="remove" data-action="click->social#removePost">
       <%= raw icon_svg("classic", "light", "circle-xmark") %>
@@ -71,12 +62,10 @@
         ⚠️ It is a ROW of controls and not one button: a control for a photo, and each other kind of
         attachment, goes beside the link button. Thus the button is not in the count line itself. %>
     <div class="social-post__toolbar">
-      <%# ⚠️ The icon is in the DEFAULT slot and _social.scss gives the square, for the reason that
-          the remove control above gives.
-          ⚠️ **It is DISABLED while the post has a link, and it is never hidden.** There is one link
-          for each post, thus it can do nothing then. It is a form control and it is taller than the
-          count beside it: a button that goes away takes the height of the row with it, and the
-          count moves up at the click that opened the field. %>
+      <%# ⚠️ The icon is in the DEFAULT slot and _social.scss gives the square, as for the remove
+          control above.
+          ⚠️ It is DISABLED while the post has a link or a photo, and it is never hidden. Refer to
+          `renderAttachmentState` in social_post_controller.js. %>
       <wa-button class="social-post__tool" appearance="plain" size="small"
                  data-social-post-target="linkButton"
                  data-action="click->social-post#showLink"
@@ -85,11 +74,8 @@
         <span class="wa-visually-hidden"><%= t(".add_link") %></span>
       </wa-button>
 
-      <%# The photo button. It opens the picker below the toolbar, exactly as the link button opens
-          the link field. ⚠️ **A post takes photos OR a link, and not both**: Bluesky renders one
-          embed. Thus this button is disabled while the post has a link, and the link button is
-          disabled while the picker is open. The server renders both states, thus a page that
-          renders again after a refusal shows them at once. %>
+      <%# The photo button, which opens the picker below the toolbar. ⚠️ A post takes photos OR a
+          link, and not both: Bluesky renders one embed. The server renders both states. %>
       <wa-button class="social-post__tool" appearance="plain" size="small"
                  data-social-post-target="photoButton"
                  data-action="click->social-post#showPhotos"
@@ -98,18 +84,16 @@
         <span class="wa-visually-hidden"><%= t(".add_photos") %></span>
       </wa-button>
 
-      <%# The server writes the first value, thus the line has its height before the JavaScript runs
-          and the page does not move. The controller writes each value after that.
+      <%# The server writes the first value, thus the line has its height before the JavaScript
+          runs.
           ⚠️ The number is the length of the text that BLUESKY will get, after the handles go in.
-          Bluesky has the shortest limit and "@tony" grows into a domain, thus a count of the words
-          alone would let a draft through that Bluesky then refuses. SocialPresenter#bluesky_length
-          makes it, and this view holds no count of its own. %>
-      <%# ⚠️ The ring is `aria-hidden`: the words beside it say the same thing. The live region is
-          a hidden span of its own, which the controller writes only when the count crosses the
-          warning or the limit: a region that changes at each keystroke reads every number aloud. %>
-      <%# ⚠️ The ring is LAST, thus it sits at the edge of the line and it does not move when the
-          number beside it gets a digit. The count sits at the end of the row with `margin-inline-
-          start: auto`, and NOT with `space-between`: it must stay there with the button hidden. %>
+          SocialPresenter#bluesky_length makes it, and this view holds no count of its own. %>
+      <%# ⚠️ The ring is `aria-hidden`: the words beside it say the same thing. The live region is a
+          hidden span of its own, which the controller writes only when the count crosses the warning
+          or the limit. %>
+      <%# ⚠️ The ring is LAST, thus it does not move when the number beside it gets a digit. The count
+          sits at the end of the row with `margin-inline-start: auto`, and NOT with `space-between`:
+          it must stay there with the button hidden. %>
       <div class="social__count wa-caption-s" data-social-post-target="count">
         <span data-social-post-target="countText"><%= count %> / <%= limit %></span>
         <span class="wa-visually-hidden" aria-live="polite" data-social-post-target="countNotice"></span>
@@ -119,19 +103,16 @@
       </div>
     </div>
 
-    <%# The photos of the post: the picker, and one tile for each photo. The photo button opens it
-        and the X closes it, exactly as the link field. ⚠️ **The X shows only while the picker
-        holds no photo**: a picker that closes with tiles in it would still send them with the
-        form. With a tile, the X of each tile is the way back, and the last one leaves the picker
-        open and empty. The server renders it open for a post that already holds a photo. It is
-        a child of the grid above, and it needs a rule for `[hidden]`; refer to _social.scss. %>
+    <%# The photos of the post: the picker, and one tile for each photo. ⚠️ The X of the picker
+        shows only while the picker holds no photo: a picker that closes with tiles in it would
+        still send them with the form. The server renders it open for a post that holds a photo.
+        It needs a rule for `[hidden]`; refer to _social.scss. %>
     <div class="social-post__photos" data-social-post-target="photos"
          data-action="dragover->social-post#dragOverPhoto drop->social-post#dropPhoto"
          <%= "hidden" if post.photos.empty? %>>
       <div class="social-post__picker">
         <%# ⚠️ It has NO name: the files never go with the form. The controller uploads each one at
-            the moment the owner picks it, then empties the input, thus the component draws no
-            list of its own and the tiles below are the one list. It is disabled at the most
+            the moment the owner picks it, then empties the input. It is disabled at the most
             photos. %>
         <wa-file-input class="social-post__file-input" accept="image/*" multiple size="small"
                        label="<%= t(".photos") %>" hint="<%= t(".photos_hint", count: max_photos, mastodon: Mastodon::MAX_MEDIA_ATTACHMENTS) %>"
@@ -167,12 +148,10 @@
       <%= render "photo", photo: SocialPresenter::Photo.new, alt_text: alt_text %>
     </template>
 
-    <%# ⚠️ The link is OPTIONAL and it has no `required`: a post can be words alone. There is no
-        list of the articles here, on purpose: the card comes from the og: tags of whatever page
-        this names, thus a link to another site needs no more code.
-        ⚠️ **The server renders it open for a post that already holds a link**, thus a page that
-        renders again after a refusal shows that link, and the controller needs no state before the
-        browser upgrades these elements.
+    <%# ⚠️ The link is OPTIONAL and it has no `required`. There is no list of the articles here, on
+        purpose: the card comes from the og: tags of whatever page this names.
+        ⚠️ The server renders it open for a post that already holds a link, thus a page that renders
+        again after a refusal shows that link.
         ⚠️ It needs a rule for `[hidden]`; refer to _social.scss. %>
     <wa-input class="social-post__link" type="url" name="posts[][link]" label="<%= t(".link") %>"
               value="<%= post.link %>"
@@ -186,10 +165,9 @@
           `[hidden]`; refer to _social.scss. %>
       <wa-spinner slot="end" class="social__spinner" data-social-post-target="spinner" hidden></wa-spinner>
 
-      <%# ⚠️ **This is the one way out of the field**, and it calls the same method as the X on the
-          card. The card can only take the owner back from a link that this app read a page for;
-          without this control a field that they opened and left empty would stay open for the rest
-          of the draft. The Escape key above does the same thing. %>
+      <%# ⚠️ This is the one way out of the field, and it calls the same method as the X on the
+          card. Without it, a field that the owner opened and left empty would stay open. The Escape
+          key above does the same thing. %>
       <wa-button slot="end" class="social-post__link-remove" appearance="plain" size="small"
                  data-action="click->social-post#removeLink">
         <%= raw icon_svg("classic", "light", "xmark") %>
@@ -199,18 +177,14 @@
 
     <%# The card of the link. The controller fills it and shows it, and it takes the place of the
         field above.
-        ⚠️ **It shows for EVERY link that this app could read a page for**, and not for a link that
-        Bluesky will draw a card from. The field is hidden by then, thus this card is the only thing
-        that says which link the post carries. A page with no og: tags gets its address in place of
-        a title.
-        ⚠️ `with-media` is not in this markup: a page can have no picture, thus the controller sets
-        it with the image. %>
+        ⚠️ It shows for EVERY link that this app could read a page for, and not only for a link that
+        Bluesky will draw a card from. A page with no og: tags gets its address in place of a title.
+        ⚠️ `with-media` is not in this markup: the controller sets it with the image. %>
     <wa-card class="social-card" data-social-post-target="preview" hidden>
       <img slot="media" class="social-card__image" data-social-post-target="previewImage" alt="" hidden>
 
-      <%# ⚠️ This is the useful part: it says that Bluesky will render the standard.site card, and
-          the owner cannot know that until after the post without it. A card with NO badge is the
-          ordinary card from the og: tags. %>
+      <%# ⚠️ The badge says that Bluesky will render the standard.site card. A card with NO badge is
+          the ordinary card from the og: tags. %>
       <wa-badge class="social-card__kind" appearance="outlined" variant="success"
                 data-social-post-target="previewKind" hidden></wa-badge>
       <p class="social-card__host wa-caption-s" data-social-post-target="previewHost"></p>
@@ -218,13 +192,11 @@
       <p class="social-card__description" data-social-post-target="previewDescription"></p>
 
       <%# The two controls of the card, in its footer: Edit puts the field back with the link still
-          in it, and Remove takes the link off the post. Refer to the three states in the controller.
+          in it, and Remove takes the link off the post.
 
-          ⚠️ **They are in the `footer` slot and NOT in `footer-actions`**, which is the slot that
-          the component names for exactly this. That slot alone renders NOTHING: the card asks
-          whether the `footer` slot holds anything to decide if it draws a footer at all, thus a
-          card with `footer-actions` and no `footer` hides both, and it gives no message. One
-          element also keeps the two buttons together: the footer lays its own children out. %>
+          ⚠️ They are in the `footer` slot and NOT in `footer-actions`. The card draws a footer only
+          when the `footer` slot holds something, thus `footer-actions` alone renders nothing, with
+          no message. %>
       <div slot="footer" class="social-card__actions">
         <wa-button class="social-card__action" appearance="plain" size="small"
                    data-action="click->social-post#showLink">

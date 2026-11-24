@@ -1,4 +1,4 @@
-# The owner authentication, with Google OAuth. It limits /whoop/auth and the Sidekiq UI to one
+# The owner authentication, with Google OAuth. It limits the admin UI and the Sidekiq UI to one
 # identity. The `hd` value of the OmniAuth provider already refuses a login outside our Google hosted
 # domain, and #create also tests the exact OWNER_EMAIL and needs an email that Google verified. A
 # successful sign-in puts the owner email in the signed cookie session.

@@ -4,8 +4,7 @@ require "uri"
 #
 # ⚠️ Mastodon has no central developer dashboard, because each instance is a separate server. Thus
 # this app registers itself on the instance that the owner names (POST /api/v1/apps) and keeps the
-# client that the instance gives. There is no env var for this integration, thus the Connected apps
-# page always shows its card.
+# client that the instance gives. There is no env var for this integration.
 # @see https://docs.joinmastodon.org/methods/apps/
 class Mastodon < ApplicationService
   # The name that the instance shows to the owner on its Authorized apps page.
@@ -24,14 +23,11 @@ class Mastodon < ApplicationService
   VISIBILITY = "public".freeze
   LANGUAGE = "en".freeze
 
-  # ⚠️ Mastodon counts a URL as this many characters, whatever its true length, and the limit of a
+  # ⚠️ Mastodon counts a URL as URL_WEIGHT characters, whatever its true length, and the limit of a
   # default instance is 500. This class makes no length check of its own.
-  # ⚠️ **The body of a draft is NOT always 300 or less.** Only the BLUESKY text carries that limit,
-  # and a mention grows the text of each network by a different amount: "@tony" becomes
-  # "@tony@hachyderm.io" here. Thus SocialDraftValidator#post_error checks this limit against the
-  # text of THIS network, before it adds the job. Without that check a long draft raises here and
-  # retries for 24 hours.
-  # An instance with a limit below this one would refuse the post, and the job would then run again.
+  # ⚠️ The Mastodon text of a draft can be longer than its Bluesky text: "@tony" becomes
+  # "@tony@hachyderm.io" here. SocialDraftValidator#post_error checks this limit before it adds
+  # the job. An instance with a lower limit refuses the post, and the job then runs again.
   URL_WEIGHT = 23
   DEFAULT_MAX_CHARACTERS = 500
 
@@ -50,8 +46,8 @@ class Mastodon < ApplicationService
 
   # The seconds that each call to the instance can take. ⚠️ The registration, the token exchange,
   # and the revoke each run in a request with a 20-second rack-timeout, and the owner types the
-  # hostname. A host that accepts the connection and then hangs would give a 500 in place of the
-  # message of the page, and `disconnect!` would then never reach its clear.
+  # hostname. A host that hangs must not give a 500, and must not stop `disconnect!` before its
+  # clear.
   REQUEST_TIMEOUT = 10
 
   # How long the URL of a posted status stays in Redis, for a retry. ⚠️ It is longer than the
@@ -72,8 +68,7 @@ class Mastodon < ApplicationService
     @credentials = credentials
   end
 
-  # @return [Boolean] True if an account is connected now. The token is the connection, because
-  #   there is no database.
+  # @return [Boolean] True if an account is connected now.
   def connected? = @credentials.usable?
 
   # @return [String, nil] The "@user@instance" name of the connected account.
@@ -126,9 +121,8 @@ class Mastodon < ApplicationService
   # Changes the authorization code into an access token, and stores it with the name of the
   # account.
   #
-  # ⚠️ It reads the account before it stores the token. A token that the instance gives and that
-  # cannot read its own account is not a connection, and the page must not show one.
-  # @param code [String] The code from the callback.
+  # ⚠️ It reads the account before it stores the token. A token that cannot read its own account
+  # is not a connection.
   # @return [Boolean] True if the account is connected now.
   def connect!(code)
     return false unless @credentials.registered?
@@ -162,16 +156,11 @@ class Mastodon < ApplicationService
 
   # Publishes one status.
   #
-  # ⚠️ **The URL goes in the TEXT here, and Bluesky puts it in an embed.** Mastodon renders a link
-  # inline and makes its own preview card from the og: tags of that page. Thus this class needs no
-  # card, and `Bluesky` builds one.
-  #
-  # ⚠️ Two things make a retry safe, and each one covers a window that the other does not.
-  # `idempotency_key` goes in the `Idempotency-Key` header: the instance keeps that key for
-  # approximately an hour and answers with the status that it already made. `MastodonPostJob` gives
-  # the record key that the controller made before it added the job, thus each attempt sends the
-  # same key. The Sidekiq retries go on for 24 hours, thus this method also keeps the URL of the
-  # status in Redis below that key, and a later attempt returns it and posts nothing.
+  # ⚠️ The URL goes in the TEXT here. Mastodon renders a link inline and makes its own preview
+  # card from the og: tags of that page, thus this class needs no card.
+  # ⚠️ Two things make a retry safe. `idempotency_key` goes in the `Idempotency-Key` header, which
+  # the instance keeps for approximately an hour. The Sidekiq retries go on for 24 hours, thus
+  # this method also keeps the status in Redis below that key, and a later attempt returns it.
   #
   # @param text [String] The body of the post.
   # @param url [String, nil] The link to add below the body.
@@ -179,7 +168,9 @@ class Mastodon < ApplicationService
   # @param in_reply_to_id [String, nil] The id of the status above this one, for a thread.
   # @param photos [Array<Hash>] `[{ bytes:, alt: }, …]`, MAX_MEDIA_ATTACHMENTS at the most.
   # @return [Hash] `{ "id" =>, "url" => }`. The next post of a thread names this one with the `id`.
-  # @raise [ApplicationService::HttpError, RuntimeError] It raises at each failure, thus
+  # @raise [ApplicationJob::PermanentError] When no account is connected, or when the post is
+  #   empty or has too many photos. The job does not run again.
+  # @raise [ApplicationService::HttpError, RuntimeError] At each other failure, thus
   #   MastodonPostJob does the work again.
   def post!(text:, url: nil, idempotency_key: nil, in_reply_to_id: nil, photos: [])
     raise ApplicationJob::PermanentError, "Mastodon is not connected" unless connected?
@@ -215,10 +206,8 @@ class Mastodon < ApplicationService
     result
   end
 
-  # The status that this instance will receive.
-  #
-  # ⚠️ **The URL goes in the TEXT here**, and Bluesky makes an embed of it and Threads makes an
-  # attachment. Thus this is the one network whose text holds the link.
+  # The status that this instance will receive. Mastodon is the one network whose text holds the
+  # link.
   #
   # ⚠️ `#post!` and the preview of the Social media page both call this. Without one method the
   # preview would show a text that the post does not send.
@@ -231,9 +220,8 @@ class Mastodon < ApplicationService
 
   # The length that this instance counts for a post.
   #
-  # ⚠️ **Mastodon counts a URL as URL_WEIGHT, whatever its true length.** Thus this is not the
-  # length of the composed status, and `String#length` on that text would give a larger number for
-  # a long link.
+  # ⚠️ Mastodon counts a URL as URL_WEIGHT, whatever its true length. Thus this is not the length
+  # of the composed status.
   # @param text [String, nil]
   # @param url [String, nil]
   # @return [Integer]
@@ -249,10 +237,8 @@ class Mastodon < ApplicationService
 
   # Tells the instance to forget the token, then removes the stored credentials.
   #
-  # ⚠️ The local credentials go away whether the revoke works or not. The instance can be away, or
-  # the owner can have removed the app there, and a disconnect that the owner asked for must not
-  # depend on that. The `ensure` is what makes that true for a rack-timeout as well: that exception
-  # is not a StandardError, thus `rescue_with` does not catch it.
+  # ⚠️ The local credentials go away whether the revoke works or not: the instance can be away.
+  # The `ensure` makes that true for a rack-timeout as well, which `rescue_with` does not catch.
   # @return [void]
   def disconnect!
     revoke! if @credentials.usable?
@@ -263,7 +249,6 @@ class Mastodon < ApplicationService
 
   private
 
-  # @param access_token [String]
   # @return [Hash, nil] The account of the token, or nil if the instance refuses it.
   def verify_credentials(access_token)
     account = get_json(
@@ -290,7 +275,6 @@ class Mastodon < ApplicationService
     nil
   end
 
-  # @return [Hash]
   def auth_headers = { "Authorization" => "Bearer #{@credentials.access_token}" }
 
   # Uploads one photo with its alt text, and waits until the instance has processed it.
@@ -324,7 +308,6 @@ class Mastodon < ApplicationService
   end
 
   # Asks for a media attachment until the instance has processed it. A 206 means "not yet".
-  # @param id [String]
   # @return [void]
   # @raise [RuntimeError] If the photo is not processed after MEDIA_POLLS attempts.
   def wait_for_media(id)

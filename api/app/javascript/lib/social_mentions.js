@@ -34,9 +34,11 @@ export function isBlueskyHandle(value) {
 }
 
 // The punctuation of a sentence at the end of an address, and the characters that close something
-// that holds it. ⚠️ They are the copy of `Bluesky::URL_TRAILING_PUNCTUATION` and
-// `Bluesky::URL_TRAILING_WRAPPERS`, because `URL_SOURCE` takes each character up to a space and
-// `Bluesky.trim_url` is what decides where an address ends.
+// that holds it. `URL_SOURCE` takes each character up to a space, thus `trimUrl` decides where an
+// address ends.
+// ⚠️ `Bluesky.trim_url` does this on the server with a different rule (`Bluesky::URL_TERMINAL`
+// and `Bluesky::URL_WRAPPERS`). The two can give a different end for an address that ends in a
+// quotation mark, a `}`, or an ellipsis.
 const URL_TRAILING_PUNCTUATION = /[.,;:!?]+$/;
 const URL_TRAILING_WRAPPERS = { ")": "(", "]": "[", ">": "<" };
 

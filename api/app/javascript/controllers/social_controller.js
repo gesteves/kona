@@ -22,8 +22,9 @@ const PHOTO = "[data-social-post-target='photo']";
  * The Social media page: the posts of a thread, the schedule fields, the label of the submit
  * button, and the time zone of the browser. The form posts to POST /social.
  *
- * ⚠️ The count and the link preview of one post are NOT here. Each block is its own `social-post`
- * controller, thus this one never reaches into a block and never needs an index.
+ * ⚠️ The count and the link preview of one post are NOT here: each block is its own
+ * `social-post` controller. This one reads the state of a block from the classes that the
+ * block writes (refer to `canPost`), and `pushMentions` calls the `count()` of each block.
  */
 export default class extends Controller {
   static targets = [
@@ -52,20 +53,17 @@ export default class extends Controller {
     // each row that the server rendered as ticked.
     this.offReasons = new Map();
 
-    // ⚠️ The date and the time carry no zone. This is what gives them a meaning, and it is the
-    // reason that a date field is safe here and was not safe in the Republish dialog. With no
-    // JavaScript the field stays empty and the server falls back to TIME_ZONE.
+    // ⚠️ The date and the time carry no zone, and this value gives them one. With no JavaScript
+    // the field stays empty and the server falls back to TIME_ZONE.
     const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     if (zone) this.timeZoneTarget.value = zone;
 
     // ⚠️ Each step below waits for the definitions: `value` and `checked` are undefined on these
-    // components until the browser upgrades them.
+    // components until the browser upgrades them. `wa-input` is in the list for the mention
+    // fields: a read before the upgrade would write an empty value over each handle.
     //
     // A Turbo restoration visit renders a snapshot that holds the values and no controller state.
     // Thus the schedule runs at connect and not at the first event only.
-    // ⚠️ `wa-input` is in this list for the MENTION fields. Before the upgrade their `value` is
-    // undefined, thus a read here would write over each handle that the server rendered with an
-    // empty one. A page that renders again after a refusal holds those values.
     Promise.all(
       ["wa-switch", "wa-date-input", "wa-time-input", "wa-input"]
         .map((tag) => customElements.whenDefined(tag))
@@ -102,8 +100,7 @@ export default class extends Controller {
     if (this.postTargets.length >= this.maxPostsValue) return;
 
     // ⚠️ The map goes on the block BEFORE it joins the document, thus the new block counts
-    // correctly at its own `connect()`. The copy in the template is the one that the server
-    // rendered, and the owner can have edited a handle after that.
+    // correctly at its own `connect()`.
     const added = this.templateTarget.content.cloneNode(true);
     const block = added.querySelector("[data-social-target='post']");
     if (block) block.dataset.socialPostBlueskyMentions = this.blueskyMentionsJson;
@@ -119,9 +116,8 @@ export default class extends Controller {
   /**
    * Removes the post that holds the control that was pressed.
    *
-   * ⚠️ **A post that holds something asks first.** A block is as much as 300 characters and a link,
-   * and nothing here can put it back: there is no undo, and the browser keeps no copy. A block that
-   * is still empty goes at once, because a question about nothing is only noise.
+   * ⚠️ A post that holds something asks first, because nothing here can put it back. A block
+   * that is still empty goes at once.
    */
   removePost(event) {
     event.preventDefault();
@@ -150,12 +146,9 @@ export default class extends Controller {
   /**
    * Forgets the post that the dialog asked about.
    *
-   * ⚠️ It runs at `wa-hide`, thus Cancel, the Escape key, and the close button of the header all
-   * reach it. Without this a post that the owner kept would stay in this reference.
-   *
-   * ⚠️ **It is `wa-hide` and NOT `wa-after-hide`.** The second one waits for the close animation to
-   * be complete, and a measurement in a browser gave a `wa-hide` with no `wa-after-hide` after it.
-   * Thus a handler on that event can never run at all.
+   * ⚠️ It runs at `wa-hide`, thus Cancel, the Escape key, and the close button all reach it.
+   * ⚠️ It is `wa-hide` and NOT `wa-after-hide`: the dialog can fire the first one with no second
+   * one after it.
    */
   clearRemoval() {
     this.pendingRemoval = null;
@@ -216,9 +209,8 @@ export default class extends Controller {
   /**
    * Moves the post that the pointer holds to where the pointer is.
    *
-   * ⚠️ It moves the block itself and it never rewrites a field. The names are `posts[][text]` and
-   * `posts[][link]` with no index, thus **the order of the blocks in the document IS the order of
-   * the thread**, and moving one is the whole change.
+   * ⚠️ It moves the block itself and it never rewrites a field. The field names have no index,
+   * thus the order of the blocks in the document IS the order of the thread.
    */
   dragOver(event) {
     if (!this.dragged) return;
@@ -287,10 +279,8 @@ export default class extends Controller {
   }
 
   /**
-   * Shows the two controls of a post while there is more than one, and hides them at one.
-   *
-   * ⚠️ It writes no number. The field names carry no index, and the ORDER OF THE BLOCKS in the
-   * document is the order of the thread. Refer to the note in _post.html.erb.
+   * Shows the two controls of a post while there is more than one, and hides them at one. It
+   * writes no number: refer to `dragOver`.
    */
   renumber() {
     const posts = this.postTargets;
@@ -324,11 +314,8 @@ export default class extends Controller {
   }
 
   /**
-   * Writes what the button does into its label.
-   *
-   * ⚠️ The switch is the only control that says "now" or "later", and the two states of this label
-   * are what make that visible at the moment of the click. A value that is not complete gets the
-   * plain word, and the `required` of the fields then stops the submit.
+   * Writes what the button does into its label. A value that is not complete gets the plain
+   * word, and the `required` of the fields then stops the submit.
    */
   relabel() {
     this.labelTarget.textContent = this.submitLabel;
@@ -337,9 +324,8 @@ export default class extends Controller {
   /**
    * What the button will do, in its own words.
    *
-   * ⚠️ **A moment that has passed is NOT a schedule**, thus the label goes back to "Post now" and
-   * the action posts at once. A label of "Schedule for" over a date in the past would promise
-   * something that cannot happen. `SocialDraft#scheduled_at` reads it the same way.
+   * ⚠️ A moment that has passed is NOT a schedule, thus the label goes back to "Post now" and the
+   * action posts at once. `SocialDraft#scheduled_at` reads it the same way.
    * @returns {string}
    */
   get submitLabel() {
@@ -359,9 +345,8 @@ export default class extends Controller {
   /**
    * Turns the submit button off while the draft cannot go out, and writes the label.
    *
-   * ⚠️ It runs from `input` and `change` on the **form**, thus one action covers each field of
-   * each post and each network. A field of a post belongs to the `social-post` controller, and
-   * this one reads the DOM in place of reaching into it.
+   * ⚠️ It runs from `input` and `change` on the form, thus one action covers each field of each
+   * post and each network.
    */
   validate() {
     // ⚠️ The order matters. `pushMentions` recounts each post AT ONCE, and `canPost` below reads
@@ -380,9 +365,8 @@ export default class extends Controller {
     // the draft that the owner wants to look at.
     this.previewTabTarget.disabled = !this.canPreview;
 
-    // ⚠️ A network goes away AT ONCE and it needs no request: the answer holds each connected
-    // network, and this hides the rows of the ones that the owner unticked. The refresh below is
-    // for the mentions and the topic, which change the TEXT and which only the server can write.
+    // ⚠️ A network that the owner unticks goes away at once, with no request. The refresh below
+    // is for the mentions and the topic, which change the text that only the server can write.
     this.filterPreview();
     if (this.previewActive) this.schedulePreviewRefresh();
 
@@ -390,23 +374,18 @@ export default class extends Controller {
   }
 
   /**
-   * Turns the rows of Mastodon and Threads off while the draft holds a Markdown link or a photo.
+   * Turns the rows of Mastodon and Threads off while the draft holds a Markdown link, or more
+   * photos on one post than the row takes.
    *
-   * ⚠️ **Only Bluesky has rich text.** There a link is a facet: the words carry the address, and
-   * the URL uses none of the 300 characters. The other two post plain words, thus the same draft
-   * would reach a reader as `[my post](https://…)`. **And each row takes its own number of
-   * photos in a post**, from its `data-max-photos`: Mastodon 4, Threads 20.
-   * `SocialDraftValidator#markdown_network_error` and `#photos_network_error` refuse such a
-   * request as well, because a row that a browser cannot tick a hand-written request can.
+   * ⚠️ Only Bluesky has rich text: the other two would post `[my post](https://…)` as plain
+   * words. Each row takes its own number of photos, from its `data-max-photos`.
+   * `SocialDraftValidator` refuses such a request as well.
    *
-   * ⚠️ **It does nothing to a row while the reason of that row has not changed**, and that is not
-   * only an optimisation: this runs at each keystroke, thus a restore at every one of them would put
-   * back a tick that the owner had just taken off. A change from one reason to the other only
-   * changes the hint line.
+   * ⚠️ It does nothing to a row while the reason of that row has not changed. This runs at each
+   * keystroke, thus a restore at each one would put back a tick that the owner took off.
    *
    * ⚠️ It reads the `markdownNetwork` targets, which the view puts on the CONNECTED rows of those
-   * two networks alone. A row with no account is disabled for its own reason, and it must never
-   * come back on.
+   * two networks alone. A row with no account must never come back on.
    */
   applyBlueskyOnly() {
     const markdown = this.hasMarkdown;
@@ -423,9 +402,9 @@ export default class extends Controller {
 
       if (on && !wasOn) {
         // ⚠️ It keeps the tick that the owner had, thus a link that they write and then remove
-        // gives the draft its networks back. It keeps a value that is already there: Turbo puts
-        // this attribute in its snapshot, and a fresh controller on a restoration visit would
-        // otherwise read the boxes after the untick and remember "false".
+        // gives the draft its networks back. It keeps a value that is already there, because Turbo
+        // puts this attribute in its snapshot and a restoration visit reads the boxes after the
+        // untick.
         if (!("wasChecked" in box.dataset)) {
           box.dataset.wasChecked = box.checked ? "true" : "false";
         }
@@ -449,12 +428,9 @@ export default class extends Controller {
   /**
    * Shows the topic field only while the Threads row can take a post and is ticked.
    *
-   * ⚠️ **It reads `disabled` as well as `checked`.** A row with no account is disabled, and a
-   * Markdown link or a photo disables that row too, thus one rule covers both and `applyBlueskyOnly` above runs
-   * first.
-   *
-   * ⚠️ It never clears the field. A topic that the owner wrote survives an untick and a tick
-   * again, and the action reads the value only while the row is ticked.
+   * ⚠️ It reads `disabled` as well as `checked`: a row with no account is disabled, and
+   * `applyBlueskyOnly` disables that row too. Thus that method runs first.
+   * ⚠️ It never clears the field. A topic that the owner wrote stays after an untick.
    */
   applyTopic() {
     const box = this.networks.find((row) => row.value === this.topicFieldTarget.dataset.network);
@@ -482,11 +458,8 @@ export default class extends Controller {
   }
 
   /**
-   * @returns {boolean} True while the draft holds something to show.
-   *
-   * ⚠️ It reads text OR link, which is the rule that `SocialDraft#posts` follows: that
-   * method drops a block with nothing at all in it. Thus an empty draft gives no post, and a dialog
-   * that opens to say "nothing yet" is worse than a button that is off.
+   * @returns {boolean} True while the draft holds something to show. It follows the rule of
+   *   `SocialDraft#posts`, which drops a block with nothing in it.
    */
   get canPreview() {
     return this.postTargets.some((post) => this.hasContent(post));
@@ -514,9 +487,8 @@ export default class extends Controller {
   /**
    * Gives the Bluesky map to each post block, and makes it count again.
    *
-   * ⚠️ Only the BLUESKY map goes out, because the count measures the Bluesky text: that network
-   * has the shortest limit and the longest handles. The server measures the same string.
-   *
+   * ⚠️ Only the BLUESKY map goes out, because the count measures the Bluesky text. The server
+   * measures the same string.
    * ⚠️ A value that this writes fires no `input` event, thus there is no loop back into validate.
    */
   pushMentions() {
@@ -592,8 +564,8 @@ export default class extends Controller {
     }
 
     // ⚠️ A new row seeds its own field, and the read at the top of this method ran before that
-    // row existed. Without this second read, the first count after a new mention is short by the
-    // "@" that the map puts back, and the server would count another number.
+    // row existed. Without this second read, the first count after a new mention is not the
+    // number that the server counts.
     this.readMentionRows();
 
     this.mentionsTarget.hidden = wanted.size === 0 || !this.hasMentionFields;
@@ -603,8 +575,6 @@ export default class extends Controller {
 
   /**
    * Makes one row from the template, with the values that the owner already gave.
-   * @param {string} token
-   * @param {string} key
    * @returns {HTMLElement}
    */
   buildMentionRow(token, key) {
@@ -632,11 +602,8 @@ export default class extends Controller {
   /**
    * The value to put in a field of a new row.
    *
-   * ⚠️ A token that is ALREADY a handle seeds its own field, thus "@tony.bsky.social" in the body
-   * still works at Bluesky with no typing. **Nothing seeds Threads**: a bare "@name" is exactly the
-   * ambiguous case, and a guess there is what tags a stranger.
-   * @param {string} token
-   * @param {string} network
+   * ⚠️ A token that is already a handle seeds its own field. Nothing seeds Threads: a bare
+   * "@name" is the ambiguous case, and a guess there is what tags a stranger.
    * @returns {string}
    */
   seedFor(token, network) {
@@ -678,9 +645,9 @@ export default class extends Controller {
     const posts = this.postTargets;
     if (posts.some((post) => !post.querySelector(BODY)?.value?.trim())) return false;
 
-    // ⚠️ It reads the count line of each post in place of counting again. That line belongs to the
-    // `social-post` controller, which writes it from the same `input` event: the field is the
-    // target of that event and this form is above it, thus the count is already up to date here.
+    // ⚠️ It reads the count line of each post in place of counting again. The `social-post`
+    // controller writes that line from the same `input` event, before the event reaches this
+    // form.
     if (posts.some((post) => post.querySelector(".social__count--over"))) return false;
 
     // A photo whose upload is still out has no id yet, and an alt text past its limit is refused
@@ -690,8 +657,7 @@ export default class extends Controller {
     if (!this.networks.some((box) => box.checked && !box.disabled)) return false;
 
     // ⚠️ The switch is on and the two fields name no moment, thus there is nothing to schedule.
-    // A moment that has **passed** is not this case: it is a complete answer, and it means "post
-    // now". `#submitLabel` reads the two the same way.
+    // A moment that has passed is not this case: it means "post now", as in `submitLabel`.
     return !(this.scheduleTarget.checked && !this.scheduledAt);
   }
 
@@ -732,8 +698,7 @@ export default class extends Controller {
    * Hides the row of each network that the owner did not tick.
    *
    * ⚠️ The action answers with every CONNECTED network, and the ticks decide what a post goes to.
-   * Thus this filter is what makes the panel show the draft as it will be sent, and it needs no
-   * request of its own.
+   * Thus this filter needs no request of its own.
    */
   filterPreview() {
     const wanted = this.networks.filter((box) => box.checked && !box.disabled)
@@ -751,20 +716,13 @@ export default class extends Controller {
   }
 
   /**
-   * Fills the preview panel with the draft as each network will receive it.
-   *
-   * ⚠️ The markup opens the dialog, thus this only fills it. It reads the draft AT THE CLICK, thus
-   * it needs no debounce and no `input` action: that is the difference from the link preview,
-   * which follows the typing.
+   * Fills the preview panel with the draft as each network will receive it. It reads the draft at
+   * the click, thus it needs no debounce.
    *
    * ⚠️ `FormData(this.element)` sends every field that a real submit sends, thus the request needs
-   * no list of the fields and cannot go out of date when one is added.
-   *
-   * ⚠️ **It sends the CSRF token in a header of its own.** The admin does not skip the forgery
-   * protection, thus this POST needs that token. The body of the form carries one as well, and the
-   * header does not depend on it: neither the test environment nor a page that a spec renders has
-   * a token at all, thus no spec here can prove that the body alone would pass. `lib/csrf.js`
-   * makes the header.
+   * no list of the fields.
+   * ⚠️ It sends the CSRF token in a header of its own, from `lib/csrf.js`. No spec can prove that
+   * the token in the body alone would pass, because the test environment has no token.
    */
   async preview() {
     this.previewBodyTarget.replaceChildren();
@@ -801,8 +759,8 @@ export default class extends Controller {
    * @param {object} draft The answer of the preview action.
    */
   showPreview(draft) {
-    // ⚠️ The Preview button is off for a draft with nothing in it, thus this is a fallback and not
-    // the ordinary path. It stays because a dialog that opens and stays blank says nothing at all.
+    // ⚠️ The Preview tab is off for a draft with nothing in it, thus this is a fallback: a panel
+    // that stays blank says nothing at all.
     const networks = draft?.networks ?? [];
     if (networks.length === 0) return this.showPreviewMessage("preview_empty");
 
@@ -881,17 +839,12 @@ export default class extends Controller {
   }
 
   /**
-   * Fills the website card of a post, or leaves it away.
+   * Fills the website card of a post, or leaves it away. `SocialPreview#card_json` answers this
+   * card and the one that `social-post#showPreview` writes below the link field.
    *
-   * ⚠️ It is the same shape that `social-post#showPreview` writes below the link field, because
-   * `SocialPreview#card_json` answers both. Thus the two cannot describe one page
-   * differently.
-   *
-   * ⚠️ **The two do NOT draw the same set of cards, on purpose.** This one is what the network will
-   * render, thus the action sends none for a page with no og: tags: Bluesky makes no embed from
-   * one. The card of the composer says which link the post CARRIES, thus it draws one for that
-   * same page, with the address in place of a title. The link is in the words of the Bluesky row,
-   * which this panel already shows.
+   * ⚠️ The two do NOT draw the same set of cards, on purpose. This one is what the network will
+   * render, thus the action sends none for a page with no og: tags. The card of the composer says
+   * which link the post carries, thus it draws one for that same page.
    * @param {HTMLElement} card The preview card of the post.
    * @param {object|null} link The website card, from the action.
    */
@@ -921,12 +874,10 @@ export default class extends Controller {
   /**
    * The text of one network, in pieces, with each link as a link.
    *
-   * ⚠️ **A Markdown link shows its WORDS and never its address**, thus the owner cannot check one
-   * without this: an `<a>` is the only thing that says where those words point. A bare URL that
-   * the owner pasted becomes a link at each of the three networks, and it is a link here as well.
-   *
+   * ⚠️ A Markdown link shows its words and never its address, thus an `<a>` is the only thing
+   * that says where those words point.
    * ⚠️ It writes each piece with `textContent` and `href`, and never with HTML. The action gives
-   * a `url` that is http or https and nothing else, thus no draft can make a `javascript:` link.
+   * a `url` that is http or https only, thus no draft can make a `javascript:` link.
    * @param {Array<{text: string, url?: string}>} segments
    * @returns {Node[]}
    */
@@ -937,7 +888,7 @@ export default class extends Controller {
       const link = document.createElement("a");
       link.href = segment.url;
       link.textContent = segment.text;
-      // ⚠️ The dialog holds the draft. A link that replaced this page would lose it.
+      // ⚠️ The page holds the draft. A link that replaced this page would lose it.
       link.target = "_blank";
       link.rel = "noopener noreferrer";
 
@@ -946,7 +897,7 @@ export default class extends Controller {
   }
 
   /**
-   * Writes one line in the dialog. ⚠️ A dialog that opens and stays empty says nothing at all.
+   * Writes one line in the preview panel. ⚠️ A panel that stays empty says nothing at all.
    * @param {string} key A key below `admin.js.social`.
    */
   showPreviewMessage(key) {
@@ -967,9 +918,9 @@ export default class extends Controller {
   /**
    * Makes the submit button busy.
    *
-   * ⚠️ This is on the `submit` of the form, and not on the `click` of the button. A click happens
-   * **before** the browser checks the fields. Thus on a form that is not complete the submit never
-   * happens and the button spins for ever.
+   * ⚠️ This is on the `submit` of the form, and not on the `click` of the button. A click comes
+   * before the browser checks the fields, and on a form that is not complete the button would
+   * then spin for all time.
    */
   markBusy() {
     this.submitTarget.loading = true;
@@ -977,7 +928,7 @@ export default class extends Controller {
 
   /**
    * The moment that the two fields name, for the label of the button.
-   * @returns {string|null} A short local date and time, or null when a field is empty.
+   * @returns {Date|null} The moment, or null when a field is empty or cannot be read.
    */
   get scheduledAt() {
     const date = this.dateTarget.value;

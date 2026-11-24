@@ -1,10 +1,8 @@
 # The AT Protocol plumbing that each PDS client here shares: the session, the record writes, and
 # the image blobs.
 #
-# ⚠️ `StandardSite` and `Bluesky` both talk to the **same** PDS with the **same** credentials, from
-# `BlueskyCredentials`. Thus the session belongs in one place. Two copies would need two edits when
-# the account, the endpoint, or the authentication changes, and a copy that a person forgets fails
-# only at the next publish.
+# ⚠️ `StandardSite` and `Bluesky` both talk to the same PDS with the same credentials, from
+# `BlueskyCredentials`. Thus the session belongs in one place.
 #
 # An includer must define `at_proto_label`, which names it in each log line and each error report.
 # It must also inherit `ApplicationService`, for `report_upstream_error`.
@@ -41,8 +39,8 @@ module AtProto
   # The PDS refused the token. The caller opens a new session and does the request one time more.
   class UnauthorizedError < StandardError; end
 
-  # The PDS takes no more writes for now. It carries the moment that it takes them again, thus a job
-  # waits that long and not a time that somebody guessed.
+  # The PDS takes no more writes for now. It carries the seconds to wait, thus a job waits that
+  # long.
   class RateLimitedError < StandardError
     # @return [Integer] The seconds to wait.
     attr_reader :retry_after
@@ -74,10 +72,9 @@ module AtProto
 
   # The seconds that a record write or a record read can take.
   #
-  # ⚠️ **Each call of this file needs a timeout.** `Bluesky#card_image` and `#build_card` also run
-  # in the request of `/social/preview`, which has a 20-second rack-timeout, and
-  # `Rack::Timeout::RequestTimeoutException` is not a `StandardError`. Thus a host that hangs gives
-  # a 500 in place of a card with no picture, and no rescue here can catch it.
+  # ⚠️ Each call of this file needs a timeout. `Bluesky#card_image` and `#build_card` also run in
+  # the request of `/social/preview`, which has a 20-second rack-timeout, and no rescue here
+  # catches that exception.
   REQUEST_TIMEOUT = 15
 
   # The seconds that one blob upload can take. It is longer, because a blob is as much as 1MB.
@@ -88,9 +85,8 @@ module AtProto
   MAX_SOURCE_IMAGE_BYTES = 10 * 1024 * 1024
 
   # The steps of the shrink, in order. ⚠️ One shrink is not always enough: a picture at 1200px and
-  # Q80 can stay above a limit, and the record then lost its picture. This walks down the steps and
-  # takes the first result that fits. It makes the quality lower first, because a person sees a
-  # smaller picture before they see a lower quality.
+  # Q80 can stay above a limit. The code takes the first result that fits. It makes the quality
+  # lower first, because a person sees a smaller picture before they see a lower quality.
   SHRINK_STEPS = [
     { width: 1200, quality: 80 },
     { width: 1200, quality: 65 },
@@ -101,8 +97,6 @@ module AtProto
 
   class_methods do
     # Encodes a 64-bit value as a 13-character TID.
-    # @param value [Integer]
-    # @return [String]
     def encode_tid(value)
       encoded = +""
       while value.positive?
@@ -117,14 +111,11 @@ module AtProto
     # @return [Time, nil] The time, or nil for a value with another shape.
     def tid_time(tid)
       # 13 characters of base32 hold 65 bits and a TID holds 64 with its high bit zero, thus the
-      # value is below 2**63 and the first character is one of the first EIGHT of the alphabet. A
-      # string of 13 characters of the alphabet that fails that is not a TID.
+      # first character is one of the first EIGHT of the alphabet.
       #
       # ⚠️ It does NOT tell a time-ordered key from a content-addressed one. `StandardSite.tid`
-      # keeps the low 63 bits of a digest, thus its high bit is zero also and it gives a Time here
-      # that means nothing. A measurement gave the first eight characters for each of 20,000 keys.
-      # No caller gives a standard.site key to this method today; do not make one, because no check
-      # here can find it.
+      # keeps the low 63 bits of a digest, thus it passes this check and gives a Time that means
+      # nothing. Do not give a standard.site key to this method.
       return unless tid.to_s.match?(/\A[#{TID_ALPHABET[0, 8]}][#{TID_ALPHABET}]{12}\z/)
 
       value = tid.each_char.reduce(0) { |acc, char| (acc * 32) + TID_ALPHABET.index(char) }
@@ -133,18 +124,16 @@ module AtProto
 
     # Makes a record key for a new record, from the current time.
     #
-    # ⚠️ The caller makes this **before** it adds a job, and the job then uses `putRecord`. Thus a
-    # second attempt writes the same record again at the same key, and it does not add a second
-    # post. `createRecord` makes its own key, thus each retry there is a new post.
+    # ⚠️ The caller makes this before it adds a job, and the job then uses `putRecord`. Thus a
+    # second attempt writes the same record again and does not add a second post.
     #
     # The shape is the shape of a TID: a zero bit, 53 bits of microseconds, and 10 bits of a random
     # clock id. Thus a later record sorts after an earlier one, which is what a feed needs.
     # @return [String] A 13-character TID.
     def new_tid
       # ⚠️ It is MONOTONIC, and the clock alone is not. The caller makes one key for each post of a
-      # thread in one loop, thus two calls land in the same microsecond. The 10 low bits are
-      # random, thus the keys of a thread would then sort in a random order and a reply could come
-      # above its own root. This gives the next microsecond in place of a repeat.
+      # thread in one loop, thus two calls can land in the same microsecond. The low bits are
+      # random, thus a reply could then sort above its own root.
       TID_LOCK.synchronize do
         micros = (Time.now.to_r * 1_000_000).to_i & ((1 << 53) - 1)
         @last_tid_micros = @last_tid_micros.to_i >= micros ? @last_tid_micros + 1 : micros
@@ -160,21 +149,15 @@ module AtProto
     @pds_url ||= (ENV["BLUESKY_PDS_URL"].presence || DEFAULT_PDS_URL).chomp("/")
   end
 
-  # Opens a session with the PDS and finds the service endpoint of the repo.
-  #
-  # It sets `@access_jwt`, `@did`, and `@service_url`. The caller checks the return value before it
-  # writes anything.
-  # @param handle [String]
-  # @param app_password [String]
+  # Opens a session with the PDS and finds the service endpoint of the repo. It sets
+  # `@access_jwt`, `@did`, and `@service_url`.
   # @return [Boolean] True when a session is available.
   def open_session(handle:, app_password:)
     @session_handle = handle
     @session_password = app_password
 
-    # ⚠️ `com.atproto.server.createSession` permits 30 calls each 5 minutes and 300 each day, FOR
-    # EACH ACCOUNT. One job posts one post of a thread, thus a thread of 25 posts made 25 sessions
-    # before its first retry, and a bulk publish adds more. A 429 there reads as "Could not open a
-    # Bluesky session" and then tries again for 24 hours.
+    # ⚠️ `com.atproto.server.createSession` permits 30 calls each 5 minutes and 300 each day, for
+    # each account. One job posts one post of a thread, thus the jobs must share a session.
     return true if load_cached_session
 
     open_new_session
@@ -183,8 +166,7 @@ module AtProto
   # Removes the session that the cache holds and opens a new one.
   #
   # ⚠️ This is what makes the cache safe. A token can stop working before its key expires: a person
-  # can revoke it, or change the app password. Without this, each request for the rest of the TTL
-  # fails against the same dead token.
+  # can revoke it, or change the app password.
   # @return [Boolean] True when a session is available.
   def renew_session!
     $redis.del(session_cache_key)
@@ -230,13 +212,11 @@ module AtProto
   end
 
   # Opens a new session with the PDS and finds the service endpoint of the repo. It is the half of
-  # `#open_session` that makes a request, thus a caller that has an empty cache comes here.
+  # `#open_session` that makes a request.
   #
-  # ⚠️ **Do not give this method a name that an includer also uses.** `StandardSite` has its own
-  # `create_session`, which calls `open_session`. With this method named `create_session`, Ruby sent
-  # the call above to that copy, which called `open_session` again: the pair made a loop with no end
-  # and each cold cache gave a `SystemStackError`. The specs of `StandardSite` each replace
-  # `create_session`, thus no example found it.
+  # ⚠️ Do not give this method a name that an includer also uses. `StandardSite` has its own
+  # `create_session`, which calls `open_session`: with that name here, the two call each other
+  # with no end. The specs of `StandardSite` replace `create_session`, thus no example finds it.
   # @return [Boolean] True when a session is available.
   def open_new_session
     handle = @session_handle
@@ -281,13 +261,10 @@ module AtProto
 
   # Makes a 429 into an error that holds the time to wait.
   #
-  # ⚠️ Without this a 429 went through `unless response.success?`, which reports an upstream error
-  # and answers nil. `#do_sync_document` then wrote "putRecord failed" to the log and the job ENDED
-  # WITH NO ERROR, thus Sidekiq did it no more times and the record never reached the PDS.
+  # ⚠️ Without this a 429 goes through `unless response.success?`, which answers nil. The job
+  # then ends with no error, Sidekiq does not run it again, and the record never reaches the PDS.
   #
-  # The PDS sends `ratelimit-reset` as a unix time. Thus a job waits the correct time, and it does
-  # not use its attempts against a limit that is still there.
-  # @param response [HTTParty::Response] The response.
+  # The PDS sends `ratelimit-reset` as a unix time.
   # @param doing [String] The operation, for the message.
   # @return [void]
   # @raise [RateLimitedError] For a 429.
@@ -310,12 +287,10 @@ module AtProto
 
   # Makes or replaces a record. The repo, the collection, and the rkey identify it, thus you can do
   # this more than one time and get one record.
+  #
+  # ⚠️ It answers with the reference of the record and not with a Boolean, because a reply names
+  # its parent by `uri` and `cid`, and an `at://` URI holds no CID.
   # @param collection [String] The lexicon id.
-  # @param rkey [String] The record key.
-  # @param record [Hash] The record.
-  # ⚠️ It answers with the **reference** of the record and not with a Boolean, because a reply
-  # names its parent by `uri` **and** `cid`, and an `at://` URI holds no CID. Each caller that only
-  # asks "did it work" still reads it correctly: a Hash is truthy and nil is not.
   # @param validate [Boolean, nil] False where the PDS does not know the lexicon. Nil omits it.
   # @return [Hash, nil] `{ "uri" =>, "cid" => }`, or nil after a failure.
   def put_record(collection, rkey, record, validate: false)
@@ -357,11 +332,7 @@ module AtProto
   # Removes a record. A record that is absent is not an error, thus you can do this more than one
   # time.
   #
-  # ⚠️ It lives here and not in `StandardSite`, where it was, for the three things that a copy there
-  # did not have: a timeout, the retry after a refused token, and a rescue. Each write of this file
-  # needs all three.
-  # @param collection [String] The lexicon id.
-  # @param rkey [String] The record key.
+  # ⚠️ Each write of this file needs a timeout, the retry after a refused token, and a rescue.
   # @return [Boolean] Whether it succeeded.
   def delete_record(collection, rkey)
     with_valid_session { delete_record_once(collection, rkey) } || false
@@ -404,8 +375,7 @@ module AtProto
   MAX_LIST_PAGES = 200
 
   # Each record key of a collection of this repo.
-  # @param collection [String] The collection to list.
-  # @return [Array<String>] The rkeys. One page comes at a time, through the cursor.
+  # @return [Array<String>]
   def list_record_rkeys(collection)
     rkeys = []
     cursor = nil
@@ -476,9 +446,8 @@ module AtProto
 
   # Reads one record and makes a `com.atproto.repo.strongRef` of it.
   #
-  # ⚠️ A strongRef needs the **CID**, and an `at://` URI does not hold one. Thus the only way to
-  # make one is to read the record. The CID also changes at each write, thus this cannot be cached
-  # for a long time: a ref with an old CID names a version that is gone.
+  # ⚠️ A strongRef needs the CID, and an `at://` URI does not hold one, thus the code must read
+  # the record. The CID changes at each write, thus do not cache this for a long time.
   # @param uri [String] An at:// URI.
   # @return [Hash, nil] `{ "uri" =>, "cid" => }`, or nil when the record cannot be read.
   def strong_ref(uri)
@@ -501,10 +470,8 @@ module AtProto
 
   # The host that holds a repo.
   #
-  # ⚠️ A PDS answers `getRecord` for its **own** repos only. Thus a DID that is not ours needs its
-  # DID document first. `did:plc` resolves at the directory, and each other method gives nil, thus
-  # the caller then makes no ref and the card is an ordinary one.
-  # @param did [String]
+  # ⚠️ A PDS answers `getRecord` for its own repos only, thus a DID that is not ours needs its DID
+  # document first. `did:plc` resolves at the directory, and each other method gives nil.
   # @return [String, nil]
   def service_for(did)
     return @service_url if did == @did && @service_url.present?
@@ -549,14 +516,11 @@ module AtProto
     nil
   end
 
-  # Downloads a smaller copy of a **Contentful** image and uploads it as a blob.
+  # Downloads a smaller copy of a Contentful image and uploads it as a blob.
   #
   # ⚠️ `StandardSite` uses this, and `Bluesky` does not: a social card takes its picture from the
   # og:image of any URL, which is not always a Contentful asset.
-  # @param url [String] The source image.
   # @param content_type [String, nil] The content type of the source.
-  # @param w [Integer] The width to ask for.
-  # @param h [Integer] The height to ask for.
   # @param limit [Integer] The most bytes that the blob can hold.
   # @return [Hash, nil] The blob, or nil after a failure.
   def upload_image_blob(url, content_type, w:, h:, limit:)
@@ -564,9 +528,9 @@ module AtProto
     bytes, mime = fetch_resized_image(url, content_type, w: w, h: h)
     return if bytes.blank?
 
-    # ⚠️ The transformation of the source asks for a size and never promises one in bytes. A
-    # picture with much detail comes back above the limit, the PDS refuses the record, and the job
-    # then tries again for 24 hours for a reason that cannot change. Thus the shrink is here.
+    # ⚠️ The transformation of the source asks for a size and never promises one in bytes. The
+    # PDS refuses a record with a blob above the limit, and that failure does not change at a
+    # retry. Thus the shrink is here.
     bytes, mime = shrink_image(bytes, limit: limit) if bytes.bytesize > limit
     return if bytes.blank? || bytes.bytesize > limit
 
@@ -600,9 +564,9 @@ module AtProto
     [ nil, nil ]
   end
 
-  # Gets a smaller image as raw bytes from the Contentful Images API. This keeps each blob below
-  # 1MB. A direct request to Contentful is satisfactory here, because this runs only when a person
-  # publishes or shares a post.
+  # Gets a smaller image as raw bytes from the Contentful Images API. A direct request to
+  # Contentful is satisfactory here, because this runs only when a person publishes or shares a
+  # post.
   # @return [Array(String, String), nil] [bytes, mime_type], or nil after a failure.
   def fetch_resized_image(url, content_type, w:, h:)
     return if url.blank?
@@ -626,9 +590,7 @@ module AtProto
   end
 
   # Cuts a string to a number of grapheme clusters. Each text field of a record has a limit in
-  # graphemes, and `String#length` counts UTF-16 code units.
-  # @param str [String, nil]
-  # @param max [Integer]
+  # graphemes, and `String#length` counts code points.
   # @return [String, nil] The string, made shorter.
   def truncate_graphemes(str, max)
     return str if str.blank?

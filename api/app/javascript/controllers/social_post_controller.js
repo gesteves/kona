@@ -27,13 +27,13 @@ const PHOTO = "[data-social-post-target='photo']";
 /**
  * One post of the thread: its character count, the preview of its link, and its photos.
  *
- * ⚠️ Each block is its own controller, and the outer `social` controller never reaches into it.
- * One controller for each block is what keeps the count and the preview of one post away from the
- * others; a flat list of targets on the outer controller would need an index at every call.
+ * ⚠️ Each block is its own controller, thus the count and the preview of one post stay away
+ * from the others and no call needs an index. The outer `social` controller reads the state
+ * classes that this one writes.
  *
- * ⚠️ **The link and the photos are ONE state machine**, and that is why the photos are here and
- * not in a controller of their own: a post takes photos OR a link, because Bluesky renders one
- * embed. Each button of the toolbar is disabled while the other attachment has a value.
+ * ⚠️ The link and the photos are ONE state machine: a post takes photos OR a link, because
+ * Bluesky renders one embed. Each button of the toolbar is disabled while the other attachment
+ * has a value.
  */
 export default class extends Controller {
   static targets = [
@@ -102,10 +102,7 @@ export default class extends Controller {
 
   /**
    * Opens the link field: the button of the toolbar asks for a link, and Edit in the footer of the
-   * card takes the owner back to the one that the post carries.
-   *
-   * ⚠️ The button of the toolbar is disabled by then. There is one link for each post, thus "add a
-   * link" has no meaning while one is being written or is already attached.
+   * card goes back to the one that the post carries.
    */
   showLink() {
     this.setLinkState(EDITING);
@@ -115,14 +112,12 @@ export default class extends Controller {
   /**
    * Reads the card at once, when the field loses the focus.
    *
-   * ⚠️ **This is what closes the round trip of the Edit control.** That control opens the field
-   * with a URL already in it, thus a person who changes nothing fires no `input` and no `change`,
-   * and the card would never come back. It is nearly always a Redis hit: `OpenGraph` caches each
-   * page for 15 minutes.
-   *
-   * ⚠️ It runs for the X of the field as well, because a click blurs before it fires. That read
-   * takes the next sequence number and `removeLink` takes the one after it, thus the answer of the
-   * blur cannot draw the card of a link that the click removed.
+   * ⚠️ This is what closes the round trip of the Edit control. That control opens the field with
+   * a URL already in it, thus a person who changes nothing fires no `input`, and the card would
+   * never come back.
+   * ⚠️ It runs for the X of the field as well, because a click blurs before it fires. `removeLink`
+   * takes the sequence number after this read, thus the answer of the blur cannot draw the card
+   * of a link that the click removed.
    */
   commitLink() {
     clearTimeout(this.previewTimer);
@@ -130,14 +125,11 @@ export default class extends Controller {
   }
 
   /**
-   * Takes the link off the post and goes back to the button of the toolbar.
+   * Takes the link off the post and goes back to the button of the toolbar. The X of the card,
+   * the X inside the field, and the Escape key in that field all call this.
    *
-   * ⚠️ **Three controls call this**: the X in the corner of the card, the X inside the field, and
-   * the Escape key in that field. EDITING has its own way out because the card cannot give it one:
-   * a field that the owner opened and left empty never becomes a card.
-   *
-   * ⚠️ It clears the value and does not only close the field. The field IS the link, thus a field
-   * that closes with a value in it would still send that value with the form.
+   * ⚠️ It clears the value and does not only close the field. A field that closes with a value
+   * in it would still send that value with the form.
    */
   removeLink() {
     this.linkTarget.value = "";
@@ -151,22 +143,14 @@ export default class extends Controller {
 
   /**
    * Shows the one control of each state, and disables each button of the toolbar that can do
-   * nothing now.
+   * nothing now. The server renders the same states.
    *
-   * ⚠️ The link field and the card take turns, and each one carries an X that goes back to IDLE.
-   * The picker works the same way: the photo button opens it, and its X closes it while it holds
-   * no photo.
-   *
-   * ⚠️ **A post takes photos OR a link.** Thus each button of the toolbar is off while the other
-   * attachment is open, and off outside its own IDLE state. The server renders the same states,
-   * thus a page that renders again after a refusal shows them before this runs.
-   *
-   * ⚠️ **A button is DISABLED and never hidden.** It is a form control and it is taller than the
-   * count beside it, thus a button that goes away takes the height of the toolbar with it and the
-   * count moves up at the click that opened the field.
-   *
-   * ⚠️ The file input is disabled at the most photos, and the X of the picker shows only while
-   * the picker holds none: a picker that closes with tiles in it would still send them.
+   * ⚠️ A post takes photos OR a link. Thus each button of the toolbar is off while the other
+   * attachment is open, and off outside its own IDLE state.
+   * ⚠️ A button is DISABLED and never hidden. A button that goes away takes the height of the
+   * toolbar with it, and the count then moves.
+   * ⚠️ The X of the picker shows only while the picker holds no photo: a picker that closes with
+   * tiles in it would still send them.
    */
   renderAttachmentState() {
     const photos = this.photoCount;
@@ -181,9 +165,7 @@ export default class extends Controller {
     this.previewTarget.hidden = this.linkState !== ATTACHED;
   }
 
-  /**
-   * @param {string} state
-   */
+  /** @param {string} state One of IDLE, EDITING, and ATTACHED. */
   setLinkState(state) {
     this.linkState = state;
     this.renderAttachmentState();
@@ -283,9 +265,8 @@ export default class extends Controller {
   /**
    * Moves the tile that the pointer holds to where the pointer is.
    *
-   * ⚠️ It moves the tile itself and it never rewrites a field. The names carry no index, thus
-   * **the order of the tiles in the document IS the order of the photos**, and moving one is the
-   * whole change.
+   * ⚠️ It moves the tile itself and it never rewrites a field. The field names have no index,
+   * thus the order of the tiles in the document IS the order of the photos.
    */
   dragOverPhoto(event) {
     if (!this.draggedPhoto) return;
@@ -401,9 +382,8 @@ export default class extends Controller {
    * The Bluesky field of each mention of the draft, by key.
    *
    * ⚠️ It is a plain data attribute and NOT a Stimulus value. A value arrives through a
-   * MutationObserver, thus it is not synchronous, and `social#canPost` reads the count line that
-   * this controller writes. The submit button would then follow the keystroke before the current
-   * one. `social#pushMentions` writes this attribute and calls `count()` at once.
+   * MutationObserver, which is not synchronous, and `social#canPost` reads the count line at
+   * once. `social#pushMentions` writes this attribute and then calls `count()`.
    * @returns {Object<string, string>}
    */
   get blueskyMentions() {
@@ -417,25 +397,15 @@ export default class extends Controller {
   /**
    * Writes the length of the body against the limit, and colors that line.
    *
-   * ⚠️ It counts the text that **Bluesky** will get, and not the words that the owner can see. Two
-   * things make those different. A mention grows into a handle, thus "@tony" can become
-   * "@tony.bsky.social". And a Markdown link keeps its address in a facet, thus
-   * "[my post](https://example.com/a)" is 7 characters and not 30.
-   * `SocialDraftValidator#post_error` and `Bluesky.post_length` measure the same string.
+   * ⚠️ It counts the text that BLUESKY will get, and not the words that the owner sees. A mention
+   * grows into a handle, a Markdown link keeps its address in a facet, and the typography makes
+   * `...` and `--` one character each. `SocialDraftValidator#post_error` measures the same string.
    *
-   * And the typography shortens the words: `...` becomes one character and `--` becomes one.
+   * ⚠️ The steps are in THIS ORDER, as they are on the server: the mentions, the typography, the
+   * link, then the Markdown. Refer to `SocialDraft#text_for`.
    *
-   * ⚠️ The three steps are in THIS ORDER, as they are on the server: the mentions, then the
-   * typography, then the Markdown. A handle can hold no bracket and no dash pair, thus no step can
-   * make work for the step below it.
-   *
-   * ⚠️ `applyLengthRules` writes NO quotation mark, and that is correct: a curly quotation mark is
-   * one character in place of one, thus it cannot change a count. Refer to that file.
-   *
-   * ⚠️ **The LINK is part of this count when the page it names gives no card.** Bluesky then makes
-   * no embed and the link goes in the words, thus it uses characters.
-   * `SocialDraft#bluesky_text` composes the same string on the server. The link goes in
-   * between the typography and the Markdown, exactly as it does there.
+   * ⚠️ The link is part of this count when the page that it names gives no card. Bluesky then
+   * makes no embed and the link goes in the words. Refer to `SocialDraft#bluesky_text`.
    */
   count() {
     const body = applyLengthRules(blueskyText(this.bodyTarget.value ?? "", this.blueskyMentions));
@@ -472,10 +442,8 @@ export default class extends Controller {
   /**
    * The length of a string in graphemes, which is how Bluesky counts.
    *
-   * ⚠️ `String#length` gives UTF-16 code units, thus one emoji counts as 2 or more there and as 1
-   * at Bluesky. The spread is the fallback: it splits by code point, which is correct for an emoji
-   * with one code point and not for a family or a flag.
-   * @param {string} text
+   * ⚠️ `String#length` gives UTF-16 code units, thus one emoji counts as 2 or more there. The
+   * spread is the fallback: it splits by code point, which is not correct for a family or a flag.
    * @returns {number}
    */
   graphemes(text) {
@@ -488,10 +456,9 @@ export default class extends Controller {
   /**
    * Adds the link below the words when that link goes in the post.
    *
-   * ⚠️ It is false until the preview answers, thus the first count of a page that renders again
-   * with a draft in it can be short by the length of a link. `connect()` reads the card at once and
-   * writes the count again, and `SocialPresenter#bluesky_length` makes no request at all.
-   * @param {string} text
+   * ⚠️ `linkInText` is false until the preview answers, thus the first count of a page that
+   * renders again with a draft can be short by the length of a link. `connect()` reads the card
+   * at once and writes the count again.
    * @returns {string}
    */
   withLink(text) {
@@ -501,10 +468,8 @@ export default class extends Controller {
   }
 
   /**
-   * Waits for the typing to stop, then reads the card.
-   *
-   * ⚠️ Each preview is one request of this app, which then reads the page. Thus it waits, and it
-   * does not read at each keystroke.
+   * Waits for the typing to stop, then reads the card. Each preview is one request of this app,
+   * which then reads the page.
    */
   schedulePreview() {
     clearTimeout(this.previewTimer);
@@ -599,12 +564,9 @@ export default class extends Controller {
    * Takes the card away, for an empty field and for a request that failed.
    *
    * ⚠️ It puts the FIELD back for a card that went away, thus the owner can correct a link that
-   * this app could not read. A field that is still being typed stays as it is, and the X of the
-   * card is the only way back to the button.
-   *
-   * ⚠️ It also takes the link out of the count. The action answers with a card for each http URL,
-   * even for a page that it could not read, thus this path means "there is no link here" or "we do
-   * not know yet", and neither one may count characters that the post may not hold.
+   * this app could not read.
+   * ⚠️ It also takes the link out of the count. This path means "there is no link here" or "we
+   * do not know yet", and neither one may count characters that the post may not hold.
    */
   hidePreview() {
     this.dropCardImage();

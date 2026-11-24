@@ -1,18 +1,12 @@
 module Widgets
-  # The current-weather widget in the static site. It finds the current location of the owner, gets
-  # the weather, the air quality, the pollen, the bay data, and the race data, and renders the
-  # summary fragment. It renders an empty body when the weather is not available or is old. The
-  # cache holds it for five minutes.
-  # The race-day weather of each event is now in Widgets::EventsController, which renders it with
-  # the featured upcoming race.
+  # The current-weather widget in the static site. The cache holds it for five minutes. The
+  # race-day weather of an event is in Widgets::EventsController.
   class WeatherController < BaseController
     include ParallelUpstreams
 
-    # Renders the markup of the current-weather widget for the static site. It finds the current
-    # location of the owner, gets the weather, the air quality, the pollen, the bay data, and the
-    # race data, and renders the summary. It renders an empty body when the weather is not available
-    # or is old, and the live-update controller then removes the placeholder and the widget goes
-    # away. The view reads each value through @summary.
+    # Finds the current location of the owner, gets the weather, the air quality, the pollen, the
+    # bay data, and the race data, and renders the summary. It renders an empty body when the
+    # weather is not available or is old. The view reads each value through @summary.
     def current
       cache_widget(ttl: 5.minutes)
 

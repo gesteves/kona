@@ -176,20 +176,23 @@ Rails.application.routes.draw do
       get  "social" => "social#show", as: :social
       post "social" => "social#create"
 
-      # The preview of the link that the owner pasted. ⚠️ `social/preview/image` must stay above
-      # `social/preview`, or Rails reads it as part of that path.
-      # The image is a proxy, and not a link to the other host: the CSP of the admin has
-      # `img-src :self`. Refer to **The Social media page** in CLAUDE.md.
-      # ⚠️ It is a POST, and not a GET: a draft is much larger than a query string should carry.
+      # ⚠️ Each route below must stay above `social/preview`, or Rails reads it as part of that
+      # path.
+
       # The photos of a draft. The composer uploads each one at the moment the owner picks it, and
-      # the form then carries the id. ⚠️ Both stay above `social/preview` for the same reason as
-      # the image path below.
+      # the form then carries the id.
       post "social/photos"     => "social_photos#create", as: :social_photos
       get  "social/photos/:id" => "social_photos#show",   as: :social_photo, constraints: { id: /\h{32}/ }
       # The alt text of one photo, from Claude. The Generate control of a tile posts here.
       post "social/photos/:id/alt" => "social_photos#alt", as: :social_photo_alt, constraints: { id: /\h{32}/ }
+
+      # The text of each post as each network gets it.
+      # ⚠️ It is a POST, and not a GET: a draft is much larger than a query string should carry.
       post "social/preview/text"  => "social#preview_text",  as: :social_preview_text
+      # The picture of the link card. It is a proxy, and not a link to the other host: the CSP of
+      # the admin has `img-src :self`. Refer to **The Social media page** in CLAUDE.md.
       get "social/preview/image" => "social#preview_image", as: :social_preview_image
+      # The card of the link that the owner pasted.
       get "social/preview"       => "social#preview",       as: :social_preview
 
       # The Contentful tools of the admin. Today there is one: the media uploader, which puts an

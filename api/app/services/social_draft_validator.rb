@@ -7,8 +7,7 @@
 # that. A control that a browser cannot use, a request that a person writes by hand can.
 class SocialDraftValidator
   # The most Bluesky handles that one draft asks the PDS about, and the seconds that all of those
-  # calls together can take. ⚠️ Refer to #bluesky_handle_error: the budget, and not the timeout of
-  # one call, is what keeps this check away from the 20-second rack-timeout.
+  # calls together can take. Refer to #bluesky_handle_error.
   MAX_HANDLE_CHECKS = 8
   HANDLE_CHECK_BUDGET = 8
 
@@ -49,28 +48,20 @@ class SocialDraftValidator
   delegate :posts, :selected_networks, to: :draft, private: true
 
   # @param key [String] The name of a message below `admin.social.errors`.
-  # @return [String]
   def t(key, **options) = I18n.t("admin.social.errors.#{key}", **options)
 
-  # ⚠️ A message names the post, because a thread has more than one and a plain message does not
-  # say which one is wrong.
-  # @param post [Hash]
-  # @param index [Integer]
+  # ⚠️ A message names the post, because a thread has more than one.
   # @return [String, nil]
   def post_error(post, index)
-    # ⚠️ Every post needs words. Each of the three networks refuses a body that is empty, thus a
-    # link with no words is not a post.
+    # ⚠️ Every post needs words: each of the three networks refuses an empty body.
     return post_message("text_missing", index) if post[:text].blank?
 
-    # ⚠️ It counts the text that BLUESKY will get, and not the words that the owner can see: a
-    # mention grows into a handle, thus "@tony" can become "@tony.bsky.social". A count of the raw
-    # words would pass a draft that Bluesky then refuses. The message says what it counted.
-    # ⚠️ It counts the Bluesky text even when Bluesky is not ticked. 300 is the limit of the page,
-    # and this check runs before the check of the ticked networks.
-    # ⚠️ It counts the LINK as well, but only when that link goes in the words: a page with no
-    # og: tags gets no embed. Refer to `SocialDraft#bluesky_text`. Without this the job composes a
-    # longer string than this check measured, `Bluesky#post!` raises, and it retries for 24 hours.
-    # #too_long_key selects the message.
+    # ⚠️ It counts the text that BLUESKY will get, and not the words that the owner sees: a mention
+    # grows into a handle. It does this even when Bluesky is not ticked, because 300 is the limit
+    # of the page.
+    # ⚠️ It counts the link as well, when that link goes in the words. Without this the job
+    # composes a longer string than this check measured, and `Bluesky#post!` raises for 24 hours.
+    # Refer to `SocialDraft#bluesky_text`.
     substituted = draft.mentioned("bluesky", post[:text])
     counted = draft.bluesky_text(post)
     unless Bluesky.valid_post_length?(counted)
@@ -89,12 +80,9 @@ class SocialDraftValidator
 
   # Refuses the photos of one post that Bluesky cannot take.
   #
-  # ⚠️ **A post takes photos OR a link.** Bluesky renders one embed, thus the composer disables
-  # the one button while the other has a value, and this refuses a request that sends both.
+  # ⚠️ A post takes photos OR a link, because Bluesky renders one embed.
   # ⚠️ A photo that is gone is one that the 24-hour draft TTL removed. Without this check the job
   # would fail the post after the owner left the page.
-  # @param post [Hash]
-  # @param index [Integer]
   # @return [String, nil]
   def photo_error(post, index)
     photos = post[:photos]
@@ -120,10 +108,9 @@ class SocialDraftValidator
 
   # Which "that post is too long" message names the reason.
   #
-  # ⚠️ **The MENTIONS and the LINK decide it, and the typography never does.** The typography runs
-  # on every draft, thus a count of the finished text would say "with the Bluesky handles" for a
-  # post that names nobody.
-  # @param post [Hash]
+  # ⚠️ The mentions and the link decide it, and the typography never does. The typography runs on
+  # every draft, thus a count of the finished text would blame the handles for a post that names
+  # nobody.
   # @param substituted [String] The text with the mentions in place and no typography.
   # @return [String] The name of the message below `admin.social.errors`.
   def too_long_key(post, substituted)
@@ -134,9 +121,8 @@ class SocialDraftValidator
 
   # One message about one post.
   #
-  # ⚠️ Each form is a COMPLETE sentence in the locale file, and this method selects one. It does
-  # not join a label to a fragment: a draft of one post says "That post", and a thread names the
-  # post by its number.
+  # ⚠️ Each form is a complete sentence in the locale file, and this method selects one: a draft
+  # of one post says "That post", and a thread names the post by its number.
   # @param key [String] The name of the message below `admin.social.errors`.
   # @param index [Integer] The index of the post, counted from zero.
   # @param options [Hash] Each interpolation that the message needs.
@@ -148,11 +134,8 @@ class SocialDraftValidator
 
   # Checks the text of the other two networks against their own limits.
   #
-  # ⚠️ Bluesky has the shortest limit, thus the check above nearly always refuses a long draft
-  # first. But a mention makes the text of each network a DIFFERENT length, and a plain name can
-  # be much longer than a handle. Without this check such a draft raises in the job.
-  # @param post [Hash]
-  # @param index [Integer]
+  # ⚠️ Bluesky has the shortest limit, but a mention makes the text of each network a different
+  # length, and a plain name can be much longer than a handle.
   # @return [String, nil]
   def network_length_error(post, index)
     return post_message("too_long_mastodon", index) if draft.over_limit?("mastodon", post)
@@ -161,10 +144,8 @@ class SocialDraftValidator
     post_message("too_long_threads", index)
   end
 
-  # Refuses a draft with a Markdown link that goes to a network with no rich text.
-  #
-  # ⚠️ Without this the post would reach a reader as `[my post](https://…)`, with the address in
-  # the words.
+  # Refuses a draft with a Markdown link that goes to a network with no rich text. The post would
+  # reach a reader there as `[my post](https://…)`.
   # @return [String, nil]
   def markdown_network_error
     return nil unless draft.markdown?
@@ -184,14 +165,11 @@ class SocialDraftValidator
     t("photos_network", networks: draft.names_of(refused))
   end
 
-  # Refuses a topic that Meta will not take.
+  # Refuses a topic that Meta will not take. Without this, `ThreadsPostJob` retries a draft that
+  # can never work.
   #
-  # ⚠️ **It reads the ticked networks only.** The field stays in the form while the Threads row is
-  # not ticked, thus a value that the owner left there must not refuse a draft that goes nowhere
-  # near Threads.
-  #
-  # ⚠️ Without this the container is refused at Meta, and `ThreadsPostJob` then retries a draft
-  # that can never work.
+  # ⚠️ It reads the ticked networks only. The field stays in the form while the Threads row is not
+  # ticked, and a value that the owner left there must not refuse the draft.
   # @return [String, nil]
   def topic_error
     return nil unless selected_networks.include?(SocialPresenter::TOPIC_NETWORK)
@@ -200,16 +178,11 @@ class SocialDraftValidator
     t("bad_topic", limit: Threads::TOPIC_MAX_CHARACTERS)
   end
 
-  # Refuses a field that holds the handle of a DIFFERENT network.
+  # Refuses a field that holds the handle of a DIFFERENT network. Without this such a value
+  # becomes plain words with no message, and each "@" comes out of the middle of it.
   #
-  # ⚠️ Without this such a value is mangled with no message: a Mastodon handle is not a Bluesky
-  # domain, thus it becomes plain words and every "@" comes out of the middle of it.
-  #
-  # ⚠️ It reads the ticked networks only. A field of a network that this draft does not post to
-  # changes nothing, and a refusal for one would stop a draft that is correct.
-  #
-  # ⚠️ Plain words are never a mistake here. `SocialMentions::DIAGNOSTIC_SHAPES` holds Bluesky and
-  # Mastodon alone, thus a name in any field passes. Refer to the ⚠️ on that constant.
+  # ⚠️ It reads the ticked networks only: a field of another network changes nothing.
+  # ⚠️ Plain words are never a mistake here. Refer to `SocialMentions::DIAGNOSTIC_SHAPES`.
   # @return [String, nil]
   def mention_shape_error
     draft.mention_rows.each do |row|
@@ -231,26 +204,20 @@ class SocialDraftValidator
     return nil unless draft.scheduled?
     return t("no_moment") if draft.picked_moment.blank?
 
-    # ⚠️ A moment that has PASSED is not an error: it is not a schedule, thus the post goes out at
-    # once. The label of the submit button says "Post now" for that same draft, and a refusal here
-    # would make that button a liar.
-    #
-    # ⚠️ There is no limit on how far ahead this can be. The owner asked for that: a post about a
-    # race can wait for the race. The job then sits in the scheduled set of Sidekiq until it runs.
+    # ⚠️ A moment that has passed is not an error: the post then goes out at once, and the label
+    # of the submit button says "Post now" for that same draft.
+    # ⚠️ There is no limit on how far ahead this can be, on purpose. The job stays in the
+    # scheduled set of Sidekiq until it runs.
     nil
   end
 
   # Asks Bluesky about each handle of the map, and refuses a draft that names one that the PDS
-  # does not know. Without this, `Bluesky#mention_facets` drops that handle with no message and
-  # the post shows it as plain text.
+  # does not know. Without this, `Bluesky#mention_facets` drops that handle with no message.
   #
-  # ⚠️ It runs only for a value that has the SHAPE of a Bluesky handle. Plain words are the answer
-  # for a person with no Bluesky account, and they are not a mistake.
-  #
-  # ⚠️ **The BUDGET is what makes this fail open, and not the timeout of one call.** Several slow
-  # calls together pass the 20-second rack-timeout, and `Rack::Timeout::RequestTimeoutException`
-  # is not a StandardError. Thus no rescue here would catch it, and the submit would give a 500 in
-  # place of the post. `Bluesky#handle_missing?` is false for each answer but a definite refusal.
+  # ⚠️ It runs only for a value that has the shape of a Bluesky handle. Plain words are the answer
+  # for a person with no Bluesky account.
+  # ⚠️ The budget is what makes this fail open, and not the timeout of one call. Several slow
+  # calls together pass the 20-second rack-timeout, and no rescue catches that exception.
   # @return [String, nil]
   def bluesky_handle_error
     handles = bluesky_handles

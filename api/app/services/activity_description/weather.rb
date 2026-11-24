@@ -85,6 +85,11 @@ module ActivityDescription
     COMPASS = %w[N NNE NE ENE E ESE SE SSE S SSW SW WSW W WNW NW NNW].freeze
     EARTH_RADIUS_METERS = 6_371_000.0
 
+    # @param activity [Hash] The Intervals.icu activity.
+    # @return [Boolean] True for a bike ride and a run, which get the headwind. An indoor activity
+    #   gets no weather line at all.
+    def self.headwind?(activity) = HEADWIND_TYPES.include?(ActivityMatcher.normalize_type(activity[:type]))
+
     # @param activity [Hash] The Intervals.icu activity. It needs `start_date`, in UTC.
     # @param streams [Array<Hash>] The `latlng` and `time` streams of Intervals.icu. A `latlng`
     #   stream holds the latitudes in `data` and the longitudes in `data2`.
@@ -95,11 +100,6 @@ module ActivityDescription
     # @param air_quality [#history] The source of the past AQI. The specs replace it.
     # @param intervals [#activity_weather_summary, nil] The source of the full weather summary for
     #   the fallback. With nil, the fallback reads the fields of the activity only.
-    # @param activity [Hash] The Intervals.icu activity.
-    # @return [Boolean] True for a bike ride and a run, which get the headwind. An indoor activity
-    #   gets no weather line at all.
-    def self.headwind?(activity) = HEADWIND_TYPES.include?(ActivityMatcher.normalize_type(activity[:type]))
-
     def initialize(activity, streams, unit:, headwind: false, weather_kit: WeatherKit, air_quality: GoogleAirQuality, intervals: nil)
       @activity = activity
       @streams = Array(streams)

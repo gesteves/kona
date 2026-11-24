@@ -3,10 +3,9 @@ require "uri"
 # Connects a Threads account with the OAuth2 authorization code flow, keeps its token alive, and
 # posts to it.
 #
-# ⚠️ **A Threads token expires, and an expired one is dead for all time.** Meta gives a short-lived
-# token of 1 hour, which the app changes into a long-lived token of 60 days. Only a refresh before
-# that day extends it, and there is no refresh token: the token refreshes itself. Thus
-# `ThreadsTokenRefreshJob` is not an improvement, and it is the thing that keeps the connection.
+# ⚠️ A Threads token expires after 60 days, and an expired one is dead for all time. There is no
+# refresh token: only a refresh before that day extends it. Thus `ThreadsTokenRefreshJob` is the
+# thing that keeps the connection.
 # @see https://developers.facebook.com/docs/threads/get-started
 class Threads < ApplicationService
   AUTHORIZE_URL = "https://threads.net/oauth/authorize".freeze
@@ -16,23 +15,14 @@ class Threads < ApplicationService
   # Each permission that the Meta dashboard of this app permits, but for `threads_trending_topics`,
   # which the owner did not enable.
   #
-  # ⚠️ **`threads_manage_replies` is the one that a THREAD needs.** The dashboard describes it as
-  # "create a reply on behalf of a Threads profile", and a container with a `reply_to_id` is a
-  # reply. Without it every reply container answered 500.
-  #
-  # ⚠️ **The reply guidance of Meta is misleading**: it says that a reply needs the **owner of the
-  # root post**, or `threads_keyword_search`, or `threads_manage_mentions`. This account **is** the
-  # owner of its own root post, thus by that rule it needs no permission at all, and the reply
-  # still failed. Read the description of the permission and not that page.
-  #
-  # ⚠️ **Meta answers `500` with an EMPTY body for a permission that the token does not hold**, and
-  # not a 403 and not an OAuthException. Thus a missing permission reads as a fault of Meta, and a
-  # delay, the transport, and the shape of the id were each measured and each was innocent. The
-  # test that names one: `GET /{user}/threads_publishing_limit` answers 200 for
-  # `fields=quota_usage` and the same empty 500 for `fields=reply_quota_usage`.
-  #
-  # ⚠️ A change here needs a **new authorization by the owner**: a token keeps the permissions that
-  # made it. Thus the owner disconnects Threads on the Connected apps page and connects it again.
+  # ⚠️ `threads_manage_replies` is the one that a THREAD needs: a container with a `reply_to_id` is
+  # a reply. The reply guidance of Meta says that the owner of the root post needs no permission,
+  # and that is not correct.
+  # ⚠️ Meta answers `500` with an EMPTY body for a permission that the token does not hold, and not
+  # a 403. To name the permission, GET `/{user}/threads_publishing_limit` with
+  # `fields=reply_quota_usage`: it gives the same empty 500.
+  # ⚠️ A change here needs a new authorization by the owner, because a token keeps the permissions
+  # that made it. The owner disconnects Threads on the Connected apps page and connects it again.
   SCOPES = %w[
     threads_basic
     threads_content_publish
@@ -48,19 +38,17 @@ class Threads < ApplicationService
   ].join(",").freeze
 
   # The limit of the text of a post. Meta counts characters, and this class makes no check.
-  # ⚠️ **The body of a draft is NOT always 300 or less.** Only the BLUESKY text carries that limit,
-  # and a mention grows the text of each network by a different amount. Thus
-  # SocialDraftValidator#post_error checks this limit against the text of THIS network, before it
-  # adds the job. Without that check a long draft raises here and retries for 24 hours.
+  # ⚠️ The Threads text of a draft can be longer than its Bluesky text, because a mention grows the
+  # text of each network by a different amount. SocialDraftValidator#post_error checks this limit
+  # before it adds the job.
   MAX_CHARACTERS = 500
 
-  # The limit of a topic tag. ⚠️ Meta permits **ONE for each post**, of 1 to 50 characters, and it
-  # refuses a period and an ampersand. `Admin::SocialController` checks a draft against these
-  # before it adds the job, exactly as it does for MAX_CHARACTERS above.
+  # The limit of a topic tag. ⚠️ Meta permits ONE for each post, of 1 to 50 characters, and it
+  # refuses a period and an ampersand. `SocialDraftValidator#topic_error` checks a draft against
+  # these before the job.
   # @see https://developers.facebook.com/documentation/threads/posts
   TOPIC_MAX_CHARACTERS = 50
-  # ⚠️ The two characters that Meta names. A topic that holds one is refused at the container, thus
-  # the job would retry it for 24 hours.
+  # The two characters that Meta refuses in a topic.
   TOPIC_FORBIDDEN = /[.&]/
 
   # @param value [String, nil] The topic as the owner wrote it.
@@ -79,10 +67,8 @@ class Threads < ApplicationService
   end
 
   # How long the id of a media container stays in Redis.
-  # ⚠️ Longer than the 24-hour retry window of ApplicationJob. A shorter TTL leaves the last
-  # retries with no container, and each of those would make a new post. Meta expires a container
-  # after 24 hours, thus a late retry can find one in the EXPIRED state: #wait_for_container
-  # removes that id, and the next attempt makes a new container.
+  # ⚠️ It is longer than the 24-hour retry window of ApplicationJob. A shorter TTL leaves the last
+  # retries with no container, and each of those would make a new post.
   CONTAINER_TTL = 25 * 60 * 60
   # The time that the id of a published post stays, for a retry that comes after the publish.
   PUBLISHED_TTL = 25 * 60 * 60
@@ -92,9 +78,8 @@ class Threads < ApplicationService
   REFRESH_LOCK_TTL = 60
 
   # ⚠️ Meta needs time to process a container, and it answers `400 subcode 4279009` ("The requested
-  # resource does not exist") for a publish that comes too early. Its documentation asks a caller to
-  # wait approximately 30 seconds. A TEXT post uploads nothing, thus this waits for the **status**
-  # in place of a flat sleep: it is usually ready at the first read.
+  # resource does not exist") for a publish that comes too early. Thus the code polls the status
+  # before it publishes. A TEXT container is usually ready at the first read.
   CONTAINER_POLL_SECONDS = 3
   CONTAINER_POLL_ATTEMPTS = 12
 
@@ -107,9 +92,8 @@ class Threads < ApplicationService
   # @see https://developers.facebook.com/docs/threads/reference/publishing
   MAX_ALT_TEXT_CHARACTERS = 1000
 
-  # The seconds that each call to Meta can take. ⚠️ `connect!` runs in the OAuth callback, which is
-  # a request with a 20-second rack-timeout. Without a limit, a Meta that hangs gives a 500 in place
-  # of the message of the page.
+  # The seconds that each call to Meta can take. ⚠️ `connect!` runs in the OAuth callback, which
+  # has a 20-second rack-timeout.
   REQUEST_TIMEOUT = 10
 
   def initialize(credentials = ThreadsCredentials.fetch)
@@ -125,9 +109,8 @@ class Threads < ApplicationService
   #   expired token: read `#expired?` before you post.
   def connected? = valid_credentials? && @credentials.usable?
 
-  # ⚠️ An expired token is dead for all time, and `connected?` stays true because the token is still
-  # in the store. This is the one thing that shows the difference, thus the Connected apps card and
-  # the Social media page both read it.
+  # ⚠️ `connected?` stays true with an expired token, because the token is still in the store. Thus
+  # the Connected apps card and the Social media page both read this.
   # @return [Boolean] True if the account is connected and its token passed its expiry time.
   def expired? = connected? && @credentials.expired?
 
@@ -144,9 +127,8 @@ class Threads < ApplicationService
   #   good.
   def refresh_error = @credentials.refresh_error
 
-  # ⚠️ The redirect URI is not an environment variable, and the caller gives it from the request.
-  # Thus it always names the admin host, which is the only host that draws the callback route. The
-  # Meta dashboard must list that same URL.
+  # ⚠️ The caller gives the redirect URI from the request, thus it always names the admin host,
+  # which is the only host that draws the callback route. The Meta dashboard must list that URL.
   # @param state [String] A value with no meaning. The callback compares it.
   # @param redirect_uri [String] The callback URL of this app.
   # @return [String, nil] The authorization URL, or nil with no app credentials.
@@ -165,11 +147,8 @@ class Threads < ApplicationService
   end
 
   # Changes the authorization code into a long-lived token, and stores it with the name of the
-  # account.
-  #
-  # There are three calls, and each one is necessary: the code gives a token of 1 hour, the
-  # exchange gives the token of 60 days, and `/me` gives the name for the admin to show.
-  # @param code [String] The code from the callback.
+  # account. It makes three calls: the code gives a token of 1 hour, the exchange gives the token
+  # of 60 days, and `/me` gives the name for the admin to show.
   # @param redirect_uri [String] The same value that the authorization used.
   # @return [Boolean] True if the account is connected now.
   def connect!(code, redirect_uri:)
@@ -200,14 +179,13 @@ class Threads < ApplicationService
   #
   # @return [Symbol] :refreshed when the token is new, :too_soon when Meta would refuse it because
   #   the token is less than 24 hours old, :skipped when no account is connected, :expired when the
-  #   token is dead and only a new authorization corrects that, and :failed when the call did not
-  #   work.
+  #   token is dead and only a new authorization corrects that, :busy when another refresh holds
+  #   the lock, and :failed when the call did not work.
   def refresh!
     return :skipped unless connected?
     return :expired if @credentials.expired?
     return :too_soon unless @credentials.refreshable?
-    # ⚠️ One refresh at a time, as Whoop does. A refresh and a reconnect at the same time would
-    # each write a token, and the second write resets the issue time of the first.
+    # ⚠️ One refresh at a time. Refer to REFRESH_LOCK_TTL.
     return :busy unless $redis.set(REFRESH_LOCK_KEY, "1", nx: true, ex: REFRESH_LOCK_TTL)
     holding = true
 
@@ -256,25 +234,23 @@ class Threads < ApplicationService
   # Publishes one post, in the two steps that Meta needs: it makes a media container, then it
   # publishes that container.
   #
-  # ⚠️ **The URL is a `link_attachment` and it is NOT in the text**, thus Meta renders its own
-  # preview card and the URL uses none of the 500 characters. Mastodon is the opposite, and puts the
-  # link in the text.
-  #
-  # ⚠️ **`idempotency_key` is what makes a retry safe, and Meta gives no header for that.** The code
-  # keeps the id of the container in Redis below that key. Thus a second attempt publishes the
-  # container that it made already, and it does not make a second post. Without this, a failure
-  # between the two steps would leave one new container at each attempt.
+  # ⚠️ The URL is a `link_attachment` and it is NOT in the text, thus Meta renders its own preview
+  # card and the URL uses none of the 500 characters.
+  # ⚠️ `idempotency_key` is what makes a retry safe, and Meta gives no header for that. The code
+  # keeps the id of the container in Redis below that key, thus a second attempt publishes the
+  # same container and makes no second post.
   #
   # @param text [String] The body of the post.
   # @param url [String, nil] The link to attach.
   # @param idempotency_key [String] A value that is the same for each attempt.
   # @param reply_to_id [String, nil] The media id of the post above this one, for a thread.
-  # @param topic [String, nil] The topic tag, with no "#". ⚠️ Meta takes one topic for each post,
-  #   thus the composer sends the same one with every post of a thread.
+  # @param topic [String, nil] The topic tag, with no "#".
   # @param photos [Array<Hash>] `[{ url:, alt: }, …]`, MAX_CAROUSEL_ITEMS at the most. Meta GETs
   #   each URL itself, thus each one must be public.
   # @return [String] The id of the post that Meta made.
-  # @raise [RuntimeError] It raises at each failure, thus the job does the work again.
+  # @raise [ApplicationJob::PermanentError] When no usable account is connected, or when the post
+  #   is empty or has too many photos. The job does not run again.
+  # @raise [RuntimeError] At each other failure, thus the job does the work again.
   def post!(text:, url: nil, idempotency_key:, reply_to_id: nil, topic: nil, photos: [])
     raise ApplicationJob::PermanentError, "Threads is not connected" unless connected?
     raise ApplicationJob::PermanentError, "The Threads token expired; connect the account again" if expired?
@@ -285,8 +261,8 @@ class Threads < ApplicationService
     text = text.to_s.strip
     raise ApplicationJob::PermanentError, "The post is empty" if text.blank? && photos.empty?
 
-    # ⚠️ A retry can come AFTER the publish: Sidekiq redelivers a job whose process died before the
-    # acknowledgement. The id of the published post is the answer, and no second post.
+    # ⚠️ A retry can come after the publish, because Sidekiq redelivers a job whose process died
+    # before the acknowledgement. The id of the published post is then the answer.
     published = $redis.get(published_key(idempotency_key))
     return published if published.present?
 
@@ -348,12 +324,10 @@ class Threads < ApplicationService
 
   REFRESH_LOCK_KEY = "threads:refresh_lock".freeze
 
-  # The Redis key that holds the container of one attempt.
-  # @return [String]
+  # @return [String] The Redis key that holds the container of one attempt.
   def container_key(key) = "threads:container:#{key}"
 
-  # The Redis key that holds the id of the post that an attempt published.
-  # @return [String]
+  # @return [String] The Redis key that holds the id of the post that an attempt published.
   def published_key(key) = "threads:published:#{key}"
 
   # Gets the container that a previous attempt made, or makes one.
@@ -413,10 +387,8 @@ class Threads < ApplicationService
   # @param body [Hash] The fields of the container, with no token.
   # @return [String] The container id.
   def make_container(body)
-    # ⚠️ The token goes in the BODY, with each other field, and not in the query string. That is
-    # the shape of the example of Meta and of the one Ruby client for this API. A container with a
-    # `reply_to_id` answered `500` with an empty error body while the token was in the query, and
-    # a container with no reply answered 200 for that same shape.
+    # ⚠️ The token goes in the BODY, with each other field, and not in the query string. With the
+    # token in the query, a container with a `reply_to_id` answers `500` with an empty error body.
     response = HTTParty.post("#{API_URL}/#{@credentials.user_id}/threads",
                              body: body.merge(access_token: @credentials.access_token),
                              timeout: REQUEST_TIMEOUT)
@@ -432,20 +404,7 @@ class Threads < ApplicationService
     id
   end
 
-  # Waits until Meta finished the container.
-  #
-  # ⚠️ **A publish that comes too early gets `400 subcode 4279009`**, and that answer reads as "The
-  # requested resource does not exist", which sounds like a container that was never made. An
-  # earlier version published at once, on the reasoning that a TEXT post uploads nothing. That
-  # reasoning was wrong: Meta processes a TEXT container as well.
-  #
-  # It raises when the container never becomes ready. The id stays in Redis, thus the retry of the
-  # job waits for the same container and makes no second one.
-  #
-  # ⚠️ A container in the ERROR state or the EXPIRED state can never publish. The code removes its
-  # id before it raises, thus the retry makes a new container. With the id in place, each retry
-  # would poll the same dead container for the full 24 hours.
-  # @param container_id [String]
+  # Waits until Meta finished one container. Refer to #wait_for_containers.
   # @param key [String] The idempotency key that holds the container.
   # @return [void]
   def wait_for_container(container_id, key:)
@@ -454,6 +413,11 @@ class Threads < ApplicationService
 
   # Waits until Meta has finished each container of the list. It polls all of them in one loop,
   # thus ten carousel items cost one wait and not ten.
+  #
+  # It raises when a container never becomes ready. The id stays in Redis, thus the retry of the
+  # job waits for the same container and makes no second one.
+  # ⚠️ A container in the ERROR state or the EXPIRED state can never publish. The code removes its
+  # id before it raises, thus the retry makes a new container and does not poll a dead one.
   # @param ids [Array<String>]
   # @param key [String, nil] The idempotency key that holds the FINAL container. ⚠️ Give nil for
   #   carousel items: an item is not below that key, and its failure must not remove the key.
@@ -537,14 +501,11 @@ class Threads < ApplicationService
 
   # The full error of Meta, for the log and for Bugsnag.
   #
-  # ⚠️ It gives **each field** of that error, and not the message alone. The message of Meta is
-  # very often "An unknown error occurred", which names no cause: the `code`, the `error_subcode`,
-  # and the `fbtrace_id` are the things that a person can look up, and the trace id is the thing
-  # that the support of Meta asks for.
-  #
-  # ⚠️ It parses the body itself and does not use `parse_json`. That helper returns nil for a
-  # response that failed **and** reports an upstream error, and this method already runs inside one.
-  # @param response [HTTParty::Response]
+  # ⚠️ It gives each field of that error, and not the message alone. The message of Meta is often
+  # "An unknown error occurred", and the `code`, the `error_subcode`, and the `fbtrace_id` are the
+  # things that a person can look up.
+  # ⚠️ It parses the body itself, because `parse_json` reports an upstream error for a response
+  # that failed, and this method already runs inside one.
   # @return [String]
   def error_message(response)
     parsed = JSON.parse(response.body.to_s, symbolize_names: true)

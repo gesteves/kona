@@ -1,11 +1,10 @@
 <%= render "layouts/page_header", title: t("admin.pages.social") %>
 
 <%# ⚠️ A refused submit renders this page again and does not redirect, thus each field below puts
-    its value back. To redirect would lose the words that the owner wrote.
+    its value back.
 
     ⚠️ `input` and `change` are on the FORM, and one action there covers each field of each post and
-    each network: both events bubble out of the components. A rule on each field would have to go
-    into the template of a post as well, and the two would drift. %>
+    each network. A rule on each field would also have to go into the template of a post. %>
 <%= form_with url: social_path, method: :post,
               class: "social wa-stack wa-gap-l",
               data: { controller: "social",
@@ -16,9 +15,8 @@
 
   <%# The draft, and the draft as each network will receive it.
 
-      ⚠️ **The thread is the only thing in these panels.** Each control below the first divider —
-      the mentions, the "Post to" list, the schedule, and the submit — stays visible in both,
-      because each one changes what a preview shows.
+      ⚠️ The thread is the only thing in these panels. Each control below the first divider stays
+      visible in both, because each one changes what a preview shows.
 
       ⚠️ A panel that is not active is `display: none`, thus its fields are still in the form and a
       submit sends them. %>
@@ -31,10 +29,8 @@
 
     <wa-tab-panel name="write" active>
       <%# ⚠️ The stack is a div INSIDE the panel, and it is not a class on the panel itself. Those
-          utilities set `display: flex`, and an author rule on the host beats the
-          `:host { display: none }` that hides a panel that is not active. Thus the two panels would
-          both show. Without the stack the fields have no gap at all: a panel is a plain block, and
-          the gap of the form reaches its own children only. %>
+          utilities set `display: flex`, which beats the `:host { display: none }` of a panel that
+          is not active. Thus the two panels would both show. %>
       <div class="wa-stack wa-gap-l">
         <%# One block for each post of the thread. The Add control below clones the template. %>
         <%# The drop target of a drag. ⚠️ `dragover` must stop its own default, or the browser
@@ -117,12 +113,10 @@
   <wa-checkbox-group label="<%= t(".post_to") %>">
     <% @social.networks.each do |network| %>
       <% if network.connected? %>
-        <%# ⚠️ The hint is a SLOT and not the `hint` attribute, because a Markdown link or too many
-            photos REPLACES that line. Only Bluesky takes a Markdown link, and each network takes
-            its own number of photos. Thus the composer unticks and disables the other two rows,
-            and the line for the reason says why.
-            ⚠️ The `markdownNetwork` target marks exactly those two rows. A row with no account is
-            disabled in the branch below, and social#applyBlueskyOnly must never turn one of those
+        <%# ⚠️ The hint is a SLOT and not the `hint` attribute, because the line for a Markdown link
+            or for too many photos replaces it when the composer disables the row.
+            ⚠️ The `markdownNetwork` target marks the rows that are not Bluesky. A row with no
+            account is in the branch below, and social#applyBlueskyOnly must never turn one of those
             back on. `data-max-photos` is the photo limit of the row. %>
         <wa-checkbox name="networks[]" value="<%= network.key %>"
                      <% unless network.markdown? %>data-social-target="markdownNetwork" data-max-photos="<%= network.max_photos %>"<% end %>
@@ -153,16 +147,13 @@
           `@social.networks` cannot separate the two. The group reads only
           `:is(wa-checkbox, wa-switch)`, thus this element is not a control of it.
 
-          ⚠️ It is THREAD-LEVEL and not a field of a post: Meta takes one topic for each post, and
-          `#create` sends this one with every post of the thread.
+          ⚠️ It is THREAD-LEVEL and not a field of a post: Meta takes one topic for each post.
 
           ⚠️ It is hidden until the row is ticked AND able to take a post, and `social#applyTopic`
-          does that. A network with no account is disabled, and a Markdown link disables this row as
-          well, thus one rule covers each of those. Refer to _social.scss: this block sets a
-          display, thus `[hidden]` needs a rule of its own.
+          does that. It needs a rule for `[hidden]`; refer to _social.scss.
 
-          ⚠️ The field stays in the form while it is hidden, thus a topic that the owner wrote
-          survives an untick and a tick again. The action reads it only while the row is ticked. %>
+          ⚠️ The field stays in the form while it is hidden, thus a topic that the owner wrote stays
+          after an untick. The action reads it only while the row is ticked. %>
       <% if network.key == SocialPresenter::TOPIC_NETWORK %>
         <div class="social__topic" data-social-target="topicField"
              data-network="<%= network.key %>"
@@ -205,10 +196,8 @@
       </wa-time-input>
 
       <%# ⚠️ The browser writes its own IANA zone here. Without it the server cannot know what
-          "9:00" means, and that is the reason that the Republish dialog has minutes and no date.
-          When the Stimulus controller did not run, this field stays empty and the server uses
-          TIME_ZONE. That is a fallback for a script error only: each wa-* control above needs
-          JavaScript to be part of the form, thus this page does not work with no JavaScript. %>
+          "9:00" means. When the Stimulus controller did not run, this field stays empty and the
+          server uses TIME_ZONE. %>
       <input type="hidden" name="time_zone" data-social-target="timeZone">
     </div>
   </div>

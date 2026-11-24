@@ -1,5 +1,5 @@
-// The Social media page. The form controls and the layout come from Web Awesome, thus this file holds
-// only the selection line below the picker and the states of the count line.
+// The Social media page: the form, the link card, one post block, one photo tile, the mention
+// rows, and the preview. The form controls come from Web Awesome.
 .social {
   &__schedule {
     // ⚠️ This rule is what makes the `hidden` attribute need a rule of its own. `[hidden]` of the

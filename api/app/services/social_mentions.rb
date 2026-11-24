@@ -18,9 +18,9 @@ class SocialMentions
   # the scan gives "@me" and then a fragment, and the owner gets two rows for one person.
   #
   # Each part ends on an alphanumeric, thus "@Tony." and "@Tony's" stop before the punctuation.
-  # ⚠️ **Each pattern here is a STRING first, and a Regexp second.** app/javascript/lib/mentions.js
-  # holds the same strings, because the character count in the browser must measure the text that
-  # this class makes. An interpolated Ruby Regexp gives a source with `(?-mix:…)` in it, which
+  # ⚠️ **Each pattern here is a STRING first, and a Regexp second.**
+  # app/javascript/lib/social_mentions.js holds the same strings, because the character count in
+  # the browser must measure the text that this class makes. An interpolated Ruby Regexp gives a source with `(?-mix:…)` in it, which
   # JavaScript cannot parse, thus a string is the only shape that the two can share.
   # spec/contracts/social_mentions_contract_spec.rb compares them.
   TOKEN_SOURCE = "(?:^|[$|\\W])(@[a-zA-Z0-9](?:[a-zA-Z0-9._-]*[a-zA-Z0-9])?(?:@[a-zA-Z0-9](?:[a-zA-Z0-9.-]*[a-zA-Z0-9])?)?)".freeze

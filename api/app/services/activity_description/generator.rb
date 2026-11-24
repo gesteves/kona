@@ -359,10 +359,9 @@ module ActivityDescription
     end
 
     # Runs a step that can fail, and it catches each failure. Thus one source with a problem
-    # removes only its own line, and not the full description.
-    #
-    # ⚠️ The name is not `safely`. That name belongs to UpstreamIsolation, which has different
-    # parameters, and a failure here would then look like it reached Bugsnag when it did not.
+    # removes only its own line, and not the full description. It writes the failure to the log
+    # with LOG_PREFIX and sends it to Bugsnag.
+    # @param label [String] The name of the step, for the log line and for Bugsnag.
     # @param fallback [Object] The value to return when the block raises: nil for a line that goes
     #   away, or [] for a collection.
     def swallow(label, fallback: nil)
