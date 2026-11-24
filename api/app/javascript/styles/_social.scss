@@ -448,7 +448,7 @@
 }
 
 // The people that the draft names. It is between the posts and the "Post to" list, and
-// social_controller.js shows it at the first token.
+// lib/mention_rows.js shows it at the first token.
 .social-mentions {
   display: flex;
   flex-direction: column;
@@ -585,8 +585,8 @@
 
   // ⚠️ Each of these needs a rule of its own. The `[hidden]` rule of the browser has the
   // specificity of a class, and our stylesheet comes after it. `&__group` sets a display, and
-  // <wa-badge> gives its own host a display. Without these rules, `social#filterPreview` and
-  // `social#previewCard` mark an element as hidden and the owner still sees it.
+  // <wa-badge> gives its own host a display. Without these rules, `PreviewPanel#filter` and
+  // `PreviewPanel#card` mark an element as hidden and the owner still sees it.
   &__group[hidden],
   &__empty[hidden],
   &__topic[hidden],

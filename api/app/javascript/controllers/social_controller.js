@@ -1,16 +1,8 @@
 import { Controller } from "@hotwired/stimulus";
 import { i18nTable, t } from "../lib/i18n";
 import { hasLinks } from "../lib/markdown_links";
-import { isBlueskyHandle, mentionKey, tokensOf } from "../lib/social_mentions";
-import { csrfHeader } from "../lib/csrf";
-
-// How long the words must be quiet before the rows are reconciled. ⚠️ A token churns while the
-// owner types it — "@t", "@to", "@ton" — and a row for each of those would take the focus.
-const MENTION_DEBOUNCE = 250;
-
-// How long a change must be quiet before the open preview is read again. ⚠️ Only the mentions and
-// the topic can change while that panel is on screen, thus this is rare and it can be short.
-const PREVIEW_DEBOUNCE = 300;
+import { MentionRows } from "../lib/mention_rows";
+import { PreviewPanel } from "../lib/preview_panel";
 
 // The words of a post, and one photo tile of a post. ⚠️ The selector of the words names the
 // field: a tile holds a `wa-textarea` of its own for the alt text, and a bare tag name would
@@ -23,8 +15,8 @@ const PHOTO = "[data-social-post-target='photo']";
  * button, and the time zone of the browser. The form posts to POST /social.
  *
  * ⚠️ The count and the link preview of one post are NOT here: each block is its own
- * `social-post` controller. This one reads the state of a block from the classes that the
- * block writes (refer to `canPost`), and `pushMentions` calls the `count()` of each block.
+ * `social-post` controller. This one asks a block two things only, through `postController`:
+ * `blocked` (refer to `canPost`) and `count()` (refer to `pushMentions`).
  */
 export default class extends Controller {
   static targets = [
@@ -43,9 +35,29 @@ export default class extends Controller {
     // A restoration visit can render a snapshot that holds the button in its busy state.
     this.submitTarget.loading = false;
 
-    // The values of each mention, by key. ⚠️ A value stays here after its row goes away, thus a
-    // token that the owner deletes and writes again gets its handles back.
-    this.mentionValues = new Map();
+    // The mention rows and the Preview panel each keep their own state. Refer to lib/.
+    this.mentionMap = new MentionRows({
+      section: this.mentionsTarget,
+      container: this.mentionRowsTarget,
+      template: this.mentionTemplateTarget,
+      rows: () => this.mentionTargets,
+      texts: () => this.postTargets.map((post) => post.querySelector(BODY)?.value ?? ""),
+      changed: () => {
+        this.pushMentions();
+        this.submitTarget.disabled = !this.canPost;
+      },
+    });
+    this.panel = new PreviewPanel({
+      form: this.element,
+      url: () => this.previewUrlValue,
+      body: this.previewBodyTarget,
+      empty: this.previewEmptyTarget,
+      spinner: this.previewSpinnerTarget,
+      groupTemplate: this.previewGroupTemplateTarget,
+      rowTemplate: this.previewRowTemplateTarget,
+      networks: () => this.networks,
+      words: this.words,
+    });
 
     // The reason that `applyBlueskyOnly` turned each row off, by network key. ⚠️ A row with no
     // entry counts as null, thus the first `validate()` of a draft with no Markdown link and no
@@ -83,10 +95,8 @@ export default class extends Controller {
    * write into a page that is gone.
    */
   disconnect() {
-    clearTimeout(this.mentionTimer);
-    clearTimeout(this.previewTimer);
-    this.previewSeq = (this.previewSeq ?? 0) + 1;
-    this.previewAborter?.abort();
+    this.mentionMap.stop();
+    this.panel.stop();
   }
 
   /**
@@ -103,7 +113,7 @@ export default class extends Controller {
     // correctly at its own `connect()`.
     const added = this.templateTarget.content.cloneNode(true);
     const block = added.querySelector("[data-social-target='post']");
-    if (block) block.dataset.socialPostBlueskyMentions = this.blueskyMentionsJson;
+    if (block) block.dataset.socialPostBlueskyMentions = this.mentionMap.blueskyJson;
 
     this.postsTarget.appendChild(added);
     this.renumber();
@@ -352,9 +362,9 @@ export default class extends Controller {
     // ⚠️ The order matters. `pushMentions` recounts each post AT ONCE, and `canPost` below reads
     // the count line that the recount wrote. A push that arrived later would leave the button on
     // for a draft that is already past the limit.
-    this.readMentionRows();
+    this.mentionMap.read();
     this.pushMentions();
-    this.scheduleMentionScan();
+    this.mentionMap.scheduleScan();
     // ⚠️ It runs BEFORE `canPost`, which reads the ticks that this method can change.
     this.applyBlueskyOnly();
     // ⚠️ And AFTER it, because a Markdown link unticks and disables the Threads row.
@@ -367,8 +377,8 @@ export default class extends Controller {
 
     // ⚠️ A network that the owner unticks goes away at once, with no request. The refresh below
     // is for the mentions and the topic, which change the text that only the server can write.
-    this.filterPreview();
-    if (this.previewActive) this.schedulePreviewRefresh();
+    this.panel.filter();
+    if (this.previewActive) this.panel.scheduleRefresh();
 
     this.relabel();
   }
@@ -466,25 +476,6 @@ export default class extends Controller {
   }
 
   /**
-   * Reads each row of the mention section into the Map.
-   *
-   * ⚠️ It runs BEFORE the scan, thus a row that the scan is about to remove has its values kept.
-   */
-  readMentionRows() {
-    this.mentionTargets.forEach((row) => {
-      const token = row.querySelector("[data-mention-token]")?.value ?? "";
-      if (!token) return;
-
-      const handles = {};
-      row.querySelectorAll("[data-mention-network]").forEach((field) => {
-        handles[field.dataset.mentionNetwork] = field.value ?? "";
-      });
-
-      this.mentionValues.set(mentionKey(token), { token, handles });
-    });
-  }
-
-  /**
    * Gives the Bluesky map to each post block, and makes it count again.
    *
    * ⚠️ Only the BLUESKY map goes out, because the count measures the Bluesky text. The server
@@ -492,147 +483,14 @@ export default class extends Controller {
    * ⚠️ A value that this writes fires no `input` event, thus there is no loop back into validate.
    */
   pushMentions() {
-    const json = this.blueskyMentionsJson;
+    const json = this.mentionMap.blueskyJson;
 
     this.postTargets.forEach((post) => {
       if (post.dataset.socialPostBlueskyMentions === json) return;
 
       post.dataset.socialPostBlueskyMentions = json;
-      this.application.getControllerForElementAndIdentifier(post, "social-post")?.count();
+      this.postController(post)?.count();
     });
-  }
-
-  /** @returns {string} The Bluesky field of each mention, by key, as JSON. */
-  get blueskyMentionsJson() {
-    const map = {};
-    this.mentionValues.forEach((entry, key) => {
-      const value = entry.handles?.bluesky?.trim();
-      if (value) map[key] = value;
-    });
-
-    return JSON.stringify(map);
-  }
-
-  /**
-   * Waits for the typing to stop, then reconciles the rows.
-   */
-  scheduleMentionScan() {
-    clearTimeout(this.mentionTimer);
-    this.mentionTimer = setTimeout(() => this.scanMentions(), MENTION_DEBOUNCE);
-  }
-
-  /**
-   * Makes the rows of the section match the tokens of the draft.
-   *
-   * ⚠️ It RECONCILES and it never renders the section again. A rebuild would take the focus and
-   * lose each value at every keystroke.
-   */
-  scanMentions() {
-    this.readMentionRows();
-
-    // The tokens of the whole draft. ⚠️ The map is thread-level, thus a token in post 1 and in
-    // post 3 is one row. The first spelling wins, and that is the one that a network with no
-    // handle will show.
-    const wanted = new Map();
-    this.postTargets.forEach((post) => {
-      const words = post.querySelector(BODY)?.value ?? "";
-      tokensOf(words).forEach((token) => {
-        const key = mentionKey(token);
-        if (!wanted.has(key)) wanted.set(key, token);
-      });
-    });
-
-    // ⚠️ A row that goes away keeps its values in the Map above, thus a token that comes back gets
-    // them again.
-    this.mentionTargets.forEach((row) => {
-      if (!wanted.has(this.keyOfRow(row))) row.remove();
-    });
-
-    wanted.forEach((token, key) => {
-      if (this.rowFor(key)) return;
-
-      this.mentionRowsTarget.appendChild(this.buildMentionRow(token, key));
-    });
-
-    // ⚠️ A node that moves loses the focus, thus the rows are not put in order while the owner is
-    // typing in one of them. The next scan does it.
-    if (!this.mentionRowsTarget.contains(document.activeElement)) {
-      wanted.forEach((_token, key) => {
-        const row = this.rowFor(key);
-        if (row) this.mentionRowsTarget.appendChild(row);
-      });
-    }
-
-    // ⚠️ A new row seeds its own field, and the read at the top of this method ran before that
-    // row existed. Without this second read, the first count after a new mention is not the
-    // number that the server counts.
-    this.readMentionRows();
-
-    this.mentionsTarget.hidden = wanted.size === 0 || !this.hasMentionFields;
-    this.pushMentions();
-    this.submitTarget.disabled = !this.canPost;
-  }
-
-  /**
-   * Makes one row from the template, with the values that the owner already gave.
-   * @returns {HTMLElement}
-   */
-  buildMentionRow(token, key) {
-    const row = this.mentionTemplateTarget.content.cloneNode(true)
-      .querySelector("[data-social-target='mention']");
-    const stored = this.mentionValues.get(key);
-
-    row.querySelector("[data-mention-token]").value = token;
-    const label = row.querySelector("[data-mention-label]");
-    if (label) {
-      label.textContent = token;
-      // The same id that the server renders: the row is a group that the token names.
-      label.id = `mention-${key}`;
-      row.setAttribute("aria-labelledby", label.id);
-    }
-
-    row.querySelectorAll("[data-mention-network]").forEach((field) => {
-      const network = field.dataset.mentionNetwork;
-      field.value = stored?.handles?.[network] || this.seedFor(token, network);
-    });
-
-    return row;
-  }
-
-  /**
-   * The value to put in a field of a new row.
-   *
-   * ⚠️ A token that is already a handle seeds its own field. Nothing seeds Threads: a bare
-   * "@name" is the ambiguous case, and a guess there is what tags a stranger.
-   * @returns {string}
-   */
-  seedFor(token, network) {
-    const bare = token.replace(/^@/, "");
-
-    if (network === "bluesky") return isBlueskyHandle(bare) ? bare : "";
-    if (network === "mastodon") return bare.includes("@") ? bare : "";
-
-    return "";
-  }
-
-  /**
-   * ⚠️ With no account connected there is no field to fill, thus the section stays away whatever
-   * the words hold. The server still removes the "@" of each token, thus such a draft posts a name
-   * and it can never tag a stranger.
-   * @returns {boolean}
-   */
-  get hasMentionFields() {
-    return !!this.mentionTemplateTarget.content.querySelector("[data-mention-network]");
-  }
-
-  /** @param {HTMLElement} row @returns {string} */
-  keyOfRow(row) {
-    return mentionKey(row.querySelector("[data-mention-token]")?.value ?? "");
-  }
-
-  /** @param {string} key @returns {HTMLElement|undefined} */
-  rowFor(key) {
-    return this.mentionTargets.find((row) => this.keyOfRow(row) === key);
   }
 
   /**
@@ -645,20 +503,24 @@ export default class extends Controller {
     const posts = this.postTargets;
     if (posts.some((post) => !post.querySelector(BODY)?.value?.trim())) return false;
 
-    // ⚠️ It reads the count line of each post in place of counting again. The `social-post`
-    // controller writes that line from the same `input` event, before the event reaches this
-    // form.
-    if (posts.some((post) => post.querySelector(".social__count--over"))) return false;
-
-    // A photo whose upload is still out has no id yet, and an alt text past its limit is refused
-    // by the action. Both read from the tile, which the `social-post` controller marks.
-    if (posts.some((post) => post.querySelector(".social-photo--uploading, .social-photo--alt-over"))) return false;
+    // ⚠️ It asks each post, and does not count again. The `social-post` controller writes its
+    // count from the same `input` event, before the event reaches this form. A block that is
+    // not connected yet holds nothing that can stop the draft.
+    if (posts.some((post) => this.postController(post)?.blocked)) return false;
 
     if (!this.networks.some((box) => box.checked && !box.disabled)) return false;
 
     // ⚠️ The switch is on and the two fields name no moment, thus there is nothing to schedule.
     // A moment that has passed is not this case: it means "post now", as in `submitLabel`.
     return !(this.scheduleTarget.checked && !this.scheduledAt);
+  }
+
+  /**
+   * @param {HTMLElement} post A post block.
+   * @returns {object|null} The `social-post` controller of that block, or null before it connects.
+   */
+  postController(post) {
+    return this.application.getControllerForElementAndIdentifier(post, "social-post");
   }
 
   /** @returns {HTMLElement[]} */
@@ -675,244 +537,12 @@ export default class extends Controller {
   tabShown(event) {
     if (event.detail?.name !== "preview") return;
 
-    this.preview();
+    this.panel.load();
   }
 
   /** @returns {boolean} True while the Preview panel is the one on screen. */
   get previewActive() {
     return this.previewPanelTarget.hasAttribute("active");
-  }
-
-  /**
-   * Reads the draft again after the owner changes something while the preview is open.
-   *
-   * ⚠️ The words of a post cannot change here: they are in the Write panel. This is for the
-   * mentions and the topic, which the server writes into the text.
-   */
-  schedulePreviewRefresh() {
-    clearTimeout(this.previewTimer);
-    this.previewTimer = setTimeout(() => this.preview(), PREVIEW_DEBOUNCE);
-  }
-
-  /**
-   * Hides the row of each network that the owner did not tick.
-   *
-   * ⚠️ The action answers with every CONNECTED network, and the ticks decide what a post goes to.
-   * Thus this filter needs no request of its own.
-   */
-  filterPreview() {
-    const wanted = this.networks.filter((box) => box.checked && !box.disabled)
-                       .map((box) => box.value);
-    const groups = [ ...this.previewBodyTarget.querySelectorAll("[data-preview-network]") ];
-    groups.forEach((group) => {
-      group.hidden = !wanted.includes(group.dataset.previewNetwork);
-    });
-
-    // ⚠️ The line shows only when the panel HOLDS a group and none of them is wanted. An empty
-    // draft has its own message, and the two must not both appear.
-    const empty = groups.length > 0 && groups.every((group) => group.hidden);
-    this.previewEmptyTarget.textContent = empty ? t(this.words, "preview_no_network") : "";
-    this.previewEmptyTarget.hidden = !empty;
-  }
-
-  /**
-   * Fills the preview panel with the draft as each network will receive it. It reads the draft at
-   * the click, thus it needs no debounce.
-   *
-   * ⚠️ `FormData(this.element)` sends every field that a real submit sends, thus the request needs
-   * no list of the fields.
-   * ⚠️ It sends the CSRF token in a header of its own, from `lib/csrf.js`. No spec can prove that
-   * the token in the body alone would pass, because the test environment has no token.
-   */
-  async preview() {
-    this.previewBodyTarget.replaceChildren();
-    this.previewEmptyTarget.hidden = true;
-    this.previewSpinnerTarget.hidden = false;
-
-    // ⚠️ A second click while one request is out must not let the older answer write. It is the
-    // rule that `social-post#preview` follows for the card of a link.
-    this.previewSeq = (this.previewSeq ?? 0) + 1;
-    const seq = this.previewSeq;
-
-    this.previewAborter?.abort();
-    this.previewAborter = new AbortController();
-    try {
-      const response = await fetch(this.previewUrlValue, {
-        method: "POST",
-        headers: { Accept: "application/json", ...csrfHeader() },
-        body: new FormData(this.element),
-        signal: this.previewAborter.signal,
-      });
-      if (seq !== this.previewSeq) return;
-
-      if (!response.ok) return this.showPreviewMessage("preview_failed");
-      this.showPreview(await response.json());
-    } catch {
-      if (seq === this.previewSeq) this.showPreviewMessage("preview_failed");
-    } finally {
-      if (seq === this.previewSeq) this.previewSpinnerTarget.hidden = true;
-    }
-  }
-
-  /**
-   * Writes one group for each post, and one row for each network below it.
-   * @param {object} draft The answer of the preview action.
-   */
-  showPreview(draft) {
-    // ⚠️ The Preview tab is off for a draft with nothing in it, thus this is a fallback: a panel
-    // that stays blank says nothing at all.
-    const networks = draft?.networks ?? [];
-    if (networks.length === 0) return this.showPreviewMessage("preview_empty");
-
-    const body = this.previewBodyTarget;
-    body.replaceChildren();
-
-    networks.forEach((network) => {
-      const group = this.cloneTemplate(this.previewGroupTemplateTarget, ".social-preview__group");
-
-      // ⚠️ `filterPreview` reads this to hide the group of a network that the owner unticks.
-      group.dataset.previewNetwork = network.key;
-      group.querySelector("[data-preview-name]").textContent = network.name;
-
-      const cards = group.querySelector("[data-preview-cards]");
-      network.posts.forEach((post) => cards.appendChild(this.previewCard(post)));
-      body.appendChild(group);
-    });
-
-    // ⚠️ The answer holds each connected network, thus the new groups need the filter at once.
-    this.filterPreview();
-  }
-
-  /**
-   * One card: one post of one network.
-   * @param {object} post
-   * @returns {HTMLElement}
-   */
-  previewCard(post) {
-    const card = this.cloneTemplate(this.previewRowTemplateTarget, ".social-preview__card");
-    const count = card.querySelector("[data-preview-count]");
-
-    count.textContent = `${post.length} / ${post.limit}`;
-    // ⚠️ The modifier goes on the LINE and not on the number, thus one rule colors the words and
-    // the ring together.
-    card.querySelector(".social-preview__meta")
-        .classList.toggle("social-preview__meta--over", post.over);
-    // ⚠️ It stops at 100, as the ring of the Write panel does: a post past the limit must not draw
-    // more than a full circle.
-    card.querySelector("[data-preview-ring]").value =
-      Math.min(100, Math.round((post.length / post.limit) * 100));
-    card.querySelector("[data-preview-text]").replaceChildren(...this.textNodes(post.segments));
-
-    // The topic, above the words, as a badge. Only one network takes one.
-    const topic = card.querySelector("[data-preview-topic]");
-    if (post.topic) {
-      topic.textContent = post.topic;
-      topic.hidden = false;
-    }
-
-    // The link of a network that keeps it out of the text and whose card this app cannot draw.
-    // ⚠️ It reuses `textNodes`, thus this address opens in the same way as one inside a text.
-    const link = card.querySelector("[data-preview-link]");
-    if (post.link) {
-      link.replaceChildren(...this.textNodes([ { text: post.link, url: post.link } ]));
-      link.hidden = false;
-    }
-
-    // The website card that Bluesky renders for the link. ⚠️ Only that network carries one: this
-    // app builds its embed, and Meta renders its own attachment for Threads.
-    this.fillLinkCard(card, post.card);
-
-    // The photos of a post, as thumbnails. ⚠️ The action sends them only on the row of a network
-    // that takes photos. Each `src` is the path of our own store.
-    const photos = card.querySelector("[data-preview-photos]");
-    if (post.photos?.length) {
-      photos.replaceChildren(...post.photos.map((photo) => {
-        const image = document.createElement("img");
-        image.src = photo.path;
-        image.alt = photo.alt ?? "";
-        return image;
-      }));
-      photos.hidden = false;
-    }
-
-    return card;
-  }
-
-  /**
-   * Fills the website card of a post, or leaves it away. `SocialPreview#card_json` answers this
-   * card and the one that `social-post#showPreview` writes below the link field.
-   *
-   * ⚠️ The two do NOT draw the same set of cards, on purpose. This one is what the network will
-   * render, thus the action sends none for a page with no og: tags. The card of the composer says
-   * which link the post carries, thus it draws one for that same page.
-   * @param {HTMLElement} card The preview card of the post.
-   * @param {object|null} link The website card, from the action.
-   */
-  fillLinkCard(card, link) {
-    const element = card.querySelector("[data-preview-card]");
-    if (!link) return;
-
-    card.querySelector("[data-preview-card-host]").textContent = link.host ?? "";
-    card.querySelector("[data-preview-card-title]").textContent = link.title ?? "";
-    card.querySelector("[data-preview-card-description]").textContent = link.description ?? "";
-
-    // ⚠️ `withMedia` follows the picture, for the reason that the markup gives.
-    const picture = card.querySelector("[data-preview-card-image]");
-    picture.hidden = !link.image_path;
-    element.withMedia = !!link.image_path;
-    if (link.image_path) picture.src = link.image_path;
-
-    // ⚠️ The badge shows for the standard.site card ALONE, which the owner cannot know without it.
-    // No badge means the ordinary card from the og: tags.
-    const kind = card.querySelector("[data-preview-card-kind]");
-    kind.hidden = !link.standard_site;
-    if (link.standard_site) kind.textContent = t(this.words, "shared.standard_site");
-
-    element.hidden = false;
-  }
-
-  /**
-   * The text of one network, in pieces, with each link as a link.
-   *
-   * ⚠️ A Markdown link shows its words and never its address, thus an `<a>` is the only thing
-   * that says where those words point.
-   * ⚠️ It writes each piece with `textContent` and `href`, and never with HTML. The action gives
-   * a `url` that is http or https only, thus no draft can make a `javascript:` link.
-   * @param {Array<{text: string, url?: string}>} segments
-   * @returns {Node[]}
-   */
-  textNodes(segments) {
-    return (segments ?? []).map((segment) => {
-      if (!segment.url) return document.createTextNode(segment.text);
-
-      const link = document.createElement("a");
-      link.href = segment.url;
-      link.textContent = segment.text;
-      // ⚠️ The page holds the draft. A link that replaced this page would lose it.
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
-
-      return link;
-    });
-  }
-
-  /**
-   * Writes one line in the preview panel. ⚠️ A panel that stays empty says nothing at all.
-   * @param {string} key A key below `admin.js.social`.
-   */
-  showPreviewMessage(key) {
-    const line = document.createElement("p");
-    line.textContent = t(this.words, key);
-    this.previewBodyTarget.replaceChildren(line);
-  }
-
-  /**
-   * @param {HTMLTemplateElement} template
-   * @param {string} selector
-   * @returns {HTMLElement}
-   */
-  cloneTemplate(template, selector) {
-    return template.content.cloneNode(true).querySelector(selector);
   }
 
   /**

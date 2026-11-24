@@ -138,7 +138,7 @@ class SocialPresenter
   # ⚠️ There is no `max_date`, on purpose. The owner can schedule a post as far ahead as they want.
 
   # @return [Boolean] True when the draft names at least one person. The section is hidden when it
-  #   is false, and social_controller.js shows it at the first token.
+  #   is false, and lib/mention_rows.js shows it at the first token.
   def mentions? = @mentions.any?
 
   # The networks that a mention row asks about.

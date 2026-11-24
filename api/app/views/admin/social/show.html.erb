@@ -66,7 +66,7 @@
     </wa-tab-panel>
 
     <%# It is read-only and it holds no form control. `social#tabShown` fills it when the owner
-        opens it, and `social#filterPreview` hides the row of a network that they then untick. %>
+        opens it, and `PreviewPanel#filter` hides the row of a network that they then untick. %>
     <wa-tab-panel name="preview" data-social-target="previewPanel">
       <div class="wa-stack wa-gap-l">
         <wa-spinner class="social-preview__spinner" data-social-target="previewSpinner" hidden></wa-spinner>
@@ -84,7 +84,7 @@
       goes out with the form and it is gone after the post. It is thread-level, thus one row covers
       a token that more than one post holds.
 
-      ⚠️ It is hidden until the draft names somebody, and social_controller.js shows it. Refer to
+      ⚠️ It is hidden until the draft names somebody, and lib/mention_rows.js shows it. Refer to
       _social.scss: this block sets a display, thus `[hidden]` needs a rule of its own. %>
   <section class="social-mentions" data-social-target="mentions" <%= "hidden" unless @social.mentions? %>>
     <h2 class="social-mentions__title wa-heading-s"><%= t(".mentions") %></h2>
@@ -234,7 +234,7 @@
 
   <%# The two shells that the controller clones. They hold no words: the action sends each one,
       already in the words of the locale file. ⚠️ The browser renders none of a <template>. %>
-  <%# One network, and its posts below it. ⚠️ `social#filterPreview` hides the whole group when the
+  <%# One network, and its posts below it. ⚠️ `PreviewPanel#filter` hides the whole group when the
       owner unticks that network, thus the group carries the key. %>
   <template data-social-target="previewGroupTemplate">
     <div class="social-preview__group">

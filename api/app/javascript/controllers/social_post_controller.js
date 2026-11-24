@@ -28,8 +28,8 @@ const PHOTO = "[data-social-post-target='photo']";
  * One post of the thread: its character count, the preview of its link, and its photos.
  *
  * ⚠️ Each block is its own controller, thus the count and the preview of one post stay away
- * from the others and no call needs an index. The outer `social` controller reads the state
- * classes that this one writes.
+ * from the others and no call needs an index. The outer `social` controller reads `blocked`
+ * and calls `count()`, and nothing else.
  *
  * ⚠️ The link and the photos are ONE state machine: a post takes photos OR a link, because
  * Bluesky renders one embed. Each button of the toolbar is disabled while the other attachment
@@ -174,6 +174,15 @@ export default class extends Controller {
   /** @returns {number} The tiles of the post, and that includes one whose upload is out. */
   get photoCount() {
     return this.photoTargets.length;
+  }
+
+  /**
+   * @returns {boolean} True while this post stops the draft: its words are past the limit, the
+   *   upload of a photo is still out, or an alt text is past its limit. `social#canPost` reads it.
+   */
+  get blocked() {
+    return this.countTarget.classList.contains("social__count--over") ||
+      !!this.element.querySelector(".social-photo--uploading, .social-photo--alt-over");
   }
 
   /**
@@ -359,7 +368,7 @@ export default class extends Controller {
   }
 
   /**
-   * Says when the alt text of a tile is past its limit, and marks the tile for `social#canPost`.
+   * Says when the alt text of a tile is past its limit, and marks the tile for `blocked`.
    *
    * ⚠️ It counts graphemes, as the count of the words does, and the field has no `maxlength`. The
    * action counts the same way.
@@ -382,7 +391,7 @@ export default class extends Controller {
    * The Bluesky field of each mention of the draft, by key.
    *
    * ⚠️ It is a plain data attribute and NOT a Stimulus value. A value arrives through a
-   * MutationObserver, which is not synchronous, and `social#canPost` reads the count line at
+   * MutationObserver, which is not synchronous, and `social#canPost` reads `blocked` at
    * once. `social#pushMentions` writes this attribute and then calls `count()`.
    * @returns {Object<string, string>}
    */

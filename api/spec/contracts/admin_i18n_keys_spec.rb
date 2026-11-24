@@ -5,15 +5,17 @@ require "rails_helper"
 # that the table does not hold, with no message, and no spec renders those words. This spec finds
 # each key in the source and checks that the locale file holds it below the scope of its view.
 RSpec.describe "Admin JavaScript i18n keys" do
-  # The scope that each view gives to the controller of a file. The location view also gives
+  # The scope that each view gives to the controller of a file, by its path below app/javascript. The location view also gives
   # `state: "admin.location.state"`, thus the `state.*` keys of that file are below admin.location.
   # The two social views give `shared: "admin.js.shared"`, thus their `shared.*` keys are below
   # admin.js.
   SCOPES = {
-    "location_map_controller.js" => %w[admin.js.location admin.location],
-    "social_controller.js" => %w[admin.js.social admin.js],
-    "social_post_controller.js" => %w[admin.js.social_post admin.js],
-    "republish_controller.js" => %w[admin.js.republish]
+    "controllers/location_map_controller.js" => %w[admin.js.location admin.location],
+    "controllers/social_controller.js" => %w[admin.js.social admin.js],
+    "controllers/social_post_controller.js" => %w[admin.js.social_post admin.js],
+    "controllers/republish_controller.js" => %w[admin.js.republish],
+    # The Preview panel gets the table of the social controller.
+    "lib/preview_panel.js" => %w[admin.js.social admin.js]
   }.freeze
 
   # A key in `this.words("…")` or `t(this.words, "…")`. A key in a template literal names its
@@ -22,7 +24,7 @@ RSpec.describe "Admin JavaScript i18n keys" do
 
   SCOPES.each do |file, scopes|
     it "names keys of #{file} that config/locales/en.yml holds" do
-      source = Rails.root.join("app/javascript/controllers", file).read
+      source = Rails.root.join("app/javascript", file).read
       keys = source.scan(KEY_CALL).map { |plain, literal| plain || literal.split("${").first.chomp(".") }
       expect(keys).not_to be_empty, "#{file} reads no keys, thus this spec covers nothing."
 
