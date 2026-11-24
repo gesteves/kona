@@ -75,6 +75,48 @@ Requirements: Ruby.
 | `fly deploy` | Deploy to fly.io |
 | `fly console` | Open a Rails console on the deployed app |
 
+## Where things are
+
+One row for each feature: where a request or an event comes in, and each file that it goes through. A name is a class, and its file is the same name in snake case:
+
+- a controller is in `app/controllers/`, a job in `app/jobs/`, a service in `app/services/`, and a presenter in `app/presenters/`;
+- a view folder is below `app/views/`;
+- an admin JS name is a Stimulus controller in `app/javascript/controllers/` (`social` is `social_controller.js`), or a module in `app/javascript/lib/`.
+
+| Feature | Comes in at | Jobs | Services | Presenter and views | Admin JS |
+| --- | --- | --- | --- | --- | --- |
+| Weather widget | `GET /widgets/weather/current` → `Widgets::WeatherController` | — | `Location`, `GoogleMaps`, `TimeZoneResolver`, `WeatherKit`, `AirQuality` (`PurpleAir`, then `GoogleAirQuality`), `GooglePollen`, `Goodspeed`, `Events`, `TrainerRoad` | `WeatherSummaryPresenter`, `WeatherHelper`, `widgets/weather`, `config/conditions.yml`, `config/beaufort.yml` | — |
+| Upcoming races and race-day weather | `GET /widgets/events/upcoming` → `Widgets::EventsController` | — | `Events`, `RaceDayWeather` (`GoogleMaps`, `WeatherKit`, `GoogleAirQuality`, `Goodspeed`) | `UpcomingRacesPresenter`, `EventWeatherPresenter`, `EventsHelper`, `widgets/events` | — |
+| Activity stats widget | `GET /widgets/activity-stats` → `Widgets::ActivityStatsController` | — | `Intervals` | `widgets/activity_stats` | — |
+| Whoop widget | `GET /widgets/whoop` → `Widgets::WhoopController` | `WhoopTokenRefreshJob` (cron) | `Whoop`, `WhoopCredentials`, `TrainerRoad` | `WhoopPresenter`, `widgets/whoop` | — |
+| Trending articles | `GET /widgets/articles/trending` → `Widgets::ArticlesController` | — | `TrendingArticles`, `Articles`, `ArticleRanking`, `Plausible`; `rake trending:*` uses `TrendingInspector` | `widgets/articles` | — |
+| Pageviews of one article | `GET /widgets/plausible/pageviews/:id` → `Widgets::PlausibleController` | — | `Plausible`, `Articles`, `ArticleAttributes` | `widgets/plausible` | — |
+| Related articles (JSON for the web build) | `GET /api/related` → `Api::RelatedController` | — | `RelatedArticles`, `ArticleIndex`, `ArticleTaxonomy`, `ArticleLinks`, `TaxonomyConcepts`, `ArticleRanking`, `Plausible`; `rake related:*` uses `RelatedInspector` | — | — |
+| Strava activity description | `POST /webhooks/strava` → `Webhooks::StravaController`; the Whoop sync also starts it | `StravaActivityJob` → `ActivityDescriptionJob`; `StravaNameJob`; `RaceTrackJob` | `ActivityDescription::Generator` with `Composer`, `Weather`, `TrackWeather`, `WeatherSentence`, `Llm`, `RaceLeg` (all in `app/services/activity_description/`); `ActivityMatcher`, `Intervals`, `Strava`, `TrainerRoad`, `Whoop`, `WeatherKit`, `GoogleAirQuality`; prompts in `app/prompts/` | — | — |
+| Whoop sync to Intervals.icu | `POST /webhooks/whoop` → `Webhooks::WhoopController` | `WhoopWebhookJob` | `WhoopWebhookProcessor`, `Whoop`, `Intervals` | — | — |
+| Social posting | `/social` → `Admin::SocialController`, `Admin::SocialPhotosController`; `GET /api/social-photos/…` → `Api::SocialPhotosController` (Meta gets each photo there) | `BlueskyPostJob`, `MastodonPostJob`, `ThreadsPostJob` (parent `SocialPostJob`); `ThreadsTokenRefreshJob` (cron) | `SocialDraft`, `SocialDraftValidator`, `SocialPreview`, `SocialMentions`, `SocialText`, `Typography`, `MarkdownLinks`, `OpenGraph`, `SocialPhotos`, `PhotoBlob`, `PhotoCaption`, `AltText`, `Bluesky`, `Mastodon`, `Threads`, `AtProto` (in `concerns/`) | `SocialPresenter`, `admin/social` | `social`, `social_post`, `lib/social_mentions`, `lib/markdown_links`, `lib/typography`, `lib/picture_tiles` |
+| standard.site sync | `POST /webhooks/contentful` → `Webhooks::ContentfulController`; `GET /api/standard-site` → `Api::StandardSiteController` | `StandardSiteSyncJob` | `StandardSite`, `AtProto`, `BlueskyCredentials`, `TaxonomyConcepts`, `ArticleAttributes`; `rake standard_site:backfill` | — | — |
+| Image mirror and blurhash | `POST /webhooks/contentful` → `Webhooks::ContentfulController` | `AssetSyncJob`, `AssetBlurhashJob` | `AssetMirror`, `BlurhashPlaceholder`, `ImagesHelper`; `rake assets:backfill`, `rake blurhash:backfill` | — | — |
+| Site build | `POST /webhooks/contentful`; `POST /api/build` → `Api::BuildController`; `POST /republish` → `Admin::RepublishController` | `SiteBuildJob` | — | `layouts/_republish_dialog` | `republish` |
+| Contact form and spam | `POST /api/contact` → `Api::ContactController`; `/spam` → `Admin::SpamController` | `ContactMailJob` → `ContactDeliveryJob`; `ContactHamJob` (parent `ContactJob`) | `Turnstile`, `EmailDomain`, `SubmissionTime`, `Akismet`, `ContactModeration`, `ContactSubject`, `SpamQuarantine`, `Resend` | `SpamMessagePresenter`, `admin/spam` | — |
+| Course maps | `/course-maps` → `Admin::CourseMapsController` | `MapTilesetJob`, `RaceTrackJob` | `GpxTrack`, `TrackLibrary`, `MapboxTileset`, `StaticMap` | `MapTrackPresenter`, `admin/course_maps` | `map_preview`, `linked_sides`, `file_submit`, `job_status` |
+| Media uploader | `/contentful/uploads` → `Admin::ContentfulUploadsController`, `Admin::ContentfulUploadFilesController` | `ContentfulAssetJob` | `UploadLibrary`, `StagedUpload`, `ContentfulManagement`, `PhotoBlob`, `PhotoCaption`, `AltText` | `ContentfulUploadPresenter`, `admin/contentful_uploads` | `media_upload`, `job_status`, `lib/picture_tiles` |
+| Connected apps | `/connected-apps` → `Admin::ConnectedAppsController`, and one controller for each app: `Admin::BlueskyController`, `MastodonController`, `ThreadsController`, `StravaController`, `WhoopController`, `TrainerRoadController` | the two token refresh jobs above | the service of each app and its `*Credentials` class (`EncryptedCredentials` in `concerns/`) | `ConnectedAppPresenter`, `admin/connected_apps`, `admin/bluesky`, `admin/mastodon`, `admin/trainer_road` | — |
+| Location | `POST /api/location` → `Api::LocationController`; `/location` → `Admin::LocationController` | `LocationSyncJob` | `Location`, `LocationSync`, `LocationContext`, `GoogleMaps`, `GoogleGeocoder`, `TimeZoneResolver`, `Events`, `Intervals` | `LocationPresenter`, `admin/location` | `location_map` |
+| Weight and FTP | `POST /api/weight` → `Api::WeightController`; `POST /api/ftp` → `Api::FtpController` | `IntervalsWeightJob`, `StravaWeightJob`, `IntervalsFtpJob`, `StravaFtpJob` | `Weight`, `Ftp`, `Intervals`, `Strava` | — | — |
+| Icons (SVGs for the web build) | `POST /api/icons` → `Api::IconsController` | — | `FontAwesome`, `FontAwesomeClient`, `IconsHelper` | — | — |
+| Owner sign-in | `/signin`, `/auth/google_oauth2/callback` → `SessionsController` | — | `Authentication` (in `app/controllers/concerns/`), `config/initializers/omniauth.rb` | `sessions` | — |
+
+Shared plumbing that most rows use:
+
+- `ApplicationService` — the base class of each API client: `cached_json`, `get_json` / `get_json!`, `download`.
+- `UpstreamIsolation` (`safely`), `Retryable` (`with_retries`), `ParallelUpstreams`, `ErrorReporter` — what happens when an upstream fails.
+- `LiveWidget` (in `app/controllers/concerns/`) — `cache_widget` and `render_empty`, the cache headers of each widget.
+- `JsonHashStore`, `JsonRecordLibrary`, `ExpiringKeyStore`, `EncryptedCredentials` — the Redis stores.
+- `AnthropicStructuredOutput` and `app/prompts/` — each call to Claude.
+- `TokenAuthentication`, `Authentication`, `OwnerFacing` — the bearer token of a machine endpoint, and the session and headers of an admin page.
+- `config/routes.rb` — which host serves which route.
+
 ## Deployment
 
 Deployed to fly.io as `kona-api`: `fly deploy`. Configure credentials with `fly secrets set KEY=value`.
