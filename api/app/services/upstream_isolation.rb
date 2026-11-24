@@ -8,7 +8,7 @@ module UpstreamIsolation
   # @param service [String] The upstream service. Bugsnag uses it to make its groups.
   # @param fallback [Object] The value to return when the block raises.
   # @param context [String] A label for the log line and for the Bugsnag context.
-  def safely(service = self.class.name, fallback = nil, context: self.class.name)
+  def safely(service = self.class.name, fallback: nil, context: self.class.name)
     yield
   rescue StandardError => e
     Rails.logger.error("#{context}: #{e}")

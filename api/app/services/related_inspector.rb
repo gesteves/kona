@@ -137,7 +137,7 @@ class RelatedInspector < ApplicationService
   end
 
   def taxonomy_tree
-    rescue_with({}, context: "#{self.class.name} taxonomy") { @taxonomy.tree } || {}
+    safely(fallback: {}, context: "#{self.class.name} taxonomy") { @taxonomy.tree } || {}
   end
 
   # The mean and the standard deviation of the similarity of a sample of pairs. A larger standard

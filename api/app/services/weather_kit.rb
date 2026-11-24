@@ -71,7 +71,7 @@ class WeatherKit < ApplicationService
     finish = to.utc.iso8601
     cache_key = "weatherkit:hourly:#{@latitude}:#{@longitude}:#{start}:#{finish}"
     cached_json(cache_key, expires_in: HOURLY_TTL, empty_expires_in: EMPTY_TTL) do
-      with_retries do
+      with_retries_or_nil do
         jwt = token
         next if jwt.blank?
 
@@ -94,7 +94,7 @@ class WeatherKit < ApplicationService
     start = time.utc.beginning_of_day
     cache_key = "weatherkit:daily:#{@latitude}:#{@longitude}:#{start.iso8601}"
     days = cached_json(cache_key, expires_in: DAILY_TTL, empty_expires_in: EMPTY_TTL) do
-      with_retries do
+      with_retries_or_nil do
         jwt = token
         next if jwt.blank?
 
@@ -112,6 +112,12 @@ class WeatherKit < ApplicationService
 
   private
 
+  # Does the block again after a failure (refer to Retryable), and gives nil when each attempt
+  # fails. `safely` writes that failure to the log and reports it.
+  def with_retries_or_nil(**options, &block)
+    safely { with_retries(**options, &block) }
+  end
+
   # Gets the current weather data for the location. On a failure it waits, then tries again.
   # @see https://developer.apple.com/documentation/weatherkitrestapi
   # @return [Hash, nil]
@@ -121,7 +127,7 @@ class WeatherKit < ApplicationService
 
     cache_key = "weatherkit:weather:#{@latitude}:#{@longitude}:#{@time_zone}:#{@country}"
     cached_json(cache_key, expires_in: 5.minutes, empty_expires_in: EMPTY_TTL) do
-      with_retries(**RETRY_OPTIONS, deadline: remaining_budget) do
+      with_retries_or_nil(**RETRY_OPTIONS, deadline: remaining_budget) do
         datasets = availability
         next if datasets.blank?
 
@@ -151,7 +157,7 @@ class WeatherKit < ApplicationService
   def availability
     cache_key = "weatherkit:availability:#{@latitude}:#{@longitude}:#{@time_zone}:#{@country}"
     cached_json(cache_key, expires_in: 5.minutes, empty_expires_in: EMPTY_TTL) do
-      with_retries(**RETRY_OPTIONS, deadline: remaining_budget) do
+      with_retries_or_nil(**RETRY_OPTIONS, deadline: remaining_budget) do
         # A token that the code cannot sign gives a 401 on each attempt. Stop before the request.
         jwt = token
         next if jwt.blank?

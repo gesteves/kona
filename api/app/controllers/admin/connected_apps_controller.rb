@@ -50,7 +50,7 @@ module Admin
     #   hides the card.
     def strava_app
       service = Strava.new
-      return unless service.valid_credentials?
+      return unless service.configured?
 
       ConnectedAppPresenter.new(
         name: t("admin.networks.strava"),
@@ -71,7 +71,7 @@ module Admin
     #   hides the card.
     def threads_app
       service = Threads.new
-      return unless service.valid_credentials?
+      return unless service.configured?
 
       ConnectedAppPresenter.new(
         name: t("admin.networks.threads"),
@@ -131,7 +131,7 @@ module Admin
     #   hides the card.
     def whoop_app
       service = Whoop.new
-      return unless service.valid_credentials?
+      return unless service.configured?
 
       connected = service.connected?
 

@@ -30,7 +30,7 @@ RSpec.describe ActivityDescriptionJob do
   it "fails permanently when Strava or Intervals.icu refuses the credential or has no activity" do
     allow(generator).to receive(:generate!).and_raise(ApplicationService::HttpError.new(404, "", "https://www.strava.com/api/v3/activities/1"))
 
-    expect { described_class.new.perform("i1") }.to raise_error(ApplicationJob::PermanentError, /HTTP 404/)
+    expect { described_class.new.perform("i1") }.to raise_error(PermanentError, /HTTP 404/)
   end
 
   it "lets each other HTTP failure raise as it is, thus Sidekiq retries" do

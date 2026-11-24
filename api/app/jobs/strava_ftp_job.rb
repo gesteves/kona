@@ -1,7 +1,7 @@
 # Writes a cycling FTP to the profile of the athlete on Strava. Api::FtpController adds it to the
 # queue. Each PUT sets the same value, thus a retry is safe.
 class StravaFtpJob < ApplicationJob
-  # @raise [ApplicationJob::PermanentError] With no connection, or with no `profile:write` scope. A
+  # @raise [PermanentError] With no connection, or with no `profile:write` scope. A
   #   retry cannot correct either one.
   def perform(watts)
     strava = Strava.new

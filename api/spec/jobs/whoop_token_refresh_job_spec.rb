@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe WhoopTokenRefreshJob do
-  let(:whoop) { instance_double(Whoop, valid_credentials?: true, connected?: true, account_email: "athlete@example.com") }
+  let(:whoop) { instance_double(Whoop, configured?: true, connected?: true, account_email: "athlete@example.com") }
 
   before { allow(Whoop).to receive(:new).and_return(whoop) }
 
@@ -30,7 +30,7 @@ RSpec.describe WhoopTokenRefreshJob do
   end
 
   it "does nothing when the credentials aren't configured" do
-    allow(whoop).to receive(:valid_credentials?).and_return(false)
+    allow(whoop).to receive(:configured?).and_return(false)
     expect(whoop).not_to receive(:refresh_tokens!)
     described_class.new.perform
   end

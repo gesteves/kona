@@ -133,14 +133,16 @@ class StandardSite < ApplicationService
   # @param entry_id [String] The Contentful sys.id.
   # @return [Symbol] :synced, :unchanged, :deleted, or :skipped.
   def sync_document(entry_id)
-    return log_skip("document #{entry_id}", "no Bluesky credentials") unless valid_credentials?
+    return log_skip("document #{entry_id}", "no Bluesky credentials") unless connected?
     return log_skip("document #{entry_id}", "invalid entry id") unless eligible?(entry_id)
     return log_skip("document #{entry_id}", "could not authenticate with the PDS") unless create_session
 
-    item = with_retries(max: 3) do
-      found = fetch_article(entry_id)
-      raise "not yet available" if found.blank?
-      found
+    item = safely do
+      with_retries(max: 3) do
+        found = fetch_article(entry_id)
+        raise "not yet available" if found.blank?
+        found
+      end
     end
     post = item && decorate_post(item)
     if post.blank? || publishable_posts([ post ]).empty?
@@ -157,7 +159,7 @@ class StandardSite < ApplicationService
   # @param entry_id [String] The Contentful sys.id.
   # @return [Symbol] :deleted or :skipped.
   def delete_document(entry_id)
-    return log_skip("document #{entry_id}", "no Bluesky credentials") unless valid_credentials?
+    return log_skip("document #{entry_id}", "no Bluesky credentials") unless connected?
     return log_skip("document #{entry_id}", "invalid entry id") unless eligible?(entry_id)
     return log_skip("document #{entry_id}", "could not authenticate with the PDS") unless create_session
 
@@ -167,7 +169,7 @@ class StandardSite < ApplicationService
   # Syncs the publication record again from the current site entry.
   # @return [Symbol] :synced, :unchanged, or :skipped.
   def sync_publication
-    return log_skip("publication", "no Bluesky credentials") unless valid_credentials?
+    return log_skip("publication", "no Bluesky credentials") unless connected?
     return log_skip("publication", "could not authenticate with the PDS") unless create_session
 
     site = fetch_site
@@ -181,7 +183,7 @@ class StandardSite < ApplicationService
   # again. A Sidekiq worker must run, to do the queued jobs. The delete step runs immediately and
   # is safe, because it touches only records outside the published set.
   def backfill
-    return log_skip("backfill", "no Bluesky credentials") unless valid_credentials?
+    return log_skip("backfill", "no Bluesky credentials") unless connected?
     return log_skip("backfill", "could not authenticate with the PDS") unless create_session
 
     log("backfill starting")
@@ -219,10 +221,10 @@ class StandardSite < ApplicationService
   # The DID of the account, from the Redis cache. If the cache is empty, this opens a session.
   # @return [String, nil] The DID, or nil if credentials are absent or the lookup fails.
   def did
-    rescue_with(context: "standard.site DID") do
+    safely(context: "standard.site DID") do
       cached = $redis.get(DID_CACHE_KEY)
       next cached if cached.present?
-      next nil unless valid_credentials?
+      next nil unless connected?
       create_session ? @did : nil
     end
   end
@@ -232,16 +234,13 @@ class StandardSite < ApplicationService
   # @return [String, nil]
   attr_reader :handle
 
-  # @return [Boolean] True if both Bluesky credentials are available.
-  def valid_credentials?
+  # Tells if an account is connected: the app holds both Bluesky credentials. This does not do a
+  # live createSession, on purpose. The Connected apps page shows this on each load, and a PDS
+  # request here would put an upstream failure in the path of the admin navigation.
+  # @return [Boolean]
+  def connected?
     @handle.present? && @app_password.present?
   end
-
-  # Tells if an account is connected, for the Connected apps page. This does not do a live
-  # createSession, on purpose. The page shows this on each load. A PDS request here would put an
-  # upstream failure in the path of the admin navigation.
-  # @return [Boolean]
-  def connected? = valid_credentials?
 
   # Checks a credential pair: it opens a session with the pair, then stores the pair if the
   # session opens. The same step caches the DID that the session finds.
@@ -251,7 +250,7 @@ class StandardSite < ApplicationService
   # fingerprint includes the DID, thus it becomes invalid by itself.
   # @return [Boolean] Whether the credentials opened a session and were stored.
   def connect!
-    return false unless valid_credentials?
+    return false unless connected?
 
     previous_did = $redis.get(DID_CACHE_KEY)
     return false unless create_session
@@ -615,7 +614,7 @@ class StandardSite < ApplicationService
   # `validate: false`, which is the default of `AtProto#put_record`.
   # @return [Boolean] True if a session is available.
   def create_session
-    return false unless valid_credentials?
+    return false unless connected?
     return false unless open_session(handle: @handle, app_password: @app_password)
 
     $redis.set(DID_CACHE_KEY, @did) if @did.present? && defined?($redis) && $redis

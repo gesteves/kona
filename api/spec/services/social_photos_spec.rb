@@ -62,7 +62,7 @@ RSpec.describe SocialPhotos do
     it "raises a permanent error with no API_HOST" do
       allow(ENV).to receive(:[]).with("API_HOST").and_return(nil)
 
-      expect { described_class.public_url(id) }.to raise_error(ApplicationJob::PermanentError, /API_HOST/)
+      expect { described_class.public_url(id) }.to raise_error(PermanentError, /API_HOST/)
     end
   end
 

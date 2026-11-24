@@ -29,10 +29,10 @@ class SocialPhotos
   #
   # ⚠️ It is on the PUBLIC API host, because Meta cannot pass the bot protection of the admin host.
   # The signature is the permission, and the TTL of the photo ends the URL.
-  # @raise [ApplicationJob::PermanentError] When `API_HOST` is blank. Meta cannot GET a local URL.
+  # @raise [PermanentError] When `API_HOST` is blank. Meta cannot GET a local URL.
   def self.public_url(id)
     host = ENV["API_HOST"].presence
-    raise ApplicationJob::PermanentError, "API_HOST is blank, thus Threads cannot get the photo" if host.nil?
+    raise PermanentError, "API_HOST is blank, thus Threads cannot get the photo" if host.nil?
 
     "https://#{host}/api/social-photos/#{id}/#{signature(id)}"
   end

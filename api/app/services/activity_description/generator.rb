@@ -194,7 +194,7 @@ module ActivityDescription
     # @return [Float, nil] Nil for a swim, with no Whoop connection, or with no match.
     def whoop_strain(activity, swim)
       return if swim
-      return unless @whoop.valid_credentials? && @whoop.connected?
+      return unless @whoop.configured? && @whoop.connected?
 
       start = ActivityMatcher.start_time(activity)
       return if start.nil?
@@ -353,6 +353,8 @@ module ActivityDescription
 
     # Runs a step that can fail, and it catches each failure. Thus one source with a problem
     # removes only its own line, and not the full description.
+    # ⚠️ It is not UpstreamIsolation#safely: it writes its log line with LOG_PREFIX, thus a search
+    # of the log for one run finds each step that failed.
     # @param label [String] The name of the step, for the log line and for Bugsnag.
     # @param fallback [Object] The value to return when the block raises: nil for a line that goes
     #   away, or [] for a collection.

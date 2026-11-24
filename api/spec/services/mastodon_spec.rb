@@ -181,7 +181,7 @@ RSpec.describe Mastodon do
       expect(MastodonCredentials.connected?).to be(false)
     end
 
-    # ⚠️ A rack-timeout is not a StandardError, thus `rescue_with` does not catch it. The clear is
+    # ⚠️ A rack-timeout is not a StandardError, thus `safely` does not catch it. The clear is
     # in an `ensure`, thus it runs anyway.
     it "clears the store when the revoke raises an exception that is not a StandardError" do
       stub_const("FakeRequestTimeout", Class.new(Exception))
@@ -383,7 +383,7 @@ RSpec.describe Mastodon do
         allow(HTTParty).to receive(:post).with(media_url, anything)
           .and_return(http_response({ error: "scope" }, success: false, code: 403))
 
-        expect { post!(photos: [ photo ]) }.to raise_error(ApplicationJob::PermanentError, /Connect Mastodon again/)
+        expect { post!(photos: [ photo ]) }.to raise_error(PermanentError, /Connect Mastodon again/)
       end
 
       it "uploads nothing for a post that an earlier attempt made" do
@@ -397,7 +397,7 @@ RSpec.describe Mastodon do
       it "refuses more photos than a status takes" do
         photos = Array.new(described_class::MAX_MEDIA_ATTACHMENTS + 1) { photo }
 
-        expect { post!(photos: photos) }.to raise_error(ApplicationJob::PermanentError, /at the most/)
+        expect { post!(photos: photos) }.to raise_error(PermanentError, /at the most/)
       end
 
       it "posts photos with no words" do

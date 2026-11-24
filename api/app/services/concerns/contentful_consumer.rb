@@ -20,7 +20,7 @@ module ContentfulConsumer
   def find_cached_item(id, query:, collection:, cache_key:, context:, expires_in: 5.minutes, empty_expires_in: 1.minute)
     return if id.blank?
 
-    item = rescue_with(context: context) do
+    item = safely(context: context) do
       cached_json("#{cache_key}:#{id}", expires_in: expires_in, empty_expires_in: empty_expires_in) do
         underscore_keys(contentful.items(query, { id: id }, collection: collection)&.first)
       end

@@ -57,9 +57,9 @@ class Strava < ApplicationService
   def self.subscription_id = $redis.get(SUBSCRIPTION_KEY).presence
 
   # @return [Boolean] True if the Strava app credentials are available.
-  def valid_credentials? = @client_id.present? && @client_secret.present?
+  def configured? = @client_id.present? && @client_secret.present?
 
-  def connected? = valid_credentials? && @credentials.usable?
+  def connected? = configured? && @credentials.usable?
 
   def athlete_id = @credentials.athlete_id
 
@@ -73,7 +73,7 @@ class Strava < ApplicationService
   # @param state [String] A value with no meaning. The callback compares it.
   # @return [String, nil] The authorization URL, or nil with no app credentials.
   def authorization_url(state, redirect_uri:)
-    return unless valid_credentials?
+    return unless configured?
 
     query = {
       client_id: @client_id,
@@ -90,9 +90,9 @@ class Strava < ApplicationService
   # Changes the authorization code into tokens, and stores them with the athlete.
   # @return [Boolean] True if the athlete is connected now.
   def connect!(code)
-    return false unless valid_credentials?
+    return false unless configured?
 
-    rescue_with(false, context: "Strava token exchange") do
+    safely(fallback: false, context: "Strava token exchange") do
       token = post_json(
         TOKEN_URL,
         body: { client_id: @client_id, client_secret: @client_secret, code: code, grant_type: "authorization_code" },
@@ -119,7 +119,7 @@ class Strava < ApplicationService
   def disconnect!
     token = @credentials.access_token
     if token.present?
-      rescue_with(context: "Strava deauthorize") do
+      safely(context: "Strava deauthorize") do
         HTTParty.post(DEAUTHORIZE_URL, body: { access_token: token }, timeout: REQUEST_TIMEOUT)
       end
     end

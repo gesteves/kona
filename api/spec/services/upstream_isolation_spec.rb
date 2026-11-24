@@ -28,11 +28,11 @@ RSpec.describe UpstreamIsolation do
   end
 
   it "returns the given fallback when the block raises" do
-    expect(service.call("Upstream", []) { raise "boom" }).to eq([])
+    expect(service.call("Upstream", fallback: []) { raise "boom" }).to eq([])
   end
 
   it "reports the failure under the given service label and context" do
-    service.call("Whoop", nil, context: "stats") { raise ArgumentError, "bad" }
+    service.call("Whoop", context: "stats") { raise ArgumentError, "bad" }
 
     expect(ErrorReporter).to have_received(:report_upstream)
       .with(instance_of(ArgumentError), hash_including(service: "Whoop", context: "stats"))

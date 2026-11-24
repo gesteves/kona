@@ -17,7 +17,7 @@ class ActivityDescriptionJob < ApplicationJob
   PERMANENT_STATUSES = [ 401, 403, 404 ].freeze
 
   # @param activity_id [String, Integer] The Intervals.icu activity id.
-  # @raise [ApplicationJob::PermanentError] On an answer in PERMANENT_STATUSES.
+  # @raise [PermanentError] On an answer in PERMANENT_STATUSES.
   def perform(activity_id)
     # The jid is the token of the lock, thus a retry of this job can enter the lock that its own
     # attempt left.

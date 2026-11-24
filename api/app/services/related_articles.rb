@@ -56,7 +56,7 @@ class RelatedArticles < ApplicationService
   # @param count [Integer] The number of neighbors for each entry.
   # @return [Hash{String=>Array<String>}] Contentful id => the neighbor ids, the nearest first.
   def all(count: 4)
-    rescue_with({}, context: self.class.name) do
+    safely(fallback: {}, context: self.class.name) do
       pool = candidates
       published = @articles.list.reject(&:draft)
       next {} if pool.blank? || published.blank?
@@ -242,6 +242,6 @@ class RelatedArticles < ApplicationService
   # A failure here gives an empty tree, thus the taxonomy part of the score becomes 0 and the BM25
   # similarity alone puts the articles in order.
   def taxonomy_tree
-    rescue_with({}, context: "#{self.class.name} taxonomy") { @taxonomy.tree } || {}
+    safely(fallback: {}, context: "#{self.class.name} taxonomy") { @taxonomy.tree } || {}
   end
 end

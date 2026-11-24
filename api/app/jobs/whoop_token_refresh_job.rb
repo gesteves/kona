@@ -10,7 +10,7 @@
 class WhoopTokenRefreshJob < ApplicationJob
   def perform
     whoop = Whoop.new
-    return unless whoop.valid_credentials? && whoop.connected?
+    return unless whoop.configured? && whoop.connected?
 
     if whoop.refresh_tokens!.present?
       # The label of the Connected apps page. A connection can have no stored email, and this gets

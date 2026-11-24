@@ -25,9 +25,9 @@ class Whoop < ApplicationService
     # The three collections do not depend on each other, thus they run at the same time. Only the
     # filter below is a chain: a sleep goes with a cycle, and a recovery goes with a sleep.
     collections = in_parallel(
-      cycles: -> { rescue_with(context: "Whoop cycles") { get_cycles } },
-      sleeps: -> { rescue_with(context: "Whoop sleeps") { get_sleeps } },
-      recoveries: -> { rescue_with(context: "Whoop recoveries") { get_recoveries } }
+      cycles: -> { safely(context: "Whoop cycles") { get_cycles } },
+      sleeps: -> { safely(context: "Whoop sleeps") { get_sleeps } },
+      recoveries: -> { safely(context: "Whoop recoveries") { get_recoveries } }
     )
 
     cycle = most_recent_scored_cycle(collections[:cycles])
@@ -51,7 +51,7 @@ class Whoop < ApplicationService
   end
 
   # @return [Boolean] True if the OAuth credentials are available.
-  def valid_credentials?
+  def configured?
     @client_id.present? && @client_secret.present? && @redirect_uri.present?
   end
 
@@ -144,7 +144,7 @@ class Whoop < ApplicationService
   # @param state [String] A value with no meaning. The app checks it when Whoop redirects back.
   # @return [String, nil] The OAuth authorization URL, or nil if there are no credentials.
   def authorization_url(state)
-    return unless valid_credentials?
+    return unless configured?
 
     params = {
       client_id: @client_id,
@@ -160,7 +160,7 @@ class Whoop < ApplicationService
   # Changes an authorization code into tokens and stores them in Redis.
   # @return [Hash, nil] The token data, or nil if the exchange failed.
   def connect!(authorization_code)
-    return unless valid_credentials?
+    return unless configured?
 
     params = {
       client_id: @client_id,
@@ -205,7 +205,7 @@ class Whoop < ApplicationService
   # never stop an authorization or a token refresh.
   # @return [String, nil] The address, or nil if the fetch failed.
   def store_account_email!
-    email = rescue_with(context: "Whoop profile") { authed_get_or_nil("user/profile/basic") }&.dig(:email)
+    email = safely(context: "Whoop profile") { authed_get_or_nil("user/profile/basic") }&.dig(:email)
     return if email.blank?
 
     $redis.set(account_email_key, email)
@@ -214,7 +214,7 @@ class Whoop < ApplicationService
 
   # @return [Boolean] True if an account is connected now. The refresh token *is* the connection.
   def connected?
-    return false unless valid_credentials?
+    return false unless configured?
 
     $redis.exists?(refresh_token_key)
   end
@@ -378,7 +378,7 @@ class Whoop < ApplicationService
   # @see https://developer.whoop.com/docs/developing/oauth#access-token-expiration
   # @return [String, nil] The token, or nil if the app cannot refresh it.
   def get_access_token
-    return unless valid_credentials?
+    return unless configured?
 
     cached_token = read_secret(access_token_key)
     return cached_token if cached_token.present?

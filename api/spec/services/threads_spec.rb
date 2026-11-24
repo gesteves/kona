@@ -57,15 +57,15 @@ RSpec.describe Threads do
     $redis.hset(ThreadsCredentials::REDIS_KEY, "issued_at", issued_at.utc.iso8601)
   end
 
-  describe "#valid_credentials?" do
+  describe "#configured?" do
     it "is true with both app credentials" do
-      expect(described_class.new).to be_valid_credentials
+      expect(described_class.new).to be_configured
     end
 
     it "is false without them" do
       allow(ENV).to receive(:[]).with("THREADS_APP_SECRET").and_return(nil)
 
-      expect(described_class.new).not_to be_valid_credentials
+      expect(described_class.new).not_to be_configured
     end
   end
 
@@ -454,7 +454,7 @@ RSpec.describe Threads do
 
     it "refuses with a permanent error when no token can post, thus the job does not retry" do
       ThreadsCredentials.clear
-      expect { post! }.to raise_error(ApplicationJob::PermanentError, /not connected/)
+      expect { post! }.to raise_error(PermanentError, /not connected/)
     end
 
     it "forgets the container after Meta published it" do
@@ -692,7 +692,7 @@ RSpec.describe Threads do
       it "refuses more photos than a carousel takes" do
         too_many = Array.new(described_class::MAX_CAROUSEL_ITEMS + 1) { photos.first }
 
-        expect { post!(url: nil, photos: too_many) }.to raise_error(ApplicationJob::PermanentError, /at the most/)
+        expect { post!(url: nil, photos: too_many) }.to raise_error(PermanentError, /at the most/)
       end
 
       it "makes no items for a retry that finds the stored container" do

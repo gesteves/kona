@@ -84,4 +84,6 @@ module UnitsHelper
   def meters_to_yards(meters)
     meters * 1.09361
   end
+
+  private :formatted_distance, :meters_to_imperial_units
 end

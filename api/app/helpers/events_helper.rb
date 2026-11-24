@@ -178,4 +178,6 @@ module EventsHelper
   rescue ArgumentError, TypeError
     nil
   end
+
+  private :event_daylight_window, :parse_forecast_date
 end

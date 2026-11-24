@@ -18,7 +18,7 @@ RSpec.describe ActivityDescription::Generator do
   let(:strava) do
     instance_double(Strava, connected?: true, activity: { name: "Morning Ride", description: nil }, update_activity!: nil)
   end
-  let(:whoop) { instance_double(Whoop, valid_credentials?: true, connected?: true, workouts_between: []) }
+  let(:whoop) { instance_double(Whoop, configured?: true, connected?: true, workouts_between: []) }
   let(:location) { instance_double(Location, time_zone: "America/Denver") }
   let(:trainer_road) { instance_double(TrainerRoad, planned_workouts: [], race_name: nil) }
 

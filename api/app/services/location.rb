@@ -83,4 +83,6 @@ class Location
     $redis.set(LOCATION_CACHE_KEY, "#{latitude},#{longitude}")
     LocationSyncJob.perform_async(latitude, longitude)
   end
+
+  private_class_method :parse_pair
 end

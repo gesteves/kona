@@ -70,7 +70,7 @@ class Articles < ApplicationService
   def list
     return @list if defined?(@list)
 
-    items = rescue_with([], context: "Error fetching articles") do
+    items = safely(fallback: [], context: "Error fetching articles") do
       # A digest of the query goes at the end, thus a change to its fields makes a new cache key.
       # ⚠️ The cached value also holds what ArticleAttributes.derive makes from each item, thus
       # that class is part of the digest through its version.
@@ -96,7 +96,7 @@ class Articles < ApplicationService
 
   # @see #corpus
   def read_corpus
-    items = rescue_with([], context: "Error fetching the article corpus") do
+    items = safely(fallback: [], context: "Error fetching the article corpus") do
       cached_json("contentful:articles:corpus:#{cache_version(CORPUS_QUERY)}", expires_in: 5.minutes) do
         fetch_corpus.map { |item| underscore_keys(item) }
       end

@@ -162,7 +162,7 @@ class Bluesky < ApplicationService
   end
 
   # @return [Boolean] True when both credentials are available.
-  def valid_credentials? = @handle.present? && @app_password.present?
+  def connected? = @handle.present? && @app_password.present?
 
   # @return [String, nil] The handle of the connected account.
   attr_reader :handle
@@ -184,15 +184,15 @@ class Bluesky < ApplicationService
   #   MAX_IMAGE_BYTES. ⚠️ A post takes photos or a card, and not both: the record holds one embed.
   # @return [Hash] `{ "uri" =>, "cid" =>, "url" => }`. The next post of a thread names this one with
   #   the `uri` and the `cid`.
-  # @raise [ApplicationJob::PermanentError] When no account is connected, or when the text or the
+  # @raise [PermanentError] When no account is connected, or when the text or the
   #   photos do not fit. The job does not run again.
   # @raise [RuntimeError] When the session, a photo upload, or the write fails. `BlueskyPostJob`
   #   then does the work again.
   def post!(rkey:, text:, card: nil, reply: nil, photos: [])
     raise ArgumentError, "A post takes a card or photos, and not both" if card.present? && photos.present?
-    raise ApplicationJob::PermanentError, "Bluesky is not connected" unless valid_credentials?
-    raise ApplicationJob::PermanentError, "The post is empty or longer than #{MAX_GRAPHEMES} characters" unless self.class.valid_post_length?(text)
-    raise ApplicationJob::PermanentError, "A post takes at most #{MAX_IMAGES} photos" if photos.length > MAX_IMAGES
+    raise PermanentError, "Bluesky is not connected" unless connected?
+    raise PermanentError, "The post is empty or longer than #{MAX_GRAPHEMES} characters" unless self.class.valid_post_length?(text)
+    raise PermanentError, "A post takes at most #{MAX_IMAGES} photos" if photos.length > MAX_IMAGES
     raise "Could not open a Bluesky session" unless open_session(handle: @handle, app_password: @app_password)
 
     # ⚠️ The Markdown is rendered here, and not in the action. The plain words and the facet of

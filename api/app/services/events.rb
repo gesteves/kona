@@ -47,7 +47,7 @@ class Events < ApplicationService
 
   # @return [Array<OpenStruct>]
   def all
-    items = rescue_with([], context: "Error fetching events") do
+    items = safely(fallback: [], context: "Error fetching events") do
       # The end of the key is a digest of the query. Thus a change to its fields makes a new key by
       # itself. A value in the cache with an older shape would have no value for a field that a view
       # reads. The cache holds it for 5 minutes: the edge cache is the main layer for freshness, and

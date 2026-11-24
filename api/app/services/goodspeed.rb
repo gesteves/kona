@@ -17,7 +17,7 @@ class Goodspeed < ApplicationService
     url = ENV["GOODSPEED_API_URL"]
     return if url.blank?
 
-    rescue_with(context: "Error fetching Goodspeed bay conditions") do
+    safely(context: "Error fetching Goodspeed bay conditions") do
       cached_json("goodspeed:latest", expires_in: 5.minutes, empty_expires_in: 1.minute) do
         parsed = get_json(url)
         parsed if parsed && parsed[:timeseries].present?

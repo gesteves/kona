@@ -103,11 +103,11 @@ class Threads < ApplicationService
   end
 
   # @return [Boolean] True if the Meta app credentials are available.
-  def valid_credentials? = @app_id.present? && @app_secret.present?
+  def configured? = @app_id.present? && @app_secret.present?
 
   # @return [Boolean] True if an account is connected now. ⚠️ A connected account can hold an
   #   expired token: read `#expired?` before you post.
-  def connected? = valid_credentials? && @credentials.usable?
+  def connected? = configured? && @credentials.usable?
 
   # ⚠️ `connected?` stays true with an expired token, because the token is still in the store. Thus
   # the Connected apps card and the Social media page both read this.
@@ -133,7 +133,7 @@ class Threads < ApplicationService
   # @param redirect_uri [String] The callback URL of this app.
   # @return [String, nil] The authorization URL, or nil with no app credentials.
   def authorization_url(state, redirect_uri:)
-    return unless valid_credentials?
+    return unless configured?
 
     query = {
       client_id: @app_id,
@@ -152,9 +152,9 @@ class Threads < ApplicationService
   # @param redirect_uri [String] The same value that the authorization used.
   # @return [Boolean] True if the account is connected now.
   def connect!(code, redirect_uri:)
-    return false unless valid_credentials?
+    return false unless configured?
 
-    rescue_with(false, context: "Threads token exchange") do
+    safely(fallback: false, context: "Threads token exchange") do
       short_lived = exchange_code(code, redirect_uri: redirect_uri)
       next false if short_lived.blank?
 
@@ -248,18 +248,18 @@ class Threads < ApplicationService
   # @param photos [Array<Hash>] `[{ url:, alt: }, …]`, MAX_CAROUSEL_ITEMS at the most. Meta GETs
   #   each URL itself, thus each one must be public.
   # @return [String] The id of the post that Meta made.
-  # @raise [ApplicationJob::PermanentError] When no usable account is connected, or when the post
+  # @raise [PermanentError] When no usable account is connected, or when the post
   #   is empty or has too many photos. The job does not run again.
   # @raise [RuntimeError] At each other failure, thus the job does the work again.
   def post!(text:, url: nil, idempotency_key:, reply_to_id: nil, topic: nil, photos: [])
-    raise ApplicationJob::PermanentError, "Threads is not connected" unless connected?
-    raise ApplicationJob::PermanentError, "The Threads token expired; connect the account again" if expired?
+    raise PermanentError, "Threads is not connected" unless connected?
+    raise PermanentError, "The Threads token expired; connect the account again" if expired?
     if photos.length > MAX_CAROUSEL_ITEMS
-      raise ApplicationJob::PermanentError, "Threads takes #{MAX_CAROUSEL_ITEMS} photos at the most"
+      raise PermanentError, "Threads takes #{MAX_CAROUSEL_ITEMS} photos at the most"
     end
 
     text = text.to_s.strip
-    raise ApplicationJob::PermanentError, "The post is empty" if text.blank? && photos.empty?
+    raise PermanentError, "The post is empty" if text.blank? && photos.empty?
 
     # ⚠️ A retry can come after the publish, because Sidekiq redelivers a job whose process died
     # before the acknowledgement. The id of the published post is then the answer.

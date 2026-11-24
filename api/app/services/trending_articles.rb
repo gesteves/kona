@@ -117,7 +117,7 @@ class TrendingArticles < ApplicationService
   # and each variant uses it. On an error it is empty, which removes the widget and does not
   # raise.
   def ranked
-    rescue_with([], context: self.class.name) do
+    safely(fallback: [], context: self.class.name) do
       t_end = Time.current.utc.beginning_of_hour
       # ⚠️ An empty list means a failure, and it also means "nothing is trending". rank() costs
       # Plausible queries. Without the negative TTL, each request does all of them during a

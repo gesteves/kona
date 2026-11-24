@@ -63,7 +63,7 @@ RSpec.describe ThreadsPostJob do
       store.discard([ first ])
 
       expect { described_class.new.perform([ with_photos ]) }
-        .to raise_error(ApplicationJob::PermanentError, %r{ThreadsPostJob: post 1/1 lost its photo})
+        .to raise_error(PermanentError, %r{ThreadsPostJob: post 1/1 lost its photo})
       expect(threads).not_to have_received(:post!)
     end
 
@@ -72,7 +72,7 @@ RSpec.describe ThreadsPostJob do
       allow(ENV).to receive(:[]).with("API_HOST").and_return(nil)
 
       expect { described_class.new.perform([ with_photos ]) }
-        .to raise_error(ApplicationJob::PermanentError, /API_HOST/)
+        .to raise_error(PermanentError, /API_HOST/)
     end
   end
 

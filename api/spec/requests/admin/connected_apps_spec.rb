@@ -28,7 +28,7 @@ RSpec.describe "Admin connected apps", type: :request do
     # ⚠️ A card whose integration cannot operate is not on the page at all. It offers no action,
     # thus a card for it is a row that a person can do nothing about.
     context "when Whoop is not configured" do
-      before { allow_any_instance_of(Whoop).to receive(:valid_credentials?).and_return(false) }
+      before { allow_any_instance_of(Whoop).to receive(:configured?).and_return(false) }
 
       it "leaves the card off the page" do
         get "/connected-apps"
@@ -50,7 +50,7 @@ RSpec.describe "Admin connected apps", type: :request do
 
     context "when Whoop is configured but nothing is attached" do
       before do
-        allow_any_instance_of(Whoop).to receive(:valid_credentials?).and_return(true)
+        allow_any_instance_of(Whoop).to receive(:configured?).and_return(true)
         allow_any_instance_of(Whoop).to receive(:connected?).and_return(false)
       end
 
@@ -67,7 +67,7 @@ RSpec.describe "Admin connected apps", type: :request do
 
     context "when Whoop is connected" do
       before do
-        allow_any_instance_of(Whoop).to receive(:valid_credentials?).and_return(true)
+        allow_any_instance_of(Whoop).to receive(:configured?).and_return(true)
         allow_any_instance_of(Whoop).to receive(:connected?).and_return(true)
         allow_any_instance_of(Whoop).to receive(:refresh_error).and_return(nil)
       end
@@ -126,7 +126,7 @@ RSpec.describe "Admin connected apps", type: :request do
     # shows a green badge while the widget and the Intervals.icu sync do not work.
     context "when Whoop is connected but its refresh token has been rejected" do
       before do
-        allow_any_instance_of(Whoop).to receive(:valid_credentials?).and_return(true)
+        allow_any_instance_of(Whoop).to receive(:configured?).and_return(true)
         allow_any_instance_of(Whoop).to receive(:connected?).and_return(true)
         allow_any_instance_of(Whoop).to receive(:refresh_error)
           .and_return(code: 401, at: "2026-08-18T22:00:00Z")
@@ -151,7 +151,7 @@ RSpec.describe "Admin connected apps", type: :request do
     end
 
     it "never lets an admin page be stored" do
-      allow_any_instance_of(Whoop).to receive(:valid_credentials?).and_return(false)
+      allow_any_instance_of(Whoop).to receive(:configured?).and_return(false)
       get "/connected-apps"
 
       expect(response.headers["Cache-Control"]).to eq("no-store")
@@ -162,7 +162,7 @@ RSpec.describe "Admin connected apps", type: :request do
   describe "the Bluesky card" do
     before do
       sign_in!
-      allow_any_instance_of(Whoop).to receive(:valid_credentials?).and_return(false)
+      allow_any_instance_of(Whoop).to receive(:configured?).and_return(false)
     end
 
     it "offers a link to the credentials form when nothing is attached" do
@@ -194,7 +194,7 @@ RSpec.describe "Admin connected apps", type: :request do
   describe "the Mastodon card" do
     before do
       sign_in!
-      allow_any_instance_of(Whoop).to receive(:valid_credentials?).and_return(false)
+      allow_any_instance_of(Whoop).to receive(:configured?).and_return(false)
     end
 
     it "offers a link to the instance form when no account is attached" do
@@ -233,7 +233,7 @@ RSpec.describe "Admin connected apps", type: :request do
   describe "the TrainerRoad card" do
     before do
       sign_in!
-      allow_any_instance_of(Whoop).to receive(:valid_credentials?).and_return(false)
+      allow_any_instance_of(Whoop).to receive(:configured?).and_return(false)
     end
 
     it "offers a link to the calendar form when no feed is connected" do
@@ -272,7 +272,7 @@ RSpec.describe "Admin connected apps", type: :request do
   describe "the Strava card" do
     before do
       sign_in!
-      allow_any_instance_of(Whoop).to receive(:valid_credentials?).and_return(false)
+      allow_any_instance_of(Whoop).to receive(:configured?).and_return(false)
       allow(ENV).to receive(:[]).with("STRAVA_CLIENT_ID").and_return("client-id")
       allow(ENV).to receive(:[]).with("STRAVA_CLIENT_SECRET").and_return("client-secret")
     end
@@ -322,7 +322,7 @@ RSpec.describe "Admin connected apps", type: :request do
   describe "the Threads card" do
     before do
       sign_in!
-      allow_any_instance_of(Whoop).to receive(:valid_credentials?).and_return(false)
+      allow_any_instance_of(Whoop).to receive(:configured?).and_return(false)
       allow(ENV).to receive(:[]).with("THREADS_APP_ID").and_return("app-id")
       allow(ENV).to receive(:[]).with("THREADS_APP_SECRET").and_return("app-secret")
     end

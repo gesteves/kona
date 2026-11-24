@@ -96,7 +96,7 @@ Redis. A fetch would put an upstream failure in the path of the navigation.
 
 ⚠️ **Each call to another service inside an admin request needs its own timeout.** The request has
 a 20-second rack-timeout. That timeout raises an exception that is not a `StandardError`, thus
-`rescue_with` does not catch it.
+`safely` does not catch it.
 
 ### The article rankings
 

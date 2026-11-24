@@ -71,5 +71,7 @@ module ActivityDescription
 
     # "3–5", or the top alone when the range starts at zero or has one value: "3", not "0–3".
     def span(min, max) = min.zero? || min == max ? max.to_s : "#{min}–#{max}"
+
+    private_class_method :temperature_range
   end
 end

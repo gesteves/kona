@@ -24,7 +24,7 @@ module Widgets
     # @param time_zone [String] An IANA timezone id.
     # @return [Array<Hash>]
     def planned_workouts(time_zone)
-      safely("TrainerRoad", []) { TrainerRoad.new(time_zone).workouts } || []
+      safely("TrainerRoad", fallback: []) { TrainerRoad.new(time_zone).workouts } || []
     end
 
     # @return [String, nil] The `:id` parameter when it has the shape of a Contentful entry id, or

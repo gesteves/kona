@@ -2,7 +2,7 @@
 # planned-workout line that the description generator writes.
 class TrainerRoad < ApplicationService
   # The timeout of the check that #connect! makes. That action runs in a request with a 20-second
-  # rack-timeout, and that timeout raises an exception that `rescue_with` does not catch.
+  # rack-timeout, and that timeout raises an exception that `safely` does not catch.
   CONNECT_TIMEOUT = 10
 
   # The feed that the owner connected. The Connected apps page reads it.

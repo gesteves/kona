@@ -221,24 +221,6 @@ class ApplicationService
     @latitude.present? && @longitude.present?
   end
 
-  # Does a block again after a failure. Refer to Retryable. This gives nil, and reports the error,
-  # after the attempts or the deadline end: a service gives a smaller result and does not raise.
-  # @return [Object, nil]
-  def with_retries(**options, &block)
-    super
-  rescue StandardError => e
-    report_upstream_error(e)
-    nil
-  end
-
-  # Runs the block. It writes each error to the log and does not raise. It is a short form of
-  # UpstreamIsolation#safely.
-  # @param fallback [Object] The value to return on an error.
-  # @param context [String] A label for the log line.
-  def rescue_with(fallback = nil, context: self.class.name)
-    safely(self.class.name, fallback, context: context) { yield }
-  end
-
   # Sends an upstream failure that the code caught to Bugsnag, with the class name of this
   # service as a tag.
   # @see ErrorReporter.report_upstream

@@ -29,7 +29,7 @@ module Widgets
         location: -> { safely("GoogleMaps") { gmaps.location } },
         air_quality: -> { safely("AirQuality") { AirQuality.new(location.latitude, location.longitude, country).data } },
         pollen: -> { safely("GooglePollen") { GooglePollen.new(location.latitude, location.longitude).data } },
-        events: -> { safely("Events", []) { Events.new.all } },
+        events: -> { safely("Events", fallback: []) { Events.new.all } },
         goodspeed: -> { safely("Goodspeed") { Goodspeed.new.data } },
         workouts: -> { planned_workouts(time_zone) }
       )

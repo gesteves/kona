@@ -88,5 +88,7 @@ module ActivityDescription
 
     # @return [String] The env var that replaces the model for this caller.
     def anthropic_model_env = "ANTHROPIC_DESCRIPTION_MODEL"
+
+    private_class_method :valid_planned_summary, :valid_weather_conditions
   end
 end

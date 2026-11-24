@@ -40,4 +40,6 @@ module PlausibleHelper
     end
     "Viewed #{times}"
   end
+
+  private :plausible_class_value
 end

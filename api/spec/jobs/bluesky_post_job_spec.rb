@@ -138,7 +138,7 @@ RSpec.describe BlueskyPostJob do
       store.discard([ second ])
 
       expect { described_class.new.perform([ with_photos ]) }
-        .to raise_error(ApplicationJob::PermanentError, /lost its photo #{second}/)
+        .to raise_error(PermanentError, /lost its photo #{second}/)
       expect(bluesky).not_to have_received(:post!)
     end
 

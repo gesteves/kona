@@ -59,4 +59,6 @@ module PublicAddress
     address = address.native if address.ipv4_mapped?
     PRIVATE_RANGES.none? { |range| range.include?(address) }
   end
+
+  private_class_method :public_host?, :public_ip?
 end

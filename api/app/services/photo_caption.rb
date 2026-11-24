@@ -71,4 +71,6 @@ module PhotoCaption
   def clean(text)
     text.to_s.gsub(/[[:cntrl:][:space:]]+/, " ").strip.presence
   end
+
+  private_class_method :xmp_caption, :exif_caption
 end

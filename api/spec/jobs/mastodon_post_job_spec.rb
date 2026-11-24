@@ -70,7 +70,7 @@ RSpec.describe MastodonPostJob do
       store.discard([ first ])
 
       expect { described_class.new.perform([ with_photos ]) }
-        .to raise_error(ApplicationJob::PermanentError, /MastodonPostJob: post 1\/1 lost its photo/)
+        .to raise_error(PermanentError, /MastodonPostJob: post 1\/1 lost its photo/)
       expect(mastodon).not_to have_received(:post!)
     end
   end

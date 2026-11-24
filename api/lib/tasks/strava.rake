@@ -8,7 +8,7 @@ namespace :strava do
     abort("Set API_HOST, or give CALLBACK_URL.") if callback_url.nil?
 
     strava = Strava.new
-    abort("Set STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET.") unless strava.valid_credentials?
+    abort("Set STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET.") unless strava.configured?
 
     puts "Strava subscription #{strava.subscribe!(callback_url)} → #{callback_url}"
   end

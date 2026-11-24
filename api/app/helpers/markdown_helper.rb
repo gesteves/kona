@@ -48,4 +48,6 @@ module MarkdownHelper
     return if text.blank?
     Sanitize.fragment(smartypants(text))
   end
+
+  private :markdown_parser
 end

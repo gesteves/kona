@@ -41,4 +41,6 @@ module EmailDomain
   rescue Resolv::ResolvError, Resolv::ResolvTimeout => e
     raise LookupError, "MX lookup for #{domain} failed: #{e.message}"
   end
+
+  private_class_method :mx_records
 end

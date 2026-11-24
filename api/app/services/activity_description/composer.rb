@@ -153,5 +153,7 @@ module ActivityDescription
       plain = line.delete(VARIATION_SELECTOR)
       STAT_EMOJIS.any? { |emoji| plain.start_with?(emoji) }
     end
+
+    private_class_method :map_line?
   end
 end

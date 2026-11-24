@@ -121,7 +121,7 @@ RSpec.describe Bluesky do
     it "refuses when there are no credentials, with an error that no retry can correct" do
       service = described_class.new(credentials: BlueskyCredentials::Credentials.new(handle: nil, app_password: nil))
 
-      expect { service.post!(rkey: "abc", text: "Hi") }.to raise_error(ApplicationJob::PermanentError, /not connected/)
+      expect { service.post!(rkey: "abc", text: "Hi") }.to raise_error(PermanentError, /not connected/)
     end
 
     # ⚠️ Each attempt must write the same bytes. A new createdAt gives a new CID, and the `parent`
@@ -259,7 +259,7 @@ RSpec.describe Bluesky do
 
       it "refuses more photos than the most, with an error that no retry can correct" do
         expect { service.post!(rkey: "3kabc", text: "Photos", photos: Array.new(described_class::MAX_IMAGES + 1) { photo }) }
-          .to raise_error(ApplicationJob::PermanentError, /at most/)
+          .to raise_error(PermanentError, /at most/)
       end
     end
 

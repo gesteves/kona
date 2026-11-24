@@ -8,8 +8,7 @@ RSpec.describe ApplicationService do
       def http_get(*args, **kwargs) = get_json(*args, **kwargs)
       def http_post(*args, **kwargs) = post_json(*args, **kwargs)
       def underscore(obj) = underscore_keys(obj)
-      def retrying(...) = with_retries(...)
-      def guarded(*args, **kwargs, &block) = rescue_with(*args, **kwargs, &block)
+      def retrying(**options, &block) = safely { with_retries(**options, &block) }
       def fetch_body(*args, **kwargs) = download(*args, **kwargs)
     end
   end
@@ -188,7 +187,8 @@ RSpec.describe ApplicationService do
     end
   end
 
-  describe "#with_retries" do
+  # A service that must give a smaller result, and not raise, puts with_retries in safely.
+  describe "#with_retries in #safely" do
     before { allow(service).to receive(:sleep) }
 
     it "returns the block value without retrying on success" do
@@ -257,28 +257,6 @@ RSpec.describe ApplicationService do
 
       expect(service.retrying(max: 3, deadline: 0) { calls += 1; raise "boom" }).to be_nil
       expect(calls).to eq(1)
-    end
-  end
-
-  describe "#rescue_with" do
-    it "returns the block value when it succeeds" do
-      expect(service.guarded { "ok" }).to eq("ok")
-    end
-
-    it "logs and returns the fallback when the block raises" do
-      expect(Rails.logger).to receive(:error).with(/boom/)
-      expect(service.guarded([], context: "ctx") { raise "boom" }).to eq([])
-    end
-
-    it "reports the error to Bugsnag in addition to logging" do
-      allow(Rails.logger).to receive(:error)
-      reported = nil
-      context = nil
-      allow(ErrorReporter).to receive(:report_upstream) { |err, **kw| reported = err; context = kw[:context] }
-
-      service.guarded([], context: "ctx") { raise "boom" }
-      expect(reported).to be_a(RuntimeError).and have_attributes(message: "boom")
-      expect(context).to eq("ctx")
     end
   end
 

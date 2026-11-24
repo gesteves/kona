@@ -69,7 +69,7 @@ class AssetMirror < ApplicationService
     return log_skip(asset_id, "not a ctfassets-hosted asset") if key.blank?
     return log("#{asset_id} already mirrored (#{key})", :present) if object_exists?(key)
 
-    file = download(asset[:url])
+    file = download_to_tempfile(asset[:url])
     begin
       size = file.size
       client.put_object(
@@ -171,7 +171,7 @@ class AssetMirror < ApplicationService
   # @raise [ApplicationService::HttpError] If the response is not a success, thus the job runs
   #   again.
   # @raise [ArgumentError] If a redirect goes away from ctfassets. Refer to #fetch_uri.
-  def download(url, redirects_left: MAX_REDIRECTS, base: nil)
+  def download_to_tempfile(url, redirects_left: MAX_REDIRECTS, base: nil)
     uri = fetch_uri(url, base: base)
     source = uri.to_s
     file = nil
@@ -188,7 +188,7 @@ class AssetMirror < ApplicationService
           # is. The result goes to R2 at the original ctfassets key, and the public image host
           # serves it. Thus a redirect with no check would publish its target, which can be
           # something that only this VM can reach.
-          return download(response["location"], redirects_left: redirects_left - 1, base: uri)
+          return download_to_tempfile(response["location"], redirects_left: redirects_left - 1, base: uri)
         end
         raise ApplicationService::HttpError.new(response.code.to_i, "", source) unless response.is_a?(Net::HTTPSuccess)
 
@@ -219,7 +219,7 @@ class AssetMirror < ApplicationService
   OPEN_TIMEOUT = 5
   READ_TIMEOUT = 30
 
-  # Resolves one URL of #download and makes sure that it is an HTTPS fetch from ctfassets.
+  # Resolves one URL of #download_to_tempfile and makes sure that it is an HTTPS fetch from ctfassets.
   #
   # ⚠️ This raises and does not return nil, on purpose. A redirect that fails this check must
   # stop the job with a message, and not copy nothing. Refer to #sync.

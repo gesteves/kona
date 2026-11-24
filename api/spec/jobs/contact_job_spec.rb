@@ -15,6 +15,6 @@ RSpec.describe ContactJob do
   end
 
   it "still kills a job that raises a PermanentError" do
-    expect(described_class.sidekiq_retry_in_block.call(1, ApplicationJob::PermanentError.new("x"))).to eq(:kill)
+    expect(described_class.sidekiq_retry_in_block.call(1, PermanentError.new("x"))).to eq(:kill)
   end
 end

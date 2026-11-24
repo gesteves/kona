@@ -53,7 +53,7 @@ RSpec.describe SiteBuildJob do
   [ 401, 404, 422 ].each do |code|
     it "fails permanently on a #{code}" do
       allow(HTTParty).to receive(:post).and_return(instance_double(HTTParty::Response, success?: false, code: code))
-      expect { described_class.new.perform }.to raise_error(ApplicationJob::PermanentError, /HTTP #{code}/)
+      expect { described_class.new.perform }.to raise_error(PermanentError, /HTTP #{code}/)
     end
   end
 

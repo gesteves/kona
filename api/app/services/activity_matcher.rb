@@ -95,4 +95,6 @@ module ActivityMatcher
   def strava_only?(icu_activity)
     icu_activity[:source] == "STRAVA" && icu_activity.key?(:_note)
   end
+
+  private_class_method :strava_only?
 end

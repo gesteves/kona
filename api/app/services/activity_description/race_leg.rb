@@ -123,5 +123,7 @@ module ActivityDescription
     def transition?(activity) = activity[:type].to_s.casecmp("transition").zero?
 
     def sport(activity) = ActivityMatcher.normalize_type(activity[:type])
+
+    private_class_method :multisport_group, :label_in_group, :separate_leg
   end
 end

@@ -79,7 +79,7 @@ class Mastodon < ApplicationService
   # @param redirect_uri [String] The callback URL of this app.
   # @return [Boolean] True if the instance gave a client id and a secret.
   def register!(instance:, redirect_uri:)
-    rescue_with(false, context: "Mastodon app registration") do
+    safely(fallback: false, context: "Mastodon app registration") do
       client = post_json(
         "https://#{instance}/api/v1/apps",
         body: {
@@ -127,7 +127,7 @@ class Mastodon < ApplicationService
   def connect!(code)
     return false unless @credentials.registered?
 
-    rescue_with(false, context: "Mastodon token exchange") do
+    safely(fallback: false, context: "Mastodon token exchange") do
       token = post_json(
         "https://#{@credentials.instance}/oauth/token",
         body: {
@@ -168,18 +168,18 @@ class Mastodon < ApplicationService
   # @param in_reply_to_id [String, nil] The id of the status above this one, for a thread.
   # @param photos [Array<Hash>] `[{ bytes:, alt: }, …]`, MAX_MEDIA_ATTACHMENTS at the most.
   # @return [Hash] `{ "id" =>, "url" => }`. The next post of a thread names this one with the `id`.
-  # @raise [ApplicationJob::PermanentError] When no account is connected, or when the post is
+  # @raise [PermanentError] When no account is connected, or when the post is
   #   empty or has too many photos. The job does not run again.
   # @raise [ApplicationService::HttpError, RuntimeError] At each other failure, thus
   #   MastodonPostJob does the work again.
   def post!(text:, url: nil, idempotency_key: nil, in_reply_to_id: nil, photos: [])
-    raise ApplicationJob::PermanentError, "Mastodon is not connected" unless connected?
+    raise PermanentError, "Mastodon is not connected" unless connected?
     if photos.length > MAX_MEDIA_ATTACHMENTS
-      raise ApplicationJob::PermanentError, "Mastodon takes #{MAX_MEDIA_ATTACHMENTS} photos at the most"
+      raise PermanentError, "Mastodon takes #{MAX_MEDIA_ATTACHMENTS} photos at the most"
     end
 
     status = SocialText.compose(text: text, url: url)
-    raise ApplicationJob::PermanentError, "The post is empty" if status.blank? && photos.empty?
+    raise PermanentError, "The post is empty" if status.blank? && photos.empty?
 
     posted = posted_status(idempotency_key)
     return posted if posted.present?
@@ -226,7 +226,7 @@ class Mastodon < ApplicationService
   # Tells the instance to forget the token, then removes the stored credentials.
   #
   # ⚠️ The local credentials go away whether the revoke works or not: the instance can be away.
-  # The `ensure` makes that true for a rack-timeout as well, which `rescue_with` does not catch.
+  # The `ensure` makes that true for a rack-timeout as well, which `safely` does not catch.
   # @return [void]
   def disconnect!
     revoke! if @credentials.usable?
@@ -249,7 +249,7 @@ class Mastodon < ApplicationService
 
   # @return [void]
   def revoke!
-    rescue_with(context: "Mastodon token revoke") do
+    safely(context: "Mastodon token revoke") do
       HTTParty.post(
         "https://#{@credentials.instance}/oauth/revoke",
         body: {
@@ -268,7 +268,7 @@ class Mastodon < ApplicationService
   # Uploads one photo with its alt text, and waits until the instance has processed it.
   # @param photo [Hash] `{ bytes:, alt: }`. The bytes are a JPEG.
   # @return [String] The id of the media attachment.
-  # @raise [ApplicationJob::PermanentError] If the token has no `write:media` scope.
+  # @raise [PermanentError] If the token has no `write:media` scope.
   # @raise [ApplicationService::HttpError, RuntimeError] At each other failure.
   # @see https://docs.joinmastodon.org/methods/media/#v2
   def upload_media(photo)
@@ -291,7 +291,7 @@ class Mastodon < ApplicationService
   rescue ApplicationService::HttpError => e
     raise unless [ 401, 403 ].include?(e.status.to_i)
 
-    raise ApplicationJob::PermanentError,
+    raise PermanentError,
           "Mastodon refused the photo upload. Connect Mastodon again to give this app the write:media scope"
   end
 

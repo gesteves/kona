@@ -58,4 +58,6 @@ module ErrorReporter
   # One class for each non-2xx report that the code catches. Thus they make one group in Bugsnag,
   # and they are not many different RuntimeErrors.
   class UpstreamError < StandardError; end
+
+  private_class_method :build_exception
 end

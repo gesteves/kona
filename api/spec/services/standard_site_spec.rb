@@ -334,7 +334,7 @@ describe StandardSite do
     before do
       # This stubs the network. The test covers the control code of the backfill and the jobs that
       # it adds to the queue.
-      allow(client).to receive(:valid_credentials?).and_return(true)
+      allow(client).to receive(:connected?).and_return(true)
       allow(client).to receive(:create_session).and_return(true)
       allow(client).to receive(:fetch_site).and_return(site)
       allow(client).to receive(:do_sync_publication)
@@ -567,7 +567,7 @@ describe StandardSite do
     let(:rkey) { client.document_rkey(entry_id) }
 
     before do
-      allow(client).to receive(:valid_credentials?).and_return(true)
+      allow(client).to receive(:connected?).and_return(true)
       allow(client).to receive(:create_session).and_return(true)
       allow(client).to receive(:forget_fingerprint)
     end

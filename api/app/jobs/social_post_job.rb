@@ -43,9 +43,9 @@ class SocialPostJob < ApplicationJob
     end
   end
 
-  # @return [ApplicationJob::PermanentError]
+  # @return [PermanentError]
   def lost_photo(photo, index, count)
-    ApplicationJob::PermanentError.new("#{self.class.name}: post #{index + 1}/#{count} lost its photo #{photo['id']}")
+    PermanentError.new("#{self.class.name}: post #{index + 1}/#{count} lost its photo #{photo['id']}")
   end
 
   # Adds the job of the next post, one time only.

@@ -93,7 +93,7 @@ RSpec.describe ContentfulAssetJob do
   it "fails permanently when the staged file expired" do
     $redis.del("#{StagedUpload::KEY_PREFIX}#{id}")
 
-    expect { described_class.new.perform(id) }.to raise_error(ApplicationJob::PermanentError)
+    expect { described_class.new.perform(id) }.to raise_error(PermanentError)
     expect(contentful).not_to have_received(:create_asset)
   end
 
