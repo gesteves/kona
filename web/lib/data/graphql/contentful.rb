@@ -12,10 +12,21 @@ module ContentfulClient
   end
 
   # `rake import:schema` writes the schema to this file, and `rake import` includes that. With the
-  # file, `rake test` needs no request to Contentful. With no file, the code reads the live schema.
+  # file, an import needs one request less. With no file, the code reads the live schema.
   SCHEMA_PATH = File.expand_path("contentful_schema.json", __dir__)
   Schema = GraphQL::Client.load_schema(File.exist?(SCHEMA_PATH) ? SCHEMA_PATH : HTTP)
   Client = GraphQL::Client.new(schema: Schema, execute: HTTP)
+
+  # Writes the live schema to SCHEMA_PATH. On a failure it raises and writes nothing: the file
+  # from the last run stays, and the next import reads it.
+  def self.write_schema
+    # ⚠️ Write beside the file, then move it into place. A network drop in the middle of the write
+    # would leave a file of half a schema, and each import then dies at its start.
+    temporary = "#{SCHEMA_PATH}.tmp"
+    GraphQL::Client.dump_schema(HTTP, temporary)
+    JSON.parse(File.read(temporary))
+    File.rename(temporary, SCHEMA_PATH)
+  end
 
   QUERIES = Client.parse <<-'GRAPHQL'
     fragment SysFields on Sys {

@@ -69,9 +69,9 @@ npx wrangler dev              # http://localhost:8787
 
 `bundle exec rake build` does these steps, in this order. The files are `Rakefile`, `lib/tasks/*.rake`, and `config.rb`.
 
-1. **The Rakefile loads the data layer** (`lib/data/*.rb`), for each rake task. That reads the Contentful GraphQL schema from `lib/data/graphql/contentful_schema.json`, or from Contentful when the file is absent.
+1. **The import loads the data layer** (`lib/data/*.rb`). That reads the Contentful GraphQL schema from `lib/data/graphql/contentful_schema.json`, or from Contentful when the file is absent. Each other rake task, for example `test` and `build:fast`, does not load it and needs no credentials.
 2. **`clobber` deletes `data/*.json`.** Thus each import starts with no old data. The two YAML files in `data/` stay: a person writes them.
-3. **Six importers run at the same time** (`lib/tasks/import.rake`):
+3. **Six importers run at the same time.** `IMPORTS` in `lib/tasks/import.rake` lists them, and the code of each one is in `lib/data/`:
 
    | Importer | Source | Writes | When it fails |
    | --- | --- | --- | --- |

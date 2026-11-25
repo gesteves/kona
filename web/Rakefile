@@ -1,8 +1,4 @@
 require 'dotenv/tasks'
 require 'rake/clean'
-require_relative 'lib/utils/redis_connection'
-
-Dir["lib/data/*.rb"].each { |file| require_relative file }
-Dir["lib/utils/*.rb"].each { |file| require_relative file }
 
 Dir.glob('lib/tasks/**/*.rake').each { |r| import r }

@@ -189,10 +189,8 @@ jobs:
         env:
           WEBAWESOME_NPM_TOKEN: ${{ secrets.WEBAWESOME_NPM_TOKEN }}
 
-      # Use rspec directly, NOT `rake test`. The Rakefile loads the data layer, which reads the
-      # live Contentful schema at boot and thus needs credentials and a network. rspec loads only
-      # the specs, and contentful_spec stubs that client. Thus the suite runs in CI with no
-      # credentials.
+      # The suite needs no credentials and no network: contentful_spec stubs the Contentful client.
+      # `rake test` runs this same command.
       - name: Ruby tests
         run: bundle exec rspec
 
@@ -701,11 +699,6 @@ jobs:
           INDEXNOW_KEY: ${{ secrets.INDEXNOW_KEY }}
           URL: ${{ secrets.URL }}
           REDIS_URL: ${{ secrets.REDIS_URL }}
-          # The Rakefile loads the data layer, which reads the Contentful schema at its boot. The
-          # build step above wrote that file, thus this makes no request to Contentful. These two
-          # are here for the condition where that file is absent.
-          CONTENTFUL_SPACE: ${{ secrets.CONTENTFUL_SPACE }}
-          CONTENTFUL_TOKEN: ${{ secrets.CONTENTFUL_TOKEN }}
         run: bundle exec rake indexnow:submit
 
       # The site is live and the purge worked, thus this is a `warning` and not "deploy failed".

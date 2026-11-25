@@ -1,3 +1,5 @@
+require_relative "../utils/redis_connection"
+
 namespace :redis do
   desc "Empties the Redis instance after confirmation"
   task :clear do

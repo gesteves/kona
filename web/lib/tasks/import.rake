@@ -1,51 +1,72 @@
-require "httparty"
-require "yaml"
+require "json"
 
 DATA_DIRECTORY = "data"
 
 # Removes each data file from an earlier import.
 CLOBBER.include %w[ data/*.json ]
 
+# Each import: the line that the output shows, and the code. `optional: true` is for an import
+# that must not stop the build: an improvement, or the data of a third party. A content deploy
+# must not wait for an api or a third party that is unavailable for a short time. An import with
+# no flag stops the build when it fails, because each page needs its data.
+IMPORTS = {
+  content: { description: "Importing site content", run: -> { Contentful.new.save_data } },
+  icons: { description: "Importing icons", run: -> { ApiImports.icons } },
+  standard_site: { description: "Fetching standard.site verification data", run: -> { ApiImports.standard_site }, optional: true },
+  related: { description: "Fetching related articles", run: -> { ApiImports.related }, optional: true },
+  known_agents: { description: "Importing robots.txt directives", run: -> { KnownAgents.import }, optional: true },
+  schema: { description: "Writing the Contentful schema", run: -> { ContentfulClient.write_schema }, optional: true }
+}.freeze
+
+# Loads the importers of lib/data/.
+#
+# ⚠️ This is a task, and not a require at the top of the Rakefile. The Contentful client reads its
+# schema when the file loads, from the network when the schema file is absent. Thus only an
+# import needs that, and `rake test` and `rake build:fast` need no credentials.
+task :importers do
+  Dir[File.expand_path("../data/*.rb", __dir__)].sort.each { |file| require file }
+end
+
 namespace :import do
   desc "Imports FontAwesome icons"
-  task icons: [ :dotenv ] do
+  task icons: [ :dotenv, :importers ] do
     setup_data_directory
-    measure_and_output(:import_font_awesome, "Importing icons")
+    run_import(:icons)
   end
 
   desc "Imports Contentful content"
-  task content: [ :dotenv ] do
+  task content: [ :dotenv, :importers ] do
     setup_data_directory
-    measure_and_output(:import_contentful, "Importing site content")
+    run_import(:content)
   end
 
   desc "Fetches standard.site verification data (DID + publication URI) from the api"
-  task standard_site: [ :dotenv ] do
+  task standard_site: [ :dotenv, :importers ] do
     setup_data_directory
-    measure_and_output(:import_standard_site, "Fetching standard.site verification data")
+    run_import(:standard_site)
   end
 
   desc "Writes the Contentful GraphQL schema to lib/data/graphql/contentful_schema.json"
-  task schema: [ :dotenv ] do
-    measure_and_output(:import_schema, "Writing the Contentful schema")
+  task schema: [ :dotenv, :importers ] do
+    run_import(:schema)
   end
 
   desc "Fetches the related-articles ranking from the api"
-  task related: [ :dotenv ] do
+  task related: [ :dotenv, :importers ] do
     setup_data_directory
-    measure_and_output(:import_related, "Fetching related articles")
+    run_import(:related)
     report_related_coverage
   end
 
   desc "Fetches the robots.txt rules that block the AI scrapers from Known Agents"
-  task known_agents: [ :dotenv ] do
+  task known_agents: [ :dotenv, :importers ] do
     setup_data_directory
-    measure_and_output(:import_known_agents, "Importing robots.txt directives")
+    run_import(:known_agents)
   end
 end
 
 desc "Imports all content for the site"
-task import: [ :dotenv, :clobber ] do
+task import: [ :dotenv, :clobber, :importers ] do
   puts "=" * 60
   puts "🚀 Starting full site data import"
   puts "=" * 60
@@ -55,21 +76,8 @@ task import: [ :dotenv, :clobber ] do
 
   output_mutex = Mutex.new
 
-  # These do not depend on each other, thus they run at the same time.
-  independent_threads = [
-    [ :import_contentful, "Importing site content" ],
-    [ :import_font_awesome, "Importing icons" ],
-    [ :import_standard_site, "Fetching standard.site verification data" ],
-    [ :import_related, "Fetching related articles" ],
-    [ :import_known_agents, "Importing robots.txt directives" ],
-    [ :import_schema, "Writing the Contentful schema" ]
-  ].map do |method, description|
-    Thread.new do
-      measure_and_output(method, description, mutex: output_mutex)
-    end
-  end
-
-  independent_threads.each(&:join)
+  # The imports do not depend on each other, thus they run at the same time.
+  IMPORTS.keys.map { |name| Thread.new { run_import(name, mutex: output_mutex) } }.each(&:join)
 
   # This runs after the join, because it reads the output of two importers that run at the same
   # time.
@@ -85,174 +93,13 @@ def setup_data_directory
   FileUtils.mkdir_p(DATA_DIRECTORY)
 end
 
-def import_contentful
-  Contentful.new.save_data
-end
-
-# The number of icons in one /api/icons call. The api gets each icon that is not in the cache from
-# Font Awesome, and it has a maximum request time. Thus the full list in one request goes past that
-# time when the cache is empty.
-ICON_IMPORT_BATCH_SIZE = 25
-
-# Posts the list in data/font_awesome.yml to the api, in groups, and writes data/icons.json. That
-# file is the family → style → [{id, svg}] tree that the icon_svg helper reads. Each page needs the
-# icons, thus a failure raises and stops the build, and the build does not go to production with an
-# icon that is absent.
-def import_font_awesome
-  base = ENV["KONA_API_URL"].to_s.chomp("/")
-  raise "KONA_API_URL is not set; cannot fetch icons from the api" if base.blank?
-
-  allowlist = YAML.load_file("data/font_awesome.yml")["icons"] || {}
-  # uniq removes each id that is the same, thus the limit of a group cannot write one id two
-  # times.
-  triples = allowlist.flat_map do |family, styles|
-    (styles || {}).flat_map { |style, ids| Array(ids).map { |id| [ family, style, id ] } }
-  end.uniq
-
-  icons = {}
-  triples.each_slice(ICON_IMPORT_BATCH_SIZE) do |batch|
-    tree = batch.each_with_object({}) do |(family, style, id), acc|
-      ((acc[family] ||= {})[style] ||= []) << id
-    end
-    # The code adds them in order, thus the output has the same order as the list.
-    fetch_icons_batch(base, tree).each do |family, styles|
-      styles.each do |style, entries|
-        ((icons[family] ||= {})[style] ||= []).concat(entries)
-      end
-    end
-  end
-
-  raise "Icon import returned no icons from the api" if icons.blank?
-
-  File.write("data/icons.json", icons.to_json)
-end
-
-# The number of attempts after a failed icon group, and the time to wait before each attempt.
-#
-# ⚠️ The api runs on fly machines that stop by themselves, thus the first request of a build can
-# fail while the origin starts. A failed icon import stops the build, on purpose. A cold start
-# takes some seconds, thus these waits cover it and do not hide an origin that is truly broken.
-ICON_IMPORT_MAX_RETRIES = 3
-ICON_IMPORT_RETRY_DELAYS = [ 2, 5, 10 ].freeze
-
-# Posts one { family => { style => [ids] } } group to the api. On a failure it waits, then tries
-# again.
-# @return [Hash] { family => { style => [{ "id", "svg" }] } }. It raises after the last attempt.
-def fetch_icons_batch(base, tree)
-  attempt = 0
-  begin
-    response = HTTParty.post(
-      "#{base}/api/icons",
-      headers: {
-        "Authorization" => "Bearer #{ENV['API_TOKEN']}",
-        "Content-Type" => "application/json"
-      },
-      body: { icons: tree }.to_json,
-      timeout: 30
-    )
-    raise "Icon import failed: HTTP #{response.code} from #{base}/api/icons" unless response.success?
-
-    JSON.parse(response.body)
-  rescue StandardError => e
-    attempt += 1
-    raise if attempt > ICON_IMPORT_MAX_RETRIES
-
-    delay = ICON_IMPORT_RETRY_DELAYS[attempt - 1]
-    warn "Icon import attempt #{attempt} failed (#{e.message}); retrying in #{delay}s"
-    sleep delay
-    retry
-  end
-end
-
-# Writes the Contentful GraphQL schema to the file that lib/data/graphql/contentful.rb reads. On a
-# failure it writes nothing: the file from the last run stays, and the build reads it.
-def import_schema
-  safely_perform do
-    # ⚠️ Write beside the file, then move it into place. A network drop in the middle of the write
-    # would leave a file of half a schema, and each rake task then dies at its start.
-    temporary = "#{ContentfulClient::SCHEMA_PATH}.tmp"
-    GraphQL::Client.dump_schema(ContentfulClient::HTTP, temporary)
-    JSON.parse(File.read(temporary))
-    File.rename(temporary, ContentfulClient::SCHEMA_PATH)
-  end
-end
-
-# Gets the standard.site DID and the publication URI from the api and writes them to
-# data/standard_site.json, for the .well-known endpoint and for the verification link tags.
-# On a failure it writes nothing, and the templates then omit the markup. An exception gives a
-# message. A non-2xx answer gives none.
-def import_standard_site
-  safely_perform do
-    base = ENV["KONA_API_URL"].to_s.chomp("/")
-    next if base.blank?
-    response = HTTParty.get("#{base}/api/standard-site", timeout: 15)
-    next unless response.success? && response.body.present?
-    data = JSON.parse(response.body)
-    next if data["publication_uri"].blank?
-    File.write("data/standard_site.json", { did: data["did"], publication_uri: data["publication_uri"] }.to_json)
-  end
-end
-
-# Gets the related-article ids of each entry from the api and writes them to data/related.json.
-# RecirculationHelpers#related_articles renders that data as the "You May Also Like" section of each
-# article.
-#
-# On a failure it writes nothing, as import_standard_site does, and the section is then absent.
-# ⚠️ This does NOT stop the build, on purpose. The list is an improvement, and an api that is
-# unavailable for a short time must not stop a content deploy. An icon that is absent is
-# different.
-def import_related
-  safely_perform do
-    base = ENV["KONA_API_URL"].to_s.chomp("/")
-    next if base.blank?
-    response = HTTParty.get("#{base}/api/related", headers: { "Authorization" => "Bearer #{ENV['API_TOKEN']}" }, timeout: 15)
-    next unless response.success? && response.body.present?
-    related = JSON.parse(response.body)
-    next unless related.is_a?(Hash) && related.present?
-    File.write("data/related.json", related.to_json)
-  end
-end
-
-# The Known Agents endpoint that makes the robots.txt rules, and the agent types that we block.
-# "AI Data Scraper" is the family that takes the text of a page to train a model. The list of the
-# agents in that family changes, thus the build gets the rules again each time.
-KNOWN_AGENTS_API_URL = "https://api.knownagents.com/robots-txts".freeze
-KNOWN_AGENTS_AGENT_TYPES = [ "AI Data Scraper", "Undocumented AI Agent" ].freeze
-
-# Gets the robots.txt rules of the AI scrapers from Known Agents and writes them to
-# data/known_agents.json. source/robots.txt.erb renders them between the rule for each other
-# crawler and the Sitemap line.
-#
-# On a failure, and with no access token, it writes nothing, as import_standard_site does, and the
-# rules are then absent from robots.txt. ⚠️ This does NOT stop the build, on purpose: a third party
-# that is unavailable must not stop a content deploy.
-def import_known_agents
-  safely_perform do
-    token = ENV["KNOWN_AGENTS_ACCESS_TOKEN"].to_s
-    next if token.blank?
-    response = HTTParty.post(
-      KNOWN_AGENTS_API_URL,
-      headers: {
-        "Authorization" => "Bearer #{token}",
-        "Content-Type" => "application/json"
-      },
-      body: { agent_types: KNOWN_AGENTS_AGENT_TYPES, disallow: "/" }.to_json,
-      timeout: 15
-    )
-    next unless response.success? && response.body.present?
-    rules = response.body.strip
-    next if rules.blank?
-    File.write("data/known_agents.json", { robots_txt: rules }.to_json)
-  end
-end
-
 # The part of the archive that needs a related list before the build reports one that is thin.
 # The two apps read Contentful separately, thus a small skew between them is normal.
 RELATED_COVERAGE_FLOOR = 0.8
 
 # Reports a related-articles file that is absent or thin. It does NOT stop the build.
 #
-# ⚠️ A non-2xx answer to import_related gives no message, and each article then loses four
+# ⚠️ A non-2xx answer to ApiImports.related gives no message, and each article then loses four
 # internal links. This report shows that failure.
 def report_related_coverage
   articles = JSON.parse(File.read("data/articles.json")) rescue nil
@@ -282,44 +129,35 @@ def report_related_coverage
   puts "⚠️  The api ranked #{covered} of #{expected} entries. Run `rake related:audit` in the api."
 end
 
-# Runs an import that must not stop the build.
+# Runs one import of IMPORTS and prints its result.
 #
-# ⚠️ It gives the exception back, and it prints nothing: measure_and_output prints the result
-# through its mutex, with the name of the import. A print here would go between the lines of the
-# other threads, and the import would still show as complete.
-# @return [StandardError, nil] The failure, or nil when the block completed.
-def safely_perform
-  yield
-  nil
-rescue => e
-  e
-end
-
-def measure_and_output(method, description, mutex: nil)
+# ⚠️ Only this method prints, through the mutex, with the name of the import. A print in an
+# importer would go between the lines of the other threads.
+# @param name [Symbol] A key of IMPORTS.
+# @param mutex [Mutex, nil] The lock of the output, when the imports run at the same time.
+def run_import(name, mutex: nil)
+  import = IMPORTS.fetch(name)
+  description = import[:description]
   log = ->(msg) { mutex ? mutex.synchronize { puts msg } : puts(msg) }
 
   log.call("\n🔄 #{description}...")
   start_time = Time.now
 
   begin
-    result = send(method)
-    duration = Time.now - start_time
-    if result.is_a?(StandardError)
-      # An import that catches its own failure with safely_perform. The build goes on, and this
-      # line is what says that the data of that import is absent.
-      log.call("⚠️  #{description} did not complete after #{format_duration(duration)}")
-      log.call("   Error: #{result.class}: #{result.message}")
-    else
-      log.call("✅ #{description} completed in #{format_duration(duration)}")
-    end
+    import[:run].call
+    log.call("✅ #{description} completed in #{format_duration(Time.now - start_time)}")
   rescue => e
-    duration = Time.now - start_time
-    log.call("❎ #{description} failed after #{format_duration(duration)}")
-    log.call("   Error: #{e.message}")
-    # This stops the build here, and not with an unclear error on each page later. An import that
-    # must continue after a failure catches its own errors with safely_perform and never comes
-    # here.
-    raise
+    duration = format_duration(Time.now - start_time)
+    if import[:optional]
+      # The build goes on, and this line is what says that the data of that import is absent.
+      log.call("⚠️  #{description} did not complete after #{duration}")
+      log.call("   Error: #{e.class}: #{e.message}")
+    else
+      log.call("❎ #{description} failed after #{duration}")
+      log.call("   Error: #{e.message}")
+      # This stops the build here, and not with an unclear error on each page later.
+      raise
+    end
   end
 end
 
