@@ -256,10 +256,10 @@ RSpec.describe SiteHelpers do
 
     # An element that the build renders with real content, that is, the upcoming-races section,
     # does not have the flag: with the flag, a temporary fetch failure would delete that content.
-    # It still fetches on connect, because the controller counts a URL with no fetch as old.
-    it 'omits the placeholder flag and aria-busy for a statically rendered element' do
+    # It has the static flag in place of it, thus it gets the fragment at each connect.
+    it 'writes the static flag, and not the placeholder flag or aria-busy, for a statically rendered element' do
       attrs = live_update_attrs('/widgets/events/upcoming', placeholder: false)
-      expect(attrs).to eq('data-controller="live-update" data-live-update-url-value="/widgets/events/upcoming" data-action="visibilitychange@document->live-update#handleVisibilityChange"')
+      expect(attrs).to eq('data-controller="live-update" data-live-update-url-value="/widgets/events/upcoming" data-live-update-static-value="true" data-action="visibilitychange@document->live-update#handleVisibilityChange"')
       expect(attrs).to be_html_safe
     end
   end

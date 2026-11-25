@@ -15,21 +15,30 @@ const lastFetchAtByUrl = new Map();
 /**
  * Gets an HTML fragment that the api renders, and puts it in the page.
  *
- * The `placeholder` value shows which of the two types of element runs this controller. The
- * skeleton on the web side sets it: that element has no real content, thus it always fetches and
- * it goes away on a failure. The api fragment that replaces it does not set the value: it fetches
- * again only when its content is old, and it keeps its content on a failure. Refer to the HTML
- * contract between the two apps in the root CLAUDE.md.
+ * Three types of element run this controller, and two values show the type:
+ * - `placeholder`: the skeleton on the web side. It has no real content, thus it always fetches,
+ *   and it goes away on a failure.
+ * - `static`: an element that the build renders with real content. It always fetches on connect,
+ *   because the build content is older than any fragment. It keeps its content on a failure.
+ * - Neither value: the api fragment. It fetches again only when its content is old, and it keeps
+ *   its content on a failure.
+ *
+ * Refer to the HTML contract between the two apps in the root CLAUDE.md.
  */
 export default class extends Controller {
   static values = {
     url: String,
     placeholder: Boolean,
+    static: Boolean,
   };
 
-  /** Fetches immediately for a placeholder, or when the content on the page is old. */
+  /**
+   * Fetches immediately for a placeholder and for a static element, or when the content on the
+   * page is old. A Turbo advance visit renders the static element from the build again, thus the
+   * clock of an earlier visit cannot tell if this element is old.
+   */
   connect() {
-    if (this.placeholderValue || this.isStale) {
+    if (this.placeholderValue || this.staticValue || this.isStale) {
       this.fetchAndUpdateContent();
     }
   }

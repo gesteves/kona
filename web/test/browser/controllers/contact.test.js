@@ -249,15 +249,49 @@ describe('submitting', () => {
     expect(fetchMock).toHaveBeenCalled();
   });
 
-  it('supersedes an in-flight submission rather than sending two', async () => {
-    fetchMock.mockReturnValue(new Promise(() => {}));
+  // The origin can accept a request that the browser aborted. A second request would then send
+  // the Turnstile token again, get a 422, and make the visitor send the same message twice.
+  it('ignores a second submit while one is in flight, and keeps the first request', async () => {
+    let resolveFetch;
+    fetchMock.mockReturnValue(
+      new Promise((resolve) => {
+        resolveFetch = resolve;
+      })
+    );
+    await mountForm();
+    const button = document.querySelector('[data-contact-target="submit"]');
+
+    await submitForm();
+    await submitForm();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][1].signal.aborted).toBe(false);
+    expect(button.loading).toBe(true);
+
+    resolveFetch({ ok: true, status: 204 });
+    await flushDom();
+
+    expect(button.loading).toBe(false);
+    expect(lastToast().variant).toBe('success');
+  });
+
+  it('submits again after the first submission settles', async () => {
     await mountForm();
 
     await submitForm();
     await submitForm();
 
-    expect(fetchMock.mock.calls[0][1].signal.aborted).toBe(true);
-    expect(fetchMock.mock.calls[1][1].signal.aborted).toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('ignores a second submit when the button is not wired as a target', async () => {
+    fetchMock.mockReturnValue(new Promise(() => {}));
+    await mountForm({ submitTarget: false });
+
+    await submitForm();
+    await submitForm();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
 

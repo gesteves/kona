@@ -98,11 +98,16 @@ module SiteHelpers
     # reads the change as "finished", and not as one nameless area in place of another.
     #
     # ⚠️ Use `placeholder: false` for an element that the build renders with REAL content. The
-    # flag makes the controller remove the element when a fetch fails, and that deletes the content.
-    # Such an element still gets the fragment on connect, because a URL with no fetch counts as
-    # old. An empty response still removes it, which is the "no data" answer from the api.
+    # placeholder flag makes the controller remove the element when a fetch fails, and that deletes
+    # the content. Such an element gets the static flag, thus it gets the fragment at each connect.
+    # The clock of the controller cannot do that: a Turbo visit renders the build content again
+    # inside the 60 seconds. An empty response still removes it, which is the "no data" answer.
     attrs = %(data-controller="live-update" data-live-update-url-value="#{url}")
-    attrs += %( data-live-update-placeholder-value="true" aria-busy="true") if placeholder
+    attrs += if placeholder
+      %( data-live-update-placeholder-value="true" aria-busy="true")
+    else
+      %( data-live-update-static-value="true")
+    end
     attrs += %( data-action="visibilitychange@document->live-update#handleVisibilityChange")
     attrs.html_safe
   end

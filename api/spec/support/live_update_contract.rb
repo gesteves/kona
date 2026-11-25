@@ -29,6 +29,14 @@ RSpec.shared_examples "a live-update fragment" do |path|
     expect(response.body).not_to include("data-live-update-placeholder-value")
   end
 
+  # The static flag makes the element fetch at each connect. On a fragment, each swap would then
+  # connect a new element that fetches again, with no end.
+  it "is not marked as static" do
+    get path, headers: auth_headers
+
+    expect(response.body).not_to include("data-live-update-static-value")
+  end
+
   # The placeholder has aria-busy="true" while its skeleton is on the screen. A fragment is the
   # complete content, thus that attribute on a fragment would make a screen reader say that the area
   # loads for all time.

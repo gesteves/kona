@@ -28,6 +28,14 @@ const fragment = (url = WIDGET_URL, body = '48 views') =>
         data-live-update-url-value="${url}"
         data-action="visibilitychange@document->live-update#handleVisibilityChange">${body}</div>`;
 
+// The upcoming-races section: the build renders it with real content, thus it has the static flag
+// and not the placeholder flag.
+const staticElement = (url = WIDGET_URL, body = 'build content') =>
+  `<div class="pageviews" data-controller="live-update"
+        data-live-update-url-value="${url}"
+        data-live-update-static-value="true"
+        data-action="visibilitychange@document->live-update#handleVisibilityChange">${body}</div>`;
+
 /** A response with only the three members that the controller reads. */
 const respondWith = (body, { ok = true, status = 200 } = {}) => ({
   ok,
@@ -136,6 +144,20 @@ describe('on connect', () => {
     expect(fetchMock.mock.calls[0][0]).toBe(OTHER_URL);
   });
 
+  it('fetches for a static element even when its URL was fetched under a minute ago', async () => {
+    // A Turbo advance visit renders the build content again, and not the fragment. The clock of
+    // the earlier visit is fresh, but that content is older than each fragment. Without the static
+    // flag, the page shows the build content, for example with no "Today's Race" section.
+    await mountLiveUpdate(staticElement());
+    await flushDom();
+    fetchMock.mockClear();
+
+    now += 1_000;
+    await render(staticElement());
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('ignores a placeholder with no URL rather than fetching the current page', async () => {
     await mountLiveUpdate(
       '<div data-controller="live-update" data-live-update-placeholder-value="true"></div>'
@@ -189,6 +211,19 @@ describe('when the fetch fails', () => {
     await flushDom();
 
     expect(document.querySelector('.pageviews')).toBeNull();
+  });
+
+  it('KEEPS a static element on a non-2xx', async () => {
+    // The static flag makes the element fetch at each connect, but a failure must not delete the
+    // build content. Only the placeholder flag permits that removal.
+    fetchMock.mockResolvedValue(respondWith('', { ok: false, status: 502 }));
+
+    await mountLiveUpdate(staticElement(WIDGET_URL, 'build content'));
+    await flushDom();
+
+    expect(document.querySelector('.pageviews').textContent).toBe(
+      'build content'
+    );
   });
 
   it('KEEPS a rendered fragment on a non-2xx', async () => {

@@ -428,8 +428,9 @@ marks an element that the build renders with **real content**, and the fragment 
 content and does not fill an empty element. Today that is the upcoming-races section only: the build
 writes it from `data/events.json`, and the api renders it again with the race-day weather and a
 "Today's Race" section. Such an element must not have the placeholder flag, for the same reason as
-the api fragment: a short fetch failure would delete content that is already correct. It still gets
-the fragment on connect, because the controller counts a URL with no fetch as old. An **empty**
+the api fragment: a short fetch failure would delete content that is already correct. The helper
+gives it the `static` flag in place of that, thus it gets the fragment at each connect. ⚠️ An api
+fragment must never have the `static` flag: each swap would then fetch again, with no end. An **empty**
 response still removes it, and that is the api saying that there is no upcoming race.
 
 `api/spec/contracts/widget_markup_contract_spec.rb` compares the outer element of each pair. A

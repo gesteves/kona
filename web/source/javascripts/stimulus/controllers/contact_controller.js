@@ -63,12 +63,20 @@ export default class extends Controller {
     }
   }
 
-  /** Submits the form with fetch, and not with a native navigation. */
+  /**
+   * Submits the form with fetch, and not with a native navigation. It ignores a submit while one
+   * is in progress.
+   *
+   * ⚠️ Do not abort the first request and send a second one. The origin can accept the first
+   * message after the abort, and the second request then sends a Turnstile token that was already
+   * used. The visitor gets an error, and sends the same message again. The Worker stops a request
+   * after a timeout, thus the button cannot stay off.
+   */
   async submit(event) {
     event.preventDefault();
+    if (this.submitting) return;
     const form = this.element;
 
-    this.abortController?.abort();
     this.abortController = new AbortController();
     this.setSubmitting(true);
 
@@ -148,10 +156,11 @@ export default class extends Controller {
    * ⚠️ Use aria-disabled, and not `disabled`. The user pressed this button, thus it has the focus,
    * and `disabled` puts tabindex="-1" on the real button in the shadow root. The focus then goes to
    * the body and it does not come back, and the user loses their place in the form.
-   * ⚠️ aria-disabled does not stop a second submit, and it must not: `submit()` aborts the request
-   * in progress and sends the new one, on purpose. Thus two presses still give one message.
+   * aria-disabled does not stop a second submit. The `submitting` flag does that, also when the
+   * button is not a target.
    */
   setSubmitting(isSubmitting) {
+    this.submitting = isSubmitting;
     if (!this.hasSubmitTarget) return;
     this.submitTarget.loading = isSubmitting;
     this.submitTarget.setAttribute('aria-disabled', String(isSubmitting));
