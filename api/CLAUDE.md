@@ -321,8 +321,8 @@ boot of Rails. Thus `rspec` and `bin/dev` both fail without it, and `web/` needs
 take the omakase configuration *is* the decision to have no house style. Turn a rule off in the code
 at the one place that needs that, and do not edit the configuration.
 
-CI runs RuboCop, Brakeman, and bundler-audit, and the deploy job **operates only if all three
-pass**. When Brakeman reports a problem that you checked and that is not true, add a
+CI runs RuboCop, Brakeman, bundler-audit, and `npm audit`, and the deploy job **operates only if
+all four pass**. When Brakeman reports a problem that you checked and that is not true, add a
 `config/brakeman.ignore` file to the repository and do not make the code weaker.
 
 ### Testing

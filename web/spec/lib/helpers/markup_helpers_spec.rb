@@ -173,6 +173,17 @@ RSpec.describe MarkupHelpers do
   end
 
   describe '#units_tag' do
+    # ⚠️ The content_tag of Middleman does not escape the content of a block, and the content_tag of
+    # Padrino does. The build uses the first one, thus this stub copies it.
+    it 'escapes its text, also with the content_tag of Middleman' do
+      allow(self).to receive(:content_tag) { |name, _options, &block| "<#{name}>#{block.call}</#{name}>" }
+
+      result = add_unit_data_attributes('<span data-imperial="6 mi">10 &lt;b&gt; km</span>')
+
+      expect(result).to include('10 &lt;b&gt; km')
+      expect(result).not_to include('<b>')
+    end
+
     it 'takes a title in place of the default one' do
       result = units_tag('10', '6.2', title: '10 km | 6.2 mi')
       expect(result).to include('title="10 km | 6.2 mi"')

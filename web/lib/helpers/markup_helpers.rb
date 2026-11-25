@@ -1,4 +1,5 @@
 require "cgi"
+require "erb"
 require "htmlentities"
 require "nokogiri"
 
@@ -299,10 +300,13 @@ module MarkupHelpers
   # Renders a tag that is connected to the units Stimulus controller.
   # @param attrs [Hash] More attributes for the element, for example a class. A `title` replaces
   #   the default "metric | imperial", for a number whose unit is in another element.
+  #
+  # ⚠️ The code escapes the text, because the content_tag of Middleman does not escape a block. The
+  # api copy escapes it through Rails, and both copies go on the same page.
   def units_tag(metric, imperial, tag = :span, **attrs)
     title = attrs.delete(:title) || "#{metric} | #{imperial}"
     content_tag tag.to_sym, 'data-controller': "units", 'data-units-imperial-value': imperial, 'data-units-metric-value': metric, title: title, **attrs do
-      metric
+      ERB::Util.html_escape(metric)
     end
   end
 

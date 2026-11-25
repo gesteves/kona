@@ -98,7 +98,7 @@ jobs:
           cache: npm
           cache-dependency-path: api/package-lock.json
 
-      # ⚠️ This is necessary. spec/requests/sessions_spec.rb renders /login through layouts/auth,
+      # ⚠️ This is necessary. spec/requests/sessions_spec.rb renders /signin through layouts/auth,
       # which calls stylesheet_link_tag "admin". Propshaft raises MissingAssetError when the
       # esbuild output is absent, and it gives no smaller result.
       - name: Install JavaScript dependencies
@@ -140,6 +140,18 @@ jobs:
 
       - name: bundler-audit (dependency CVEs)
         run: bundle exec bundle-audit check --update
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version-file: api/.nvmrc
+
+      # Turbo, Stimulus, and Web Awesome go into the admin bundle, which the browser of the owner
+      # runs. The audit reads the lockfile only, thus it needs no install and no registry token.
+      # ⚠️ This step stops the workflow on a failure, as bundler-audit above does, and as the same
+      # step in web.yml does.
+      - name: npm audit (JS dependency CVEs)
+        run: npm audit --omit=dev --audit-level=high
 
   notify-checks:
     name: Notify checks result
