@@ -81,9 +81,13 @@ Rails.application.routes.draw do
   # constraint is what makes that rule safe: a route outside this block is available on the public
   # host, with Super Bot Fight Mode off.
   # spec/requests/host_constraints_spec.rb enforces this.
+  #
+  # ⚠️ Read the `Host` header, and not `request.host`. Rails gives `X-Forwarded-Host` first, with no
+  # check of the proxy, thus a client could send the admin host in that header on the public host.
   admin_only = lambda do |request|
     api_host = ENV["API_HOST"].presence
-    api_host.nil? || !request.host.casecmp?(api_host)
+    host = request.get_header("HTTP_HOST").to_s.sub(/:\d+\z/, "")
+    api_host.nil? || !host.casecmp?(api_host)
   end
 
   constraints(admin_only) do

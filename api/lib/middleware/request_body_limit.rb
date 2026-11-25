@@ -5,6 +5,9 @@
 #
 # It reads CONTENT_LENGTH only. Puma reads a chunked body to its end and sets that header, thus
 # no body reaches this code with no length.
+#
+# ⚠️ It applies to each method, and not to POST only. Puma reads the body of each method, the form
+# parser reads it for each method, and the `*unmatched` catch-all takes each method.
 class RequestBodyLimit
   # ⚠️ Plain integers: this file loads before ActiveSupport adds `megabytes` to Integer.
   MEGABYTE = 1024 * 1024
@@ -26,15 +29,11 @@ class RequestBodyLimit
   ].freeze
   DEFAULT_LIMIT = 64 * 1024
 
-  BODY_METHODS = %w[POST PUT PATCH].freeze
-
   def initialize(app)
     @app = app
   end
 
   def call(env)
-    return @app.call(env) unless BODY_METHODS.include?(env["REQUEST_METHOD"])
-
     length = env["CONTENT_LENGTH"].to_i
     return @app.call(env) if length <= limit_for(env["PATH_INFO"].to_s)
 

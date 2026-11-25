@@ -44,7 +44,18 @@ RSpec.describe RequestBodyLimit do
   end
 
   it "ignores a request with no body" do
-    expect(status_for("/widgets/weather/current", method: "GET", length: 50.megabytes)).to eq(200)
+    expect(status_for("/widgets/weather/current", method: "GET", length: 0)).to eq(200)
+    env = Rack::MockRequest.env_for("/widgets/weather/current", method: "GET")
+    expect(middleware.call(env).first).to eq(200)
+  end
+
+  # The catch-all route takes each method, and the form parser reads a body for each method. Thus
+  # a large body on a GET, a DELETE, or an OPTIONS needs the same limit as on a POST.
+  %w[GET DELETE OPTIONS].each do |method|
+    it "refuses a large body on a #{method}" do
+      expect(status_for("/probe", method: method, length: 64.kilobytes + 1)).to eq(413)
+      expect(status_for("/probe", method: method, length: 64.kilobytes)).to eq(200)
+    end
   end
 
   it "answers as plain text with no cache header" do

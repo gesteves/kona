@@ -166,6 +166,37 @@ RSpec.describe "Rack::Attack", type: :request do
     expect(response).not_to have_http_status(:too_many_requests)
   end
 
+  # One IPv6 subscriber controls at least a /64. A new address for each request must not give a
+  # new budget.
+  it "throttles contact submissions per IPv6 /64, whatever the address inside it" do
+    5.times do |i|
+      post "/api/contact", headers: { "X-Kona-Client-IP" => "2001:db8:1:2::#{i + 1}" }
+      expect(response).not_to have_http_status(:too_many_requests)
+    end
+
+    post "/api/contact", headers: { "X-Kona-Client-IP" => "2001:db8:1:2:ffff::9" }
+    expect(response).to have_http_status(:too_many_requests)
+
+    # The next /64 is a different visitor.
+    post "/api/contact", headers: { "X-Kona-Client-IP" => "2001:db8:1:3::1" }
+    expect(response).not_to have_http_status(:too_many_requests)
+  end
+
+  describe "RACK_ATTACK_VISITOR_KEY" do
+    it "keeps an IPv4 address, and gives an IPv4 address in IPv6 form as IPv4" do
+      expect(RACK_ATTACK_VISITOR_KEY.call("9.9.9.9")).to eq("9.9.9.9")
+      expect(RACK_ATTACK_VISITOR_KEY.call("::ffff:9.9.9.9")).to eq("9.9.9.9")
+    end
+
+    it "gives the /64 network of an IPv6 address" do
+      expect(RACK_ATTACK_VISITOR_KEY.call("2001:db8:1:2:aaaa:bbbb:cccc:dddd")).to eq("2001:db8:1:2::/64")
+    end
+
+    it "keeps a value that is not an IP" do
+      expect(RACK_ATTACK_VISITOR_KEY.call("not-an-ip")).to eq("not-an-ip")
+    end
+  end
+
   # /signin and /auth are in RACK_ATTACK_KNOWN_PREFIXES, and that is what keeps them out of the
   # throttle for unknown paths. Thus without a rule of their own, the sign-in pages have no limit at
   # the origin. client_ip is a safe key here and at no other place: these paths are on the admin

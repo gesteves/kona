@@ -12,6 +12,7 @@
 # them when it sets Rack::Attack.enabled.
 
 require "cgi"
+require "ipaddr"
 
 Rack::Attack.enabled = !Rails.env.test?
 
@@ -101,12 +102,27 @@ Rack::Attack.throttle("webhooks/ip", limit: 600, period: 1.minute) do |req|
   req.client_ip if req.path.start_with?("/webhooks/")
 end
 
+# The throttle key of one visitor IP: the IPv4 address, or the /64 network of an IPv6 address. An
+# IPv4 address in IPv6 form gives its IPv4 address. A value that is not an IP stays as it is.
+# @return [String]
+RACK_ATTACK_VISITOR_KEY = lambda do |ip|
+  address = IPAddr.new(ip)
+  address = address.native if address.ipv4_mapped?
+  address.ipv6? ? "#{address.mask(64)}/64" : address.to_s
+rescue IPAddr::InvalidAddressError
+  ip
+end
+
 # Throttles the contact-form submissions for each visitor. The key is the IP that the web proxy
 # sends, and not client_ip. For proxy traffic, client_ip is the shared egress, and it would
 # throttle each person at the same time. A direct request to the origin has no forwarded header and
 # has no key here. A bearer token already controls it.
+#
+# ⚠️ An IPv6 key is the /64 network, and not the address. One subscriber controls at least a /64,
+# thus a new address for each request would make the limit useless.
 Rack::Attack.throttle("contact/ip", limit: 5, period: 1.hour) do |req|
-  req.get_header("HTTP_X_KONA_CLIENT_IP").presence if req.post? && req.path == "/api/contact"
+  ip = req.get_header("HTTP_X_KONA_CLIENT_IP").presence if req.post? && req.path == "/api/contact"
+  RACK_ATTACK_VISITOR_KEY.call(ip) if ip
 end
 
 # Plain-text responses, as in lib/plain_text_exceptions.rb. There are no edge cache headers,

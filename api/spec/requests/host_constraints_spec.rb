@@ -117,6 +117,22 @@ RSpec.describe "Public API host route constraints", type: :request do
     end
     end
 
+    # ⚠️ Rails reads `X-Forwarded-Host` before `Host` for `request.host`. A client that sends the
+    # admin host in that header must still get the public host, with its 404.
+    [ [ :get, "/signin" ], [ :get, "/connected-apps" ], [ :post, "/spam/abc123/not-spam" ] ].each do |method, path|
+      it "404s #{method.to_s.upcase} #{path} on the public API host with a spoofed X-Forwarded-Host" do
+        process(method, "http://#{api_host}#{path}", headers: { "X-Forwarded-Host" => admin_host })
+
+        expect(response).to have_http_status(:not_found)
+      end
+    end
+
+    it "matches the public API host with a port in the Host header" do
+      process(:get, "http://#{api_host}:443/signin")
+
+      expect(response).to have_http_status(:not_found)
+    end
+
     # `/` is the one path where the two hosts give a different answer, and where neither one gives a
     # 404. The admin UI is at the root of the admin host, and the public host keeps the redirect to
     # the main site. Rails draws two routes for "/", thus only their order and the host constraint
