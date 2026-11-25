@@ -15,13 +15,6 @@ RSpec.describe ContentfulConsumer do
 
   before do
     allow(ContentfulClient).to receive(:new).with("SpecConsumer").and_return(client)
-    keys = $redis.keys("spec:item:*")
-    $redis.del(*keys) if keys.any?
-  end
-
-  after do
-    keys = $redis.keys("spec:item:*")
-    $redis.del(*keys) if keys.any?
   end
 
   def find(id) = host.find_cached_item(id, query: query, collection: :things, cache_key: "spec:item", context: "spec")

@@ -103,8 +103,6 @@ RSpec.describe BlueskyPostJob do
                                                        { "id" => second, "alt" => "" } ])
     end
 
-    after { store.discard([ first, second ]) }
-
     it "reads each photo from the store and gives it to the post, in order, with its alt text" do
       described_class.new.perform([ with_photos ])
 

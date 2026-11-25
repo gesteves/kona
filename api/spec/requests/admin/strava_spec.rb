@@ -7,7 +7,6 @@ RSpec.describe "Admin Strava connection", type: :request do
 
   before do
     stub_env("STRAVA_CLIENT_ID" => "client-id", "STRAVA_CLIENT_SECRET" => "client-secret")
-    $redis.del(StravaCredentials::REDIS_KEY)
   end
 
   def sign_in! = sign_in_as(email: owner_email)

@@ -3,10 +3,6 @@ require "rails_helper"
 RSpec.describe "Admin Bluesky connection", type: :request do
   include_context "the admin UI"
 
-  before do
-    $redis.del(BlueskyCredentials::REDIS_KEY)
-  end
-
   def sign_in! = sign_in_as(email: owner_email)
 
   describe "GET /connected-apps/bluesky" do
@@ -137,8 +133,6 @@ RSpec.describe "Admin Bluesky connection", type: :request do
       delete "/connected-apps/bluesky"
 
       expect($redis.get(StandardSite::DID_CACHE_KEY)).to eq("did:plc:abc123")
-    ensure
-      $redis.del(StandardSite::DID_CACHE_KEY)
     end
   end
 

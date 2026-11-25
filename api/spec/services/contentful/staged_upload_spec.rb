@@ -5,13 +5,9 @@ RSpec.describe StagedUpload do
 
   let(:jpeg) { "\xFF\xD8\xFF\xE0jpeg".b }
 
-  after { $redis.del(*@stored.map { |id| "#{described_class::KEY_PREFIX}#{id}" }) if @stored.present? }
-
   def stage(**overrides)
-    id = store.store(**{ thumbnail: jpeg, upload_id: "upload-1", file_name: "IMG_4821.jpg",
-                         content_type: "image/jpeg", width: 2, height: 1 }.merge(overrides))
-    (@stored ||= []) << id
-    id
+    store.store(**{ thumbnail: jpeg, upload_id: "upload-1", file_name: "IMG_4821.jpg",
+                    content_type: "image/jpeg", width: 2, height: 1 }.merge(overrides))
   end
 
   describe ".id?" do

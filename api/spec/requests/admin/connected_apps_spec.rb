@@ -3,18 +3,6 @@ require "rails_helper"
 RSpec.describe "Admin connected apps", type: :request do
   include_context "the admin UI"
 
-  before do
-    # Bluesky, Mastodon, and TrainerRoad each have their own card on this page. Remove their
-    # credentials, thus the Whoop examples do not depend on the credentials that are available.
-    $redis.del(BlueskyCredentials::REDIS_KEY, MastodonCredentials::REDIS_KEY, ThreadsCredentials::REDIS_KEY,
-               TrainerRoadCredentials::REDIS_KEY, StravaCredentials::REDIS_KEY)
-  end
-
-  after do
-    $redis.del(BlueskyCredentials::REDIS_KEY, MastodonCredentials::REDIS_KEY, ThreadsCredentials::REDIS_KEY,
-               TrainerRoadCredentials::REDIS_KEY, StravaCredentials::REDIS_KEY)
-  end
-
   def sign_in!
     sign_in_as(email: owner_email)
   end

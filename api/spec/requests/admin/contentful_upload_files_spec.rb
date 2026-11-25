@@ -11,8 +11,6 @@ RSpec.describe "Admin Contentful upload files", type: :request do
     allow(contentful).to receive(:create_upload).and_return("upload-1")
   end
 
-  after { $redis.del(*@stored.map { |id| "#{StagedUpload::KEY_PREFIX}#{id}" }) if @stored.present? }
-
   # A PNG of one colour, on the disk, as an upload.
   def upload(width = 30, height = 10, name: "IMG_4821.png")
     file = Tempfile.new([ "media", ".png" ])
@@ -33,15 +31,9 @@ RSpec.describe "Admin Contentful upload files", type: :request do
     Rack::Test::UploadedFile.new(file.path, "image/jpeg", original_filename: "captioned.jpg")
   end
 
-  def remember(id)
-    (@stored ||= []) << id
-    id
-  end
-
   def stage(file_name: "IMG_4821.jpg", content_type: "image/jpeg")
-    remember(StagedUpload.new.store(thumbnail: "\xFF\xD8\xFF\xE0jpeg".b, upload_id: "upload-1",
-                                    file_name: file_name, content_type: content_type,
-                                    width: 2, height: 1))
+    StagedUpload.new.store(thumbnail: "\xFF\xD8\xFF\xE0jpeg".b, upload_id: "upload-1",
+                           file_name: file_name, content_type: content_type, width: 2, height: 1)
   end
 
   describe "POST /contentful/uploads/files" do
@@ -59,7 +51,7 @@ RSpec.describe "Admin Contentful upload files", type: :request do
 
         expect(response).to have_http_status(:ok)
         answer = JSON.parse(response.body)
-        id = remember(answer["id"])
+        id = answer["id"]
         expect(id).to match(StagedUpload::ID_PATTERN)
         expect(answer["path"]).to eq("/contentful/uploads/files/#{id}")
         expect(answer["alt_path"]).to eq("/contentful/uploads/files/#{id}/alt")
@@ -73,7 +65,6 @@ RSpec.describe "Admin Contentful upload files", type: :request do
                                           headers: { "Accept" => "application/json" }
 
         answer = JSON.parse(response.body)
-        remember(answer["id"])
         expect(answer["caption"]).to eq("The finish arch at dusk")
       end
 
@@ -81,7 +72,6 @@ RSpec.describe "Admin Contentful upload files", type: :request do
         post "/contentful/uploads/files", params: { file: upload }, headers: { "Accept" => "application/json" }
 
         answer = JSON.parse(response.body)
-        remember(answer["id"])
         expect(answer).to include("caption" => nil)
       end
 
@@ -91,7 +81,7 @@ RSpec.describe "Admin Contentful upload files", type: :request do
         post "/contentful/uploads/files", params: { file: upload(4000, 3000) },
                                           headers: { "Accept" => "application/json" }
 
-        id = remember(JSON.parse(response.body)["id"])
+        id = JSON.parse(response.body)["id"]
         expect(contentful).to have_received(:create_upload)
         staged = StagedUpload.new.fetch(id)
         expect(staged[:upload_id]).to eq("upload-1")
@@ -116,7 +106,6 @@ RSpec.describe "Admin Contentful upload files", type: :request do
         end
 
         post "/contentful/uploads/files", params: { file: upload }, headers: { "Accept" => "application/json" }
-        remember(JSON.parse(response.body)["id"])
 
         expect(seen[:thumbnail]).to be(true), "the action did not give PhotoBlob the path of the upload"
         expect(seen[:upload]).to be(true), "the action did not give Contentful the path of the upload"
@@ -181,7 +170,6 @@ RSpec.describe "Admin Contentful upload files", type: :request do
 
       it "does not store the answer" do
         post "/contentful/uploads/files", params: { file: upload }, headers: { "Accept" => "application/json" }
-        remember(JSON.parse(response.body)["id"])
 
         expect(response.headers["Cache-Control"]).to include("no-store")
       end
@@ -205,7 +193,6 @@ RSpec.describe "Admin Contentful upload files", type: :request do
           post "/contentful/uploads/files", params: { file: upload },
                                             headers: { "Accept" => "application/json", "X-CSRF-Token" => token }
           expect(response).to have_http_status(:ok)
-          remember(JSON.parse(response.body)["id"])
 
           post "/contentful/uploads/files", params: { file: upload }, headers: { "Accept" => "application/json" }
           expect(response).not_to have_http_status(:ok)

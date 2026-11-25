@@ -3,8 +3,6 @@ require "rails_helper"
 RSpec.describe ThreadsCredentials do
   include ActiveSupport::Testing::TimeHelpers
 
-  before { $redis.del(described_class::REDIS_KEY) }
-
   def connect!(expires_in: 60.days.to_i)
     described_class.store_account(
       access_token: "a-long-lived-token", expires_in: expires_in,

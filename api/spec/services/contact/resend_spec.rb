@@ -7,14 +7,8 @@ RSpec.describe Resend do
     { to: "owner@example.test", subject: "New message", text: "body", reply_to: "jane@example.com" }
   end
 
-  def stub_response(success:, body:)
-    allow(HTTParty).to receive(:post).and_return(
-      instance_double(HTTParty::Response, success?: success, code: success ? 200 : 422, body: body, request: nil)
-    )
-  end
-
   it "posts to the Resend emails endpoint with the sender's Reply-To and the verified from" do
-    stub_response(success: true, body: { id: "abc-123" }.to_json)
+    stub_http_post({ id: "abc-123" }.to_json)
 
     service.send_email(**send_args)
 
@@ -28,7 +22,7 @@ RSpec.describe Resend do
   end
 
   it "sends the idempotency key as a header, thus a retry sends the email one time only" do
-    stub_response(success: true, body: { id: "abc-123" }.to_json)
+    stub_http_post({ id: "abc-123" }.to_json)
 
     service.send_email(**send_args, idempotency_key: "key-1")
 
@@ -38,7 +32,7 @@ RSpec.describe Resend do
   end
 
   it "sends no idempotency header with no key" do
-    stub_response(success: true, body: { id: "abc-123" }.to_json)
+    stub_http_post({ id: "abc-123" }.to_json)
 
     service.send_email(**send_args)
 
@@ -48,7 +42,7 @@ RSpec.describe Resend do
   end
 
   it "raises on a non-2xx response so the job retries" do
-    stub_response(success: false, body: { statusCode: 422, message: "Invalid" }.to_json)
+    stub_http_post({ statusCode: 422, message: "Invalid" }.to_json, success: false, code: 422)
     expect { service.send_email(**send_args) }.to raise_error(ApplicationService::HttpError)
   end
 

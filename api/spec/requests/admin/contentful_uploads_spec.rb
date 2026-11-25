@@ -5,19 +5,11 @@ RSpec.describe "Admin Contentful uploads", type: :request do
 
   before do
     stub_env("CONTENTFUL_SPACE" => "space123", "CONTENTFUL_MANAGEMENT_TOKEN" => "cma-token")
-    $redis.del(UploadLibrary::REDIS_KEY)
-  end
-
-  after do
-    $redis.del(UploadLibrary::REDIS_KEY)
-    $redis.del(*@stored.map { |id| "#{StagedUpload::KEY_PREFIX}#{id}" }) if @stored.present?
   end
 
   def stage(file_name: "IMG_4821.jpg")
-    id = StagedUpload.new.store(thumbnail: "\xFF\xD8\xFF\xE0jpeg".b, upload_id: "upload-1",
-                                file_name: file_name, content_type: "image/jpeg", width: 2, height: 1)
-    (@stored ||= []) << id
-    id
+    StagedUpload.new.store(thumbnail: "\xFF\xD8\xFF\xE0jpeg".b, upload_id: "upload-1",
+                           file_name: file_name, content_type: "image/jpeg", width: 2, height: 1)
   end
 
   describe "GET /contentful/uploads" do

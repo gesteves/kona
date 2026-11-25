@@ -6,8 +6,6 @@ RSpec.describe SocialPhotos do
   let(:jpeg) { "\xFF\xD8\xFF\xE0binary\x00bytes".b }
   let!(:id) { store.store(image: jpeg, width: 640, height: 480) }
 
-  after { $redis.del("#{described_class::KEY_PREFIX}#{id}") }
-
   it "makes an id of the shape that it accepts" do
     expect(id).to match(described_class::ID_PATTERN)
     expect(described_class.id?(id)).to be(true)

@@ -4,8 +4,6 @@ require "vips"
 RSpec.describe "Admin social photos", type: :request do
   include_context "the admin UI"
 
-  after { $redis.del(*@stored.map { |id| "#{SocialPhotos::KEY_PREFIX}#{id}" }) if @stored.present? }
-
   # A PNG of one colour, on the disk, as an upload.
   def upload(width = 30, height = 10, name: "photo.png")
     file = Tempfile.new([ "photo", ".png" ])
@@ -26,11 +24,6 @@ RSpec.describe "Admin social photos", type: :request do
     Rack::Test::UploadedFile.new(file.path, "image/jpeg", original_filename: "captioned.jpg")
   end
 
-  def remember(id)
-    (@stored ||= []) << id
-    id
-  end
-
   describe "POST /social/photos" do
     it "needs the owner session" do
       post "/social/photos", params: { photo: upload }
@@ -46,7 +39,7 @@ RSpec.describe "Admin social photos", type: :request do
 
         expect(response).to have_http_status(:ok)
         answer = JSON.parse(response.body)
-        id = remember(answer["id"])
+        id = answer["id"]
         expect(id).to match(SocialPhotos::ID_PATTERN)
         expect(answer["path"]).to eq("/social/photos/#{id}")
         expect(answer["alt_path"]).to eq("/social/photos/#{id}/alt")
@@ -61,7 +54,7 @@ RSpec.describe "Admin social photos", type: :request do
                                headers: { "Accept" => "application/json" }
 
         answer = JSON.parse(response.body)
-        id = remember(answer["id"])
+        id = answer["id"]
         expect(answer["caption"]).to eq("A swimmer in the lake")
         stored = Vips::Image.new_from_buffer(SocialPhotos.new.fetch(id)[:image], "")
         expect(stored.get_typeof("xmp-data")).to eq(0)
@@ -71,7 +64,6 @@ RSpec.describe "Admin social photos", type: :request do
         post "/social/photos", params: { photo: upload }, headers: { "Accept" => "application/json" }
 
         answer = JSON.parse(response.body)
-        remember(answer["id"])
         expect(answer).to include("caption" => nil)
       end
 
@@ -108,7 +100,6 @@ RSpec.describe "Admin social photos", type: :request do
         end
 
         post "/social/photos", params: { photo: upload }, headers: { "Accept" => "application/json" }
-        remember(JSON.parse(response.body)["id"])
 
         expect(seen[:a_file]).to be(true), "the action gave #{seen[:argument].class}, and not the path of the upload"
       end
@@ -128,7 +119,6 @@ RSpec.describe "Admin social photos", type: :request do
 
       it "does not store the answer" do
         post "/social/photos", params: { photo: upload }, headers: { "Accept" => "application/json" }
-        remember(JSON.parse(response.body)["id"])
 
         expect(response.headers["Cache-Control"]).to include("no-store")
       end
@@ -152,7 +142,6 @@ RSpec.describe "Admin social photos", type: :request do
           post "/social/photos", params: { photo: upload },
                                  headers: { "Accept" => "application/json", "X-CSRF-Token" => token }
           expect(response).to have_http_status(:ok)
-          remember(JSON.parse(response.body)["id"])
 
           post "/social/photos", params: { photo: upload }, headers: { "Accept" => "application/json" }
           expect(response).not_to have_http_status(:ok)
@@ -162,7 +151,7 @@ RSpec.describe "Admin social photos", type: :request do
   end
 
   describe "GET /social/photos/:id" do
-    let(:id) { remember(SocialPhotos.new.store(image: "\xFF\xD8\xFF\xE0jpeg".b, width: 2, height: 1)) }
+    let(:id) { SocialPhotos.new.store(image: "\xFF\xD8\xFF\xE0jpeg".b, width: 2, height: 1) }
 
     it "needs the owner session" do
       get "/social/photos/#{id}"
@@ -200,7 +189,7 @@ RSpec.describe "Admin social photos", type: :request do
 
   describe "POST /social/photos/:id/alt" do
     let(:jpeg) { "\xFF\xD8\xFF\xE0jpeg".b }
-    let(:id) { remember(SocialPhotos.new.store(image: jpeg, width: 2, height: 1)) }
+    let(:id) { SocialPhotos.new.store(image: jpeg, width: 2, height: 1) }
 
     before do
       stub_env("ANTHROPIC_API_KEY" => "key")

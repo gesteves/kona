@@ -42,10 +42,6 @@ RSpec.describe "Webhooks::Whoop", type: :request do
   end
 
   context "with a valid signature and payload" do
-    # The controller keeps the id of each event for the signature window, thus each example starts
-    # with no record of its event.
-    before { $redis.del("whoop:webhook:trace-1") }
-
     # ⚠️ The signature accepts a timestamp of some minutes, and a replay inside that window must not
     # add the job again: each run makes a new description with a new text.
     it "acknowledges a repeated event and adds no second job" do

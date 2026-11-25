@@ -8,24 +8,18 @@ RSpec.describe Akismet do
     { content: "Hello there!", author: "Jane", author_email: "jane@example.com", user_ip: "203.0.113.7", user_agent: "Mozilla/5.0" }
   end
 
-  def stub_response(success:, body:)
-    allow(HTTParty).to receive(:post).and_return(
-      instance_double(HTTParty::Response, success?: success, body: body, code: success ? 200 : 500, request: nil)
-    )
-  end
-
   it "reports spam when Akismet answers \"true\"" do
-    stub_response(success: true, body: "true")
+    stub_http_post("true")
     expect(service.spam?(**check_args)).to be(true)
   end
 
   it "reports ham when Akismet answers \"false\"" do
-    stub_response(success: true, body: "false")
+    stub_http_post("false")
     expect(service.spam?(**check_args)).to be(false)
   end
 
   it "posts to the key-scoped comment-check endpoint with the required params" do
-    stub_response(success: true, body: "false")
+    stub_http_post("false")
     service.spam?(**check_args)
 
     expect(HTTParty).to have_received(:post).with(
@@ -35,12 +29,12 @@ RSpec.describe Akismet do
   end
 
   it "raises (fails closed) on a non-success response so the job retries rather than delivering" do
-    stub_response(success: false, body: "")
+    stub_http_post("", success: false)
     expect { service.spam?(**check_args) }.to raise_error(ApplicationService::HttpError)
   end
 
   it "raises (fails closed) on an unexpected body, e.g. an invalid-key \"invalid\" response" do
-    stub_response(success: true, body: "invalid")
+    stub_http_post("invalid")
     expect { service.spam?(**check_args) }.to raise_error(ApplicationService::HttpError)
   end
 
@@ -65,7 +59,7 @@ RSpec.describe Akismet do
 
   describe "#submit_ham" do
     it "posts to the key-scoped submit-ham endpoint with the same comment params" do
-      stub_response(success: true, body: "Thanks for making the web a better place.")
+      stub_http_post("Thanks for making the web a better place.")
 
       expect(service.submit_ham(**check_args)).to be(true)
       expect(HTTParty).to have_received(:post).with(
@@ -77,7 +71,7 @@ RSpec.describe Akismet do
     # ContactHamJob is separate from the delivery, thus a raise retries the report and never stops
     # the message.
     it "raises on a non-2xx so ContactHamJob retries the report" do
-      stub_response(success: false, body: "")
+      stub_http_post("", success: false)
       expect { service.submit_ham(**check_args) }.to raise_error(ApplicationService::HttpError)
     end
 

@@ -7,7 +7,6 @@ RSpec.describe ContentfulAssetJob do
   let(:id) { SecureRandom.hex(16) }
 
   before do
-    $redis.del(UploadLibrary::REDIS_KEY)
     # ⚠️ `StagedUpload#store` makes its own id, and the record of the library must carry the SAME
     # one. Thus this spec writes the staged key directly, with the id that it controls.
     $redis.hset("#{StagedUpload::KEY_PREFIX}#{id}", "thumbnail", "\xFF\xD8\xFF\xE0jpeg".b,
@@ -19,11 +18,6 @@ RSpec.describe ContentfulAssetJob do
     allow(contentful).to receive(:create_asset).and_return({ id: "asset-1", version: 1 })
     allow(contentful).to receive(:ensure_processed).and_return(2)
     allow(contentful).to receive(:publish_asset).and_return({ id: "asset-1", version: 3 })
-  end
-
-  after do
-    $redis.del(UploadLibrary::REDIS_KEY)
-    $redis.del("#{StagedUpload::KEY_PREFIX}#{id}")
   end
 
   it "creates, processes, and publishes the asset, then records it" do

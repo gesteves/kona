@@ -82,9 +82,6 @@ RSpec.describe SiteBuildJob do
   end
 
   describe ".coalesce_asset_build" do
-    before { $redis.del(described_class::ASSET_WINDOW_KEY) }
-    after  { $redis.del(described_class::ASSET_WINDOW_KEY) }
-
     it "schedules one build and opens a 60-second window" do
       allow(described_class).to receive(:perform_in)
 

@@ -3,8 +3,6 @@ require "rails_helper"
 RSpec.describe MastodonCredentials do
   let(:redirect_uri) { "https://admin.example.test/connected-apps/mastodon/callback" }
 
-  before { $redis.del(described_class::REDIS_KEY) }
-
   def store_client!(instance: "mastodon.social")
     described_class.store_client(
       instance: instance, client_id: "client-id", client_secret: "client-secret",

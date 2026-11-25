@@ -1,8 +1,6 @@
 require "rails_helper"
 
 RSpec.describe BlueskyCredentials do
-  before { $redis.del(described_class::REDIS_KEY) }
-
   describe ".store and .fetch" do
     it "round-trips a stored pair and reports it as coming from the admin" do
       described_class.store(handle: "me.bsky.social", app_password: "abcd-efgh-ijkl-mnop")

@@ -5,10 +5,6 @@ RSpec.describe "Admin TrainerRoad connection", type: :request do
   let(:url) { "https://www.trainerroad.com/app/calendar/00000000-0000-4000-8000-000000000000" }
   let(:calendar) { "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Test//EN\nEND:VCALENDAR" }
 
-  before do
-    $redis.del(TrainerRoadCredentials::REDIS_KEY)
-  end
-
   def sign_in! = sign_in_as(email: owner_email)
 
   def stub_feed(success: true, body: nil)

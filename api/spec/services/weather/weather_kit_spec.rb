@@ -19,17 +19,9 @@ RSpec.describe WeatherKit do
     )
     allow(service).to receive(:sleep)
 
-    keys = $redis.keys("weatherkit:*")
-    $redis.del(*keys) if keys.any?
-
     allow(HTTParty).to receive(:get) do |url, **_options|
       url.include?("/availability/") ? response(%w[currentWeather forecastDaily].to_json) : response(weather_body)
     end
-  end
-
-  after do
-    keys = $redis.keys("weatherkit:*")
-    $redis.del(*keys) if keys.any?
   end
 
   it "signs an ES256 JWT for the key and the team, and keeps it in Redis for less than a minute" do

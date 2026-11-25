@@ -3,9 +3,6 @@ require "rails_helper"
 RSpec.describe UploadLibrary do
   subject(:library) { described_class.new }
 
-  before { $redis.del(described_class::REDIS_KEY) }
-  after  { $redis.del(described_class::REDIS_KEY) }
-
   def stage(id = SecureRandom.hex(16), title: "IMG_4821")
     library.stage(id: id, title: title, alt: "A dog running on a beach.", file_name: "#{title}.jpg")
   end

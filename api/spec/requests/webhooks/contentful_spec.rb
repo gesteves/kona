@@ -8,9 +8,6 @@ RSpec.describe "Webhooks::Contentful", type: :request do
     stub_env("CONTENTFUL_WEBHOOK_SECRET" => webhook_secret)
     # The webhook only adds a job to the queue. Each job runs in the fake mode, thus no code here
     # uses the PDS.
-    # ⚠️ The coalescing window of the asset build is a Redis key with a TTL of a minute. It stays
-    # between two examples, thus each one starts with it removed.
-    $redis.del(SiteBuildJob::ASSET_WINDOW_KEY)
   end
 
   def now_ms

@@ -4,7 +4,6 @@ RSpec.describe Strava do
   let(:redirect_uri) { "https://admin.example.test/connected-apps/strava/callback" }
 
   before do
-    $redis.del(StravaCredentials::REDIS_KEY, Strava::REFRESH_LOCK_KEY, Strava::SUBSCRIPTION_KEY)
     stub_env("STRAVA_CLIENT_ID" => "client-id", "STRAVA_CLIENT_SECRET" => "client-secret")
   end
 

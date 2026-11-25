@@ -5,7 +5,6 @@ RSpec.describe "Admin social media", type: :request do
 
   before do
     # The credentials of each network live in Redis. Each example says which ones are connected.
-    $redis.del(BlueskyCredentials::REDIS_KEY, MastodonCredentials::REDIS_KEY, ThreadsCredentials::REDIS_KEY)
     connect(bluesky: true, mastodon: false, threads: false)
   end
 
@@ -187,619 +186,6 @@ RSpec.describe "Admin social media", type: :request do
       end
     end
 
-    describe "GET /social/preview" do
-      before { sign_in_as(email: owner_email) }
-
-      let(:card) do
-        OpenGraph::Card.new(url: "https://example.test/a/", title: "A title",
-                            description: "A summary.", image_url: "https://cdn.test/og.png",
-                            document_uri: "at://did:plc:abc/site.standard.document/d1")
-      end
-
-      it "needs the owner session" do
-        reset!
-
-        get "/social/preview", params: { url: "https://example.test/a/" }
-
-        expect(response).to redirect_to("/signin")
-      end
-
-      it "gives the card of the link" do
-        allow_any_instance_of(OpenGraph).to receive(:fetch).and_return(card)
-
-        get "/social/preview", params: { url: "https://example.test/a/" }
-
-        body = response.parsed_body
-        expect(body["title"]).to eq("A title")
-        expect(body["description"]).to eq("A summary.")
-        expect(body["host"]).to eq("example.test")
-      end
-
-      # ⚠️ This is the useful part: the owner cannot know which of the two cards Bluesky will
-      # render until after the post without it.
-      it "says when the page publishes standard.site records" do
-        allow_any_instance_of(OpenGraph).to receive(:fetch).and_return(card)
-
-        get "/social/preview", params: { url: "https://example.test/a/" }
-
-        expect(response.parsed_body["standard_site"]).to be(true)
-      end
-
-      it "says when it is an ordinary link card" do
-        allow_any_instance_of(OpenGraph).to receive(:fetch)
-          .and_return(OpenGraph::Card.new(url: "https://other.test/", title: "T", description: nil,
-                                          image_url: nil))
-
-        get "/social/preview", params: { url: "https://other.test/" }
-
-        expect(response.parsed_body["standard_site"]).to be(false)
-      end
-
-      # ⚠️ The og:image itself is never in the answer. The CSP of the admin has `img-src :self`,
-      # thus the browser must ask this app for the picture.
-      it "gives the path of our own proxy and not the og:image" do
-        allow_any_instance_of(OpenGraph).to receive(:fetch).and_return(card)
-
-        get "/social/preview", params: { url: "https://example.test/a/" }
-
-        expect(response.parsed_body["image_path"]).to start_with("/social/preview/image")
-        expect(response.body).not_to include("cdn.test")
-      end
-
-      # ⚠️ False means that Bluesky draws NO card: the browser then hides the card, says where the
-      # link goes, and adds that link to its count.
-      it "says when the page gives no card at all" do
-        allow_any_instance_of(OpenGraph).to receive(:fetch)
-          .and_return(OpenGraph::Card.new(url: "https://other.test/", title: nil, description: nil,
-                                          image_url: nil))
-
-        get "/social/preview", params: { url: "https://other.test/" }
-
-        expect(response.parsed_body["embeddable"]).to be(false)
-      end
-
-      it "says when the page gives a card" do
-        allow_any_instance_of(OpenGraph).to receive(:fetch).and_return(card)
-
-        get "/social/preview", params: { url: "https://example.test/a/" }
-
-        expect(response.parsed_body["embeddable"]).to be(true)
-      end
-
-      it "gives no image path for a page with no picture" do
-        allow_any_instance_of(OpenGraph).to receive(:fetch)
-          .and_return(OpenGraph::Card.new(url: "https://other.test/", title: "T", description: nil,
-                                          image_url: nil))
-
-        get "/social/preview", params: { url: "https://other.test/" }
-
-        expect(response.parsed_body["image_path"]).to be_nil
-      end
-
-      it "refuses a value that is not a link, and reads nothing" do
-        expect_any_instance_of(OpenGraph).not_to receive(:fetch)
-
-        get "/social/preview", params: { url: "not a link" }
-
-        expect(response).to have_http_status(:unprocessable_content)
-      end
-    end
-
-    describe "GET /social/preview/image" do
-      before { sign_in_as(email: owner_email) }
-
-      let(:card) do
-        OpenGraph::Card.new(url: "https://example.test/a/", title: "T", description: nil,
-                            image_url: "https://cdn.test/og.png")
-      end
-
-      it "needs the owner session" do
-        reset!
-
-        get "/social/preview/image", params: { url: "https://example.test/a/" }
-
-        expect(response).to redirect_to("/signin")
-      end
-
-      # ⚠️ The parameter is the page, and not the picture. Thus a caller cannot name any URL for
-      # this app to get: the picture is always the one that the og: tags of that page name.
-      # `Bluesky#card_image` gives the same bytes that go up as the blob.
-      it "sends the picture that the og: tags of the page name" do
-        allow_any_instance_of(OpenGraph).to receive(:fetch).and_return(card)
-        allow_any_instance_of(Bluesky).to receive(:card_image)
-          .with("https://cdn.test/og.png")
-          .and_return({ body: "bytes", content_type: "image/png" })
-
-        get "/social/preview/image", params: { url: "https://example.test/a/" }
-
-        expect(response).to have_http_status(:ok)
-        expect(response.media_type).to eq("image/png")
-        expect(response.body).to eq("bytes")
-      end
-
-      it "answers 404 for a page with no picture" do
-        allow_any_instance_of(OpenGraph).to receive(:fetch)
-          .and_return(OpenGraph::Card.new(url: "https://other.test/", title: nil, description: nil,
-                                          image_url: nil))
-
-        get "/social/preview/image", params: { url: "https://other.test/" }
-
-        expect(response).to have_http_status(:not_found)
-      end
-
-      # ⚠️ The page names the picture, and the page is not ours. A picture on a private address
-      # must not be read, and the answer is the same as for a picture that cannot be read.
-      it "answers 404 for a picture on a private address, and does not read it" do
-        allow_any_instance_of(OpenGraph).to receive(:fetch)
-          .and_return(OpenGraph::Card.new(url: "https://example.test/a/", title: "T", description: nil,
-                                          image_url: "http://169.254.169.254/latest/meta-data/"))
-        allow(HTTParty).to receive(:get)
-
-        get "/social/preview/image", params: { url: "https://example.test/a/" }
-
-        expect(response).to have_http_status(:not_found)
-        expect(HTTParty).not_to have_received(:get)
-      end
-
-      it "answers 404 when the picture cannot be read" do
-        allow_any_instance_of(OpenGraph).to receive(:fetch).and_return(card)
-        allow_any_instance_of(Bluesky).to receive(:card_image).and_return(nil)
-
-        get "/social/preview/image", params: { url: "https://example.test/a/" }
-
-        expect(response).to have_http_status(:not_found)
-      end
-
-      it "refuses a value that is not a link" do
-        get "/social/preview/image", params: { url: "javascript:alert(1)" }
-
-        expect(response).to have_http_status(:unprocessable_content)
-      end
-    end
-
-    describe "POST /social" do
-      before { sign_in_as(email: owner_email) }
-
-      # ⚠️ The length check reads the card of the link, because a page with NO og: tags puts its
-      # link in the words of the Bluesky post. Refer to `#bluesky_text`. Thus each example here
-      # links to a page that gives a card, which is the ordinary condition.
-      before do
-        allow_any_instance_of(OpenGraph).to receive(:fetch) do |_service, link|
-          OpenGraph::Card.new(url: link, title: "A title", description: "A summary.",
-                              image_url: "https://cdn.test/og.png")
-        end
-      end
-
-      let(:url) { "https://example.test/2026/07/12/ironman-canada/" }
-
-      it "adds the job of the network, with the link and the body" do
-        post "/social", params: { posts: [ { text: "A long day.", link: url } ], networks: [ "bluesky" ] }
-
-        expect(response).to redirect_to(social_path)
-        expect(flash[:notice]).to eq(I18n.t("admin.social.flash.sent", networks: "Bluesky"))
-        expect(BlueskyPostJob.jobs.size).to eq(1)
-        payload = BlueskyPostJob.jobs.first["args"].first
-        expect(payload.length).to eq(1)
-        expect(payload.first["link"]).to eq(url)
-        expect(payload.first["text"]).to eq("A long day.")
-        # ⚠️ The controller makes the key of each post, and each job writes at that key. Thus a
-        # Sidekiq retry replaces one post and does not add a second one.
-        expect(payload.first["key"]).to match(/\A[234567a-z]{13}\z/)
-      end
-
-      # ⚠️ The link is optional. A post with no link is words alone, and it makes no card.
-      it "takes a post with no link" do
-        post "/social", params: { posts: [ { text: "No link here." } ], networks: [ "bluesky" ] }
-
-        expect(response).to redirect_to(social_path)
-        expect(BlueskyPostJob.jobs.first["args"].first.first["link"]).to eq("")
-      end
-
-      describe "a thread" do
-        # ⚠️ The form sends `posts[][text]` and `posts[][link]`, and Rails starts a new hash when a
-        # key repeats. Thus each pair must stay together and in order.
-        it "adds one job for the thread, with each post in order and a key of its own" do
-          post "/social", params: {
-            posts: [ { text: "One", link: "https://example.test/a/" },
-                     { text: "Two", link: "" },
-                     { text: "Three", link: "https://example.test/b/" } ],
-            networks: [ "bluesky" ]
-          }
-
-          expect(response).to redirect_to(social_path)
-          expect(BlueskyPostJob.jobs.size).to eq(1)
-          payload = BlueskyPostJob.jobs.first["args"].first
-          expect(payload.map { |p| p["text"] }).to eq(%w[One Two Three])
-          expect(payload.map { |p| p["link"] })
-            .to eq([ "https://example.test/a/", "", "https://example.test/b/" ])
-          expect(payload.map { |p| p["key"] }.uniq.length).to eq(3)
-        end
-
-        it "names each network in the notice" do
-          connect(bluesky: true, mastodon: true, threads: false)
-
-          post "/social", params: { posts: [ { text: "One" }, { text: "Two" } ],
-                                    networks: %w[bluesky mastodon] }
-
-          expect(flash[:notice]).to eq(I18n.t("admin.social.flash.sent", networks: "Bluesky and Mastodon"))
-        end
-
-        # ⚠️ Only the FIRST post of each network is scheduled. That job adds the next one when it
-        # succeeds, thus the rest of the thread needs no time of its own.
-        it "schedules the first job of each network only" do
-          on = 10.days.from_now.strftime("%Y-%m-%d")
-
-          post "/social", params: { posts: [ { text: "One" }, { text: "Two" } ],
-                                    networks: [ "bluesky" ], schedule: "1", date: on,
-                                    time: "09:00", time_zone: "America/Denver" }
-
-          expect(BlueskyPostJob.jobs.size).to eq(1)
-          expect(BlueskyPostJob.jobs.first["at"]).to be_present
-          expect(flash[:notice]).to include(t_before("admin.social.flash.scheduled", :at, networks: "Bluesky"))
-        end
-
-        # An empty block that the owner added and left alone must not refuse the whole draft.
-        it "drops a block with nothing in it" do
-          post "/social", params: { posts: [ { text: "One" }, { text: "", link: "" } ],
-                                    networks: [ "bluesky" ] }
-
-          expect(response).to redirect_to(social_path)
-          expect(BlueskyPostJob.jobs.first["args"].first.length).to eq(1)
-        end
-
-        # ⚠️ A message names the post: a thread has more than one, and a plain message does not say
-        # which one is wrong.
-        it "names the post that is too long" do
-          post "/social", params: { posts: [ { text: "One" }, { text: "a" * 301 } ],
-                                    networks: [ "bluesky" ] }
-
-          expect(response).to have_http_status(:unprocessable_content)
-          expect(response.body).to include(I18n.t("admin.social.errors.too_long.numbered", index: 2, count: 301, limit: Bluesky::MAX_GRAPHEMES))
-          expect(BlueskyPostJob.jobs).to be_empty
-        end
-
-        it "names the post with a link that is not a link" do
-          post "/social", params: { posts: [ { text: "One" }, { text: "Two", link: "nope" } ],
-                                    networks: [ "bluesky" ] }
-
-          expect(response).to have_http_status(:unprocessable_content)
-          expect(response.body).to include(I18n.t("admin.social.errors.bad_link.numbered", index: 2))
-        end
-
-        it "refuses a post of the thread that has a link and no words" do
-          post "/social", params: {
-            posts: [ { text: "One" }, { text: "", link: "https://example.test/a/" } ],
-            networks: [ "bluesky" ]
-          }
-
-          expect(response).to have_http_status(:unprocessable_content)
-          expect(response.body).to include(I18n.t("admin.social.errors.text_missing.numbered", index: 2))
-        end
-
-        it "refuses a thread past the limit" do
-          post "/social", params: {
-            posts: Array.new(SocialDraft::MAX_POSTS + 1) { |i| { text: "Post #{i}" } },
-            networks: [ "bluesky" ]
-          }
-
-          expect(response).to have_http_status(:unprocessable_content)
-          expect(response.body).to include(I18n.t("admin.social.errors.too_many_posts", count: SocialDraft::MAX_POSTS))
-          expect(BlueskyPostJob.jobs).to be_empty
-        end
-
-        # ⚠️ A refusal renders again and keeps every post. A redirect would lose what the owner
-        # wrote, and a thread is more of it.
-        it "puts every post back after a refusal, in order" do
-          post "/social", params: { posts: [ { text: "First words" }, { text: "a" * 301 } ],
-                                    networks: [ "bluesky" ] }
-
-          expect(response.body).to include("First words")
-          expect(response.body).to include("a" * 301)
-        end
-      end
-
-      # ⚠️ One job for each network, thus a failure at one service retries that service alone.
-      it "adds one job for each network, and gives all three the same key" do
-        connect(bluesky: true, mastodon: true, threads: true)
-
-        post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: %w[bluesky mastodon threads] }
-
-        expect(flash[:notice]).to eq(I18n.t("admin.social.flash.sent", networks: "Bluesky, Mastodon, and Threads"))
-        # ⚠️ It compares the KEY of each post and not the whole payload. The three networks get a
-        # different text when the draft names a person, and they must still share one key.
-        keys = [ BlueskyPostJob, MastodonPostJob, ThreadsPostJob ].map do |job|
-          expect(job.jobs.size).to eq(1)
-          job.jobs.first["args"].first.map { |post| post["key"] }
-        end
-        expect(keys.uniq.size).to eq(1)
-        expect(keys.first.compact.size).to eq(1)
-      end
-
-      # A request that a person writes by hand, and the shape that an empty `posts[]` sends.
-      it "refuses a body whose posts are not blocks, and does not give a 500" do
-        post "/social", params: { posts: "", mentions: "", networks: [ "bluesky" ] }
-
-        expect(response).to have_http_status(:unprocessable_content)
-        expect(flash[:alert]).to eq(I18n.t("admin.social.errors.empty"))
-        expect(BlueskyPostJob.jobs).to be_empty
-      end
-
-      it "adds no job for a network that the owner did not tick" do
-        connect(bluesky: true, mastodon: true, threads: true)
-
-        post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [ "mastodon" ] }
-
-        expect(MastodonPostJob.jobs.size).to eq(1)
-        expect(BlueskyPostJob.jobs).to be_empty
-        expect(ThreadsPostJob.jobs).to be_empty
-      end
-
-      # ⚠️ A row with no account renders `disabled`, thus a browser cannot tick it. A request that
-      # a person writes by hand can, and the job would then retry "not connected" for 24 hours.
-      it "refuses a network that has no account" do
-        connect(bluesky: true, mastodon: false, threads: false)
-
-        post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [ "mastodon" ] }
-
-        expect(response).to have_http_status(:unprocessable_content)
-        expect(MastodonPostJob.jobs).to be_empty
-      end
-
-      # ⚠️ The link field takes any URL, thus the owner can share a page on another site.
-      it "takes a link that is not an article of this site" do
-        post "/social", params: { posts: [ { text: "Good.", link: "https://someone-else.test/a-post/" } ],
-                                 networks: [ "bluesky" ] }
-
-        expect(response).to redirect_to(social_path)
-        expect(BlueskyPostJob.jobs.first["args"].first.first["link"])
-          .to eq("https://someone-else.test/a-post/")
-      end
-
-      it "ignores a network key that this app does not know" do
-        post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: %w[bluesky myspace] }
-
-        expect(BlueskyPostJob.jobs.size).to eq(1)
-        expect(flash[:notice]).to eq(I18n.t("admin.social.flash.sent", networks: "Bluesky"))
-      end
-
-      # ⚠️ A dead Threads token is connected and cannot post. Without this check the job would
-      # raise at Meta and retry for 24 hours.
-      it "refuses the Threads row when its token expired" do
-        expire_threads
-
-        post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [ "threads" ] }
-
-        expect(response).to have_http_status(:unprocessable_content)
-        expect(ThreadsPostJob.jobs).to be_empty
-      end
-
-      # ⚠️ The body is stripped one time, here. Without that a newline at its end went to Bluesky
-      # as it was and to Mastodon with the newline removed.
-      it "strips the body before it counts it and before it adds the job" do
-        post "/social", params: { posts: [ { text: "  A long day.\n\n", link: url } ], networks: [ "bluesky" ] }
-
-        expect(response).to redirect_to(social_path)
-        expect(BlueskyPostJob.jobs.first["args"].first.first["text"]).to eq("A long day.")
-      end
-
-      it "refuses a body that is only white space" do
-        post "/social", params: { posts: [ { text: " \n ", link: url } ], networks: [ "bluesky" ] }
-
-        expect(response).to have_http_status(:unprocessable_content)
-        expect(response.body).to include(I18n.t("admin.social.errors.text_missing.single"))
-      end
-
-      # ⚠️ A submit that fails keeps the ticks of the owner, and an empty choice is a choice. The
-      # default ticks apply to the first load only.
-      it "keeps the rows unticked after a refusal when the owner unticked them" do
-        connect(bluesky: true, mastodon: true, threads: false)
-
-        post "/social", params: { posts: [ { text: "", link: url } ], networks: [] }
-
-        expect(response).to have_http_status(:unprocessable_content)
-        expect(response.body).not_to match(/value="bluesky"[^>]*\schecked>/)
-        expect(response.body).not_to match(/value="mastodon"[^>]*\schecked>/)
-      end
-
-      describe "scheduling" do
-        # Any date in the future. ⚠️ It must not be a constant: a date that a person writes here
-        # becomes the past, and the action then refuses it and the example fails one day.
-        let(:on) { 10.days.from_now.strftime("%Y-%m-%d") }
-
-        # ⚠️ A date and a time carry no zone. The browser sends its own IANA id, thus "09:00" has
-        # one meaning. This is the difference from the Republish dialog, which takes minutes from
-        # now for exactly this reason.
-        it "reads the date and the time in the zone that the browser sent" do
-          post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [ "bluesky" ],
-                                   schedule: "1", date: on, time: "09:00",
-                                   time_zone: "America/New_York" }
-
-          expect(response).to redirect_to(social_path)
-          expected = Time.use_zone("America/New_York") { Time.zone.parse("#{on} 09:00") }
-          expect(BlueskyPostJob.jobs.first["at"]).to be_within(1).of(expected.to_f)
-        end
-
-        it "names the moment in the notice, in that same zone" do
-          post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [ "bluesky" ],
-                                   schedule: "1", date: on, time: "09:00",
-                                   time_zone: "America/New_York" }
-
-          expected = Time.use_zone("America/New_York") do
-            Time.zone.parse("#{on} 09:00").strftime("%B %-e at %-I:%M %p %Z")
-          end
-          expect(flash[:notice]).to eq(I18n.t("admin.social.flash.scheduled", networks: "Bluesky", at: expected))
-        end
-
-        # ⚠️ With no JavaScript the hidden field is empty. TIME_ZONE is then the meaning, and the
-        # form still works.
-        it "falls back to the configured zone with no time zone field" do
-          allow(TimeZoneResolver).to receive(:default).and_return("America/Denver")
-
-          post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [ "bluesky" ],
-                                   schedule: "1", date: on, time: "09:00" }
-
-          expected = Time.use_zone("America/Denver") { Time.zone.parse("#{on} 09:00") }
-          expect(BlueskyPostJob.jobs.first["at"]).to be_within(1).of(expected.to_f)
-        end
-
-        # That field comes from the browser, thus a value with a mistake must never raise.
-        it "falls back for a time zone that Rails does not know" do
-          post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [ "bluesky" ],
-                                   schedule: "1", date: on, time: "09:00",
-                                   time_zone: "Mars/Olympus_Mons" }
-
-          expect(response).to redirect_to(social_path)
-          expect(BlueskyPostJob.jobs.size).to eq(1)
-        end
-
-        it "posts now when the switch is off, and schedules nothing" do
-          post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [ "bluesky" ],
-                                   schedule: "0", date: on, time: "09:00" }
-
-          expect(flash[:notice]).to eq(I18n.t("admin.social.flash.sent", networks: "Bluesky"))
-          expect(BlueskyPostJob.jobs.first["at"]).to be_nil
-        end
-
-        # ⚠️ A moment that has PASSED is not an error: it is not a schedule, thus the post goes out
-        # at once. The label of the submit button says "Post now" for that same draft, and a
-        # refusal here would make that button a liar.
-        it "posts at once for a moment that has passed" do
-          post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [ "bluesky" ],
-                                   schedule: "1", date: "2020-01-01", time: "09:00" }
-
-          expect(response).to redirect_to(social_path)
-          expect(flash[:notice]).to eq(I18n.t("admin.social.flash.sent", networks: "Bluesky"))
-          expect(BlueskyPostJob.jobs.size).to eq(1)
-          expect(BlueskyPostJob.jobs.first["at"]).to be_nil
-        end
-
-        # ⚠️ There is no limit on how far ahead this can be, on purpose. A post about a race can
-        # wait for the race.
-        it "takes a moment years from now" do
-          far = 3.years.from_now
-
-          post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [ "bluesky" ],
-                                   schedule: "1", date: far.strftime("%Y-%m-%d"), time: "09:00" }
-
-          expect(response).to redirect_to(social_path)
-          expect(BlueskyPostJob.jobs.size).to eq(1)
-        end
-
-        # ⚠️ `Time.zone.parse("garbage 09:00")` gives today at 09:00. Without the check of the
-        # shape, a value with a mistake would schedule a post for today.
-        it "refuses a date that is not a date" do
-          post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [ "bluesky" ],
-                                   schedule: "1", date: "garbage", time: "09:00" }
-
-          expect(response).to have_http_status(:unprocessable_content)
-          expect(response.body).to include(I18n.t("admin.social.errors.no_moment"))
-          expect(BlueskyPostJob.jobs).to be_empty
-        end
-
-        it "refuses a time that is not a time" do
-          post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [ "bluesky" ],
-                                   schedule: "1", date: on, time: "9 in the morning" }
-
-          expect(response).to have_http_status(:unprocessable_content)
-          expect(BlueskyPostJob.jobs).to be_empty
-        end
-
-        it "refuses a schedule with no date, and keeps the fields open" do
-          post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [ "bluesky" ],
-                                   schedule: "1", date: "", time: "09:00" }
-
-          expect(response).to have_http_status(:unprocessable_content)
-          expect(response.body).to include(I18n.t("admin.social.errors.no_moment"))
-          expect(response.body).to include(%(value="09:00"))
-          expect(response.body).to include("<wa-switch name=\"schedule\" value=\"1\" checked")
-          expect(BlueskyPostJob.jobs).to be_empty
-        end
-      end
-
-      # ⚠️ A refusal renders the page again and keeps the draft. A redirect would lose it.
-      context "when the draft is not good" do
-        it "refuses an empty body and keeps the picker" do
-          post "/social", params: { posts: [ { text: "", link: url } ], networks: [ "bluesky" ] }
-
-          expect(response).to have_http_status(:unprocessable_content)
-          expect(response.body).to include(I18n.t("admin.social.errors.text_missing.single"))
-          expect(response.body).to include(%(value="#{url}"))
-          expect(BlueskyPostJob.jobs).to be_empty
-        end
-
-        it "refuses a body past the limit and keeps it in the field" do
-          long = "a" * (Bluesky::MAX_GRAPHEMES + 1)
-
-          post "/social", params: { posts: [ { text: long, link: url } ], networks: [ "bluesky" ] }
-
-          expect(response).to have_http_status(:unprocessable_content)
-          expect(response.body).to include(I18n.t("admin.social.errors.too_long.single", count: 301, limit: Bluesky::MAX_GRAPHEMES))
-          expect(response.body).to include(long)
-          expect(BlueskyPostJob.jobs).to be_empty
-        end
-
-        it "refuses a value that is not a URL" do
-          post "/social", params: { posts: [ { text: "Hi.", link: "not a link" } ], networks: [ "bluesky" ] }
-
-          expect(response).to have_http_status(:unprocessable_content)
-          expect(response.body).to include(I18n.t("admin.social.errors.bad_link.single"))
-          expect(BlueskyPostJob.jobs).to be_empty
-        end
-
-        # ⚠️ A page with no og: tags puts its link in the WORDS of the Bluesky post. Without this
-        # check the job composes a longer text than the page counted, `Bluesky#post!` raises, and
-        # the job retries for 24 hours.
-        it "counts the link when the page gives no card, and says so" do
-          allow_any_instance_of(OpenGraph).to receive(:fetch)
-            .and_return(OpenGraph::Card.new(url: url, title: nil, description: nil, image_url: nil))
-          text = "a" * 290
-
-          post "/social", params: { posts: [ { text: text, link: url } ], networks: [ "bluesky" ] }
-
-          expect(response).to have_http_status(:unprocessable_content)
-          expect(response.body).to include(
-            ERB::Util.html_escape(
-              I18n.t("admin.social.errors.too_long_link.single",
-                     count: 290 + 2 + url.length, limit: Bluesky::MAX_GRAPHEMES)
-            )
-          )
-          expect(BlueskyPostJob.jobs).to be_empty
-        end
-
-        # The same draft fits when the page draws a card: that link is an embed and it uses none of
-        # the 300 characters.
-        it "counts no link when the page gives a card" do
-          post "/social", params: { posts: [ { text: "a" * 290, link: url } ], networks: [ "bluesky" ] }
-
-          expect(response).to redirect_to(social_path)
-        end
-
-        # ⚠️ The field is closed on a first load, thus a refusal must render it OPEN for a post that
-        # already holds a link. Without this the owner cannot see the link that they wrote, and the
-        # button would offer to add a second one.
-        #
-        # ⚠️ That button is DISABLED and it is never hidden: it is taller than the count beside it,
-        # thus a button that goes away moves that count up.
-        it "puts the link field back open after a refusal, and disables the button beside it" do
-          post "/social", params: { posts: [ { text: "", link: url } ], networks: [ "bluesky" ] }
-
-          expect(response).to have_http_status(:unprocessable_content)
-          field = open_tag("wa-input", "social-post__link")
-          expect(field).to include(%(value="#{url}"))
-          expect(field).not_to include("hidden")
-          expect(open_tag("wa-button", "social-post__tool")).to include("disabled")
-        end
-
-        it "refuses a draft with no network" do
-          post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [] }
-
-          expect(response).to have_http_status(:unprocessable_content)
-          expect(response.body).to include(I18n.t("admin.social.errors.no_network"))
-          expect(BlueskyPostJob.jobs).to be_empty
-        end
-      end
-    end
-
     # ⚠️ The page is a draft screen, thus it renders with no account at all. Each row is then
     # disabled, and the owner can still look at the page and change it.
     context "when no account is connected" do
@@ -829,807 +215,1420 @@ RSpec.describe "Admin social media", type: :request do
         expect(response.body).to include(I18n.t("admin.pages.social"))
       end
     end
+  end
 
-    # The mention map of a draft. ⚠️ It is part of the draft and nothing stores it: the owner says
-    # what one person is called at each network, and the action writes those words into the text of
-    # each network before it adds the jobs.
-    describe "POST /social with mentions" do
-      before do
-        sign_in_as(email: owner_email)
-        connect(bluesky: true, mastodon: true, threads: true)
-        # The handle check must not reach the network in an example that is not about it.
-        allow_any_instance_of(Bluesky).to receive(:handle_missing?).and_return(false)
+  describe "GET /social/preview" do
+    before { sign_in_as(email: owner_email) }
+
+    let(:card) do
+      OpenGraph::Card.new(url: "https://example.test/a/", title: "A title",
+                          description: "A summary.", image_url: "https://cdn.test/og.png",
+                          document_uri: "at://did:plc:abc/site.standard.document/d1")
+    end
+
+    it "needs the owner session" do
+      reset!
+
+      get "/social/preview", params: { url: "https://example.test/a/" }
+
+      expect(response).to redirect_to("/signin")
+    end
+
+    it "gives the card of the link" do
+      allow_any_instance_of(OpenGraph).to receive(:fetch).and_return(card)
+
+      get "/social/preview", params: { url: "https://example.test/a/" }
+
+      body = response.parsed_body
+      expect(body["title"]).to eq("A title")
+      expect(body["description"]).to eq("A summary.")
+      expect(body["host"]).to eq("example.test")
+    end
+
+    # ⚠️ This is the useful part: the owner cannot know which of the two cards Bluesky will
+    # render until after the post without it.
+    it "says when the page publishes standard.site records" do
+      allow_any_instance_of(OpenGraph).to receive(:fetch).and_return(card)
+
+      get "/social/preview", params: { url: "https://example.test/a/" }
+
+      expect(response.parsed_body["standard_site"]).to be(true)
+    end
+
+    it "says when it is an ordinary link card" do
+      allow_any_instance_of(OpenGraph).to receive(:fetch)
+        .and_return(OpenGraph::Card.new(url: "https://other.test/", title: "T", description: nil,
+                                        image_url: nil))
+
+      get "/social/preview", params: { url: "https://other.test/" }
+
+      expect(response.parsed_body["standard_site"]).to be(false)
+    end
+
+    # ⚠️ The og:image itself is never in the answer. The CSP of the admin has `img-src :self`,
+    # thus the browser must ask this app for the picture.
+    it "gives the path of our own proxy and not the og:image" do
+      allow_any_instance_of(OpenGraph).to receive(:fetch).and_return(card)
+
+      get "/social/preview", params: { url: "https://example.test/a/" }
+
+      expect(response.parsed_body["image_path"]).to start_with("/social/preview/image")
+      expect(response.body).not_to include("cdn.test")
+    end
+
+    # ⚠️ False means that Bluesky draws NO card: the browser then hides the card, says where the
+    # link goes, and adds that link to its count.
+    it "says when the page gives no card at all" do
+      allow_any_instance_of(OpenGraph).to receive(:fetch)
+        .and_return(OpenGraph::Card.new(url: "https://other.test/", title: nil, description: nil,
+                                        image_url: nil))
+
+      get "/social/preview", params: { url: "https://other.test/" }
+
+      expect(response.parsed_body["embeddable"]).to be(false)
+    end
+
+    it "says when the page gives a card" do
+      allow_any_instance_of(OpenGraph).to receive(:fetch).and_return(card)
+
+      get "/social/preview", params: { url: "https://example.test/a/" }
+
+      expect(response.parsed_body["embeddable"]).to be(true)
+    end
+
+    it "gives no image path for a page with no picture" do
+      allow_any_instance_of(OpenGraph).to receive(:fetch)
+        .and_return(OpenGraph::Card.new(url: "https://other.test/", title: "T", description: nil,
+                                        image_url: nil))
+
+      get "/social/preview", params: { url: "https://other.test/" }
+
+      expect(response.parsed_body["image_path"]).to be_nil
+    end
+
+    it "refuses a value that is not a link, and reads nothing" do
+      expect_any_instance_of(OpenGraph).not_to receive(:fetch)
+
+      get "/social/preview", params: { url: "not a link" }
+
+      expect(response).to have_http_status(:unprocessable_content)
+    end
+  end
+
+  describe "GET /social/preview/image" do
+    before { sign_in_as(email: owner_email) }
+
+    let(:card) do
+      OpenGraph::Card.new(url: "https://example.test/a/", title: "T", description: nil,
+                          image_url: "https://cdn.test/og.png")
+    end
+
+    it "needs the owner session" do
+      reset!
+
+      get "/social/preview/image", params: { url: "https://example.test/a/" }
+
+      expect(response).to redirect_to("/signin")
+    end
+
+    # ⚠️ The parameter is the page, and not the picture. Thus a caller cannot name any URL for
+    # this app to get: the picture is always the one that the og: tags of that page name.
+    # `Bluesky#card_image` gives the same bytes that go up as the blob.
+    it "sends the picture that the og: tags of the page name" do
+      allow_any_instance_of(OpenGraph).to receive(:fetch).and_return(card)
+      allow_any_instance_of(Bluesky).to receive(:card_image)
+        .with("https://cdn.test/og.png")
+        .and_return({ body: "bytes", content_type: "image/png" })
+
+      get "/social/preview/image", params: { url: "https://example.test/a/" }
+
+      expect(response).to have_http_status(:ok)
+      expect(response.media_type).to eq("image/png")
+      expect(response.body).to eq("bytes")
+    end
+
+    it "answers 404 for a page with no picture" do
+      allow_any_instance_of(OpenGraph).to receive(:fetch)
+        .and_return(OpenGraph::Card.new(url: "https://other.test/", title: nil, description: nil,
+                                        image_url: nil))
+
+      get "/social/preview/image", params: { url: "https://other.test/" }
+
+      expect(response).to have_http_status(:not_found)
+    end
+
+    # ⚠️ The page names the picture, and the page is not ours. A picture on a private address
+    # must not be read, and the answer is the same as for a picture that cannot be read.
+    it "answers 404 for a picture on a private address, and does not read it" do
+      allow_any_instance_of(OpenGraph).to receive(:fetch)
+        .and_return(OpenGraph::Card.new(url: "https://example.test/a/", title: "T", description: nil,
+                                        image_url: "http://169.254.169.254/latest/meta-data/"))
+      allow(HTTParty).to receive(:get)
+
+      get "/social/preview/image", params: { url: "https://example.test/a/" }
+
+      expect(response).to have_http_status(:not_found)
+      expect(HTTParty).not_to have_received(:get)
+    end
+
+    it "answers 404 when the picture cannot be read" do
+      allow_any_instance_of(OpenGraph).to receive(:fetch).and_return(card)
+      allow_any_instance_of(Bluesky).to receive(:card_image).and_return(nil)
+
+      get "/social/preview/image", params: { url: "https://example.test/a/" }
+
+      expect(response).to have_http_status(:not_found)
+    end
+
+    it "refuses a value that is not a link" do
+      get "/social/preview/image", params: { url: "javascript:alert(1)" }
+
+      expect(response).to have_http_status(:unprocessable_content)
+    end
+  end
+
+  describe "POST /social" do
+    before { sign_in_as(email: owner_email) }
+
+    # ⚠️ The length check reads the card of the link, because a page with NO og: tags puts its
+    # link in the words of the Bluesky post. Refer to `#bluesky_text`. Thus each example here
+    # links to a page that gives a card, which is the ordinary condition.
+    before do
+      allow_any_instance_of(OpenGraph).to receive(:fetch) do |_service, link|
+        OpenGraph::Card.new(url: link, title: "A title", description: "A summary.",
+                            image_url: "https://cdn.test/og.png")
       end
+    end
 
-      def text_of(job) = job.jobs.first["args"].first.first["text"]
+    let(:url) { "https://example.test/2026/07/12/ironman-canada/" }
 
-      def post_draft(text:, mentions: [], networks: %w[bluesky mastodon threads])
-        post "/social", params: { posts: [ { text: text, link: "" } ],
-                                  mentions: mentions, networks: networks }
-      end
+    it "adds the job of the network, with the link and the body" do
+      post "/social", params: { posts: [ { text: "A long day.", link: url } ], networks: [ "bluesky" ] }
 
-      it "gives each network its own text from one body" do
-        post_draft(text: "Great ride with @tony.",
-                   mentions: [ { token: "@tony", bluesky: "tony.bsky.social",
-                                 mastodon: "Anthony Edwards", threads: "@tony" } ])
+      expect(response).to redirect_to(social_path)
+      expect(flash[:notice]).to eq(I18n.t("admin.social.flash.sent", networks: "Bluesky"))
+      expect(BlueskyPostJob.jobs.size).to eq(1)
+      payload = BlueskyPostJob.jobs.first["args"].first
+      expect(payload.length).to eq(1)
+      expect(payload.first["link"]).to eq(url)
+      expect(payload.first["text"]).to eq("A long day.")
+      # ⚠️ The controller makes the key of each post, and each job writes at that key. Thus a
+      # Sidekiq retry replaces one post and does not add a second one.
+      expect(payload.first["key"]).to match(/\A[234567a-z]{13}\z/)
+    end
 
-        expect(text_of(BlueskyPostJob)).to eq("Great ride with @tony.bsky.social.")
-        expect(text_of(MastodonPostJob)).to eq("Great ride with Anthony Edwards.")
-        expect(text_of(ThreadsPostJob)).to eq("Great ride with @tony.")
-      end
+    # ⚠️ The link is optional. A post with no link is words alone, and it makes no card.
+    it "takes a post with no link" do
+      post "/social", params: { posts: [ { text: "No link here." } ], networks: [ "bluesky" ] }
 
-      # ⚠️ The case of a person with no account at that network. It is a correct answer.
-      it "posts plain words with no @ where the owner gave a name" do
-        post_draft(text: "Great ride with @tony.",
-                   mentions: [ { token: "@tony", bluesky: "", mastodon: "Anthony Edwards",
-                                 threads: "" } ])
+      expect(response).to redirect_to(social_path)
+      expect(BlueskyPostJob.jobs.first["args"].first.first["link"]).to eq("")
+    end
 
-        expect(text_of(MastodonPostJob)).to eq("Great ride with Anthony Edwards.")
-      end
-
-      it "keeps the words of the token, with no @, for a field that is empty" do
-        post_draft(text: "Great ride with @Tony.",
-                   mentions: [ { token: "@Tony", bluesky: "", mastodon: "", threads: "" } ])
-
-        [ BlueskyPostJob, MastodonPostJob, ThreadsPostJob ].each do |job|
-          expect(text_of(job)).to eq("Great ride with Tony.")
-        end
-      end
-
-      # ⚠️ The server finds each token itself and reads the map as a lookup only. Thus a token that
-      # the browser sent no row for still loses its "@", and it can never tag a stranger.
-      it "removes the @ of a token that the form sent no row for" do
-        post_draft(text: "Great ride with @tony.", mentions: [])
-
-        expect(text_of(ThreadsPostJob)).to eq("Great ride with tony.")
-      end
-
-      it "reads a handle that the owner wrote with an @" do
-        post_draft(text: "cc @tony", networks: [ "bluesky" ],
-                   mentions: [ { token: "@tony", bluesky: "@tony.bsky.social", mastodon: "",
-                                 threads: "" } ])
-
-        expect(text_of(BlueskyPostJob)).to eq("cc @tony.bsky.social")
-      end
-
-      it "leaves a draft with no mention alone" do
-        post_draft(text: "A long day.")
-
-        expect(text_of(BlueskyPostJob)).to eq("A long day.")
-      end
-
-      describe "the character count" do
-        # 292 words, and the handle adds 13 more. ⚠️ The raw body fits and the Bluesky text does not.
-        let(:body) { "#{'a' * 286} @tony" }
-
-        it "counts the text that Bluesky will get, and says so" do
-          post_draft(text: body, networks: [ "bluesky" ],
-                     mentions: [ { token: "@tony", bluesky: "tony.bsky.social", mastodon: "",
-                                   threads: "" } ])
-
-          expect(response).to have_http_status(:unprocessable_content)
-          expect(flash[:alert]).to include(t_before("admin.social.errors.too_long_handles.single", :count, limit: Bluesky::MAX_GRAPHEMES))
-          expect(BlueskyPostJob.jobs).to be_empty
-        end
-
-        it "takes the same body when the handle is short enough" do
-          post_draft(text: body, networks: [ "bluesky" ],
-                     mentions: [ { token: "@tony", bluesky: "", mastodon: "", threads: "" } ])
-
-          expect(response).to redirect_to(social_path)
-        end
-      end
-
-      # ⚠️ A handle of another network in a field is otherwise mangled with no message.
-      describe "a handle in the field of the wrong network" do
-        it "refuses it, and names the field and the token" do
-          post_draft(text: "cc @tony", networks: [ "bluesky" ],
-                     mentions: [ { token: "@tony", bluesky: "tony@hachyderm.io", mastodon: "",
-                                   threads: "" } ])
-
-          expect(response).to have_http_status(:unprocessable_content)
-          expect(flash[:alert]).to eq(I18n.t("admin.social.errors.mistaken_network", network: I18n.t("admin.networks.bluesky"),
-                                                            token: "@tony",
-                                                            other: I18n.t("admin.networks.mastodon")))
-          expect(BlueskyPostJob.jobs).to be_empty
-        end
-
-        # ⚠️ The check reads the ticked networks only.
-        it "says nothing about a field of a network that the draft does not post to" do
-          post_draft(text: "cc @tony", networks: [ "mastodon" ],
-                     mentions: [ { token: "@tony", bluesky: "tony@hachyderm.io",
-                                   mastodon: "tony@hachyderm.io", threads: "" } ])
-
-          expect(response).to redirect_to(social_path)
-        end
-
-        # ⚠️ The case that DIAGNOSTIC_SHAPES protects: a name is not a mistake in any field.
-        it "takes a plain name in every field" do
-          post_draft(text: "cc @tony",
-                     mentions: [ { token: "@tony", bluesky: "Tony", mastodon: "Tony",
-                                   threads: "Tony" } ])
-
-          expect(response).to redirect_to(social_path)
-        end
-      end
-
-      describe "the Bluesky handle check" do
-        let(:draft) do
-          { token: "@tony", bluesky: "nobody.bsky.social", mastodon: "", threads: "" }
-        end
-
-        it "refuses a handle that the PDS does not know, and names it" do
-          allow_any_instance_of(Bluesky).to receive(:handle_missing?).and_return(true)
-
-          post_draft(text: "cc @tony", mentions: [ draft ])
-
-          expect(response).to have_http_status(:unprocessable_content)
-          expect(flash[:alert]).to include(I18n.t("admin.social.errors.bad_handle", handle: "nobody.bsky.social"))
-          expect(BlueskyPostJob.jobs).to be_empty
-        end
-
-        # ⚠️ Fail open. An outage of the PDS must never stop a post to Mastodon and Threads.
-        it "posts when the PDS does not answer" do
-          allow_any_instance_of(Bluesky).to receive(:handle_missing?).and_return(false)
-
-          post_draft(text: "cc @tony", mentions: [ draft ])
-
-          expect(response).to redirect_to(social_path)
-          expect(MastodonPostJob.jobs.size).to eq(1)
-        end
-
-        it "asks nothing when the owner does not post to Bluesky" do
-          expect_any_instance_of(Bluesky).not_to receive(:handle_missing?)
-
-          post_draft(text: "cc @tony", networks: %w[mastodon threads], mentions: [ draft ])
-
-          expect(response).to redirect_to(social_path)
-        end
-
-        # Plain words are not a handle, thus there is nothing to ask about.
-        it "asks nothing about a name" do
-          expect_any_instance_of(Bluesky).not_to receive(:handle_missing?)
-
-          post_draft(text: "cc @tony", networks: [ "bluesky" ],
-                     mentions: [ { token: "@tony", bluesky: "Anthony Edwards", mastodon: "",
-                                   threads: "" } ])
-
-          expect(response).to redirect_to(social_path)
-        end
-      end
-
-      # ⚠️ A refusal renders the page again, thus the owner must not lose the map that they filled.
-      it "puts each row back after a refusal" do
+    describe "a thread" do
+      # ⚠️ The form sends `posts[][text]` and `posts[][link]`, and Rails starts a new hash when a
+      # key repeats. Thus each pair must stay together and in order.
+      it "adds one job for the thread, with each post in order and a key of its own" do
         post "/social", params: {
-          posts: [ { text: "cc @tony", link: "" } ],
-          mentions: [ { token: "@tony", bluesky: "tony.bsky.social", mastodon: "Anthony Edwards",
-                        threads: "" } ],
-          networks: []
+          posts: [ { text: "One", link: "https://example.test/a/" },
+                   { text: "Two", link: "" },
+                   { text: "Three", link: "https://example.test/b/" } ],
+          networks: [ "bluesky" ]
+        }
+
+        expect(response).to redirect_to(social_path)
+        expect(BlueskyPostJob.jobs.size).to eq(1)
+        payload = BlueskyPostJob.jobs.first["args"].first
+        expect(payload.map { |p| p["text"] }).to eq(%w[One Two Three])
+        expect(payload.map { |p| p["link"] })
+          .to eq([ "https://example.test/a/", "", "https://example.test/b/" ])
+        expect(payload.map { |p| p["key"] }.uniq.length).to eq(3)
+      end
+
+      it "names each network in the notice" do
+        connect(bluesky: true, mastodon: true, threads: false)
+
+        post "/social", params: { posts: [ { text: "One" }, { text: "Two" } ],
+                                  networks: %w[bluesky mastodon] }
+
+        expect(flash[:notice]).to eq(I18n.t("admin.social.flash.sent", networks: "Bluesky and Mastodon"))
+      end
+
+      # ⚠️ Only the FIRST post of each network is scheduled. That job adds the next one when it
+      # succeeds, thus the rest of the thread needs no time of its own.
+      it "schedules the first job of each network only" do
+        on = 10.days.from_now.strftime("%Y-%m-%d")
+
+        post "/social", params: { posts: [ { text: "One" }, { text: "Two" } ],
+                                  networks: [ "bluesky" ], schedule: "1", date: on,
+                                  time: "09:00", time_zone: "America/Denver" }
+
+        expect(BlueskyPostJob.jobs.size).to eq(1)
+        expect(BlueskyPostJob.jobs.first["at"]).to be_present
+        expect(flash[:notice]).to include(t_before("admin.social.flash.scheduled", :at, networks: "Bluesky"))
+      end
+
+      # An empty block that the owner added and left alone must not refuse the whole draft.
+      it "drops a block with nothing in it" do
+        post "/social", params: { posts: [ { text: "One" }, { text: "", link: "" } ],
+                                  networks: [ "bluesky" ] }
+
+        expect(response).to redirect_to(social_path)
+        expect(BlueskyPostJob.jobs.first["args"].first.length).to eq(1)
+      end
+
+      # ⚠️ A message names the post: a thread has more than one, and a plain message does not say
+      # which one is wrong.
+      it "names the post that is too long" do
+        post "/social", params: { posts: [ { text: "One" }, { text: "a" * 301 } ],
+                                  networks: [ "bluesky" ] }
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(response.body).to include(I18n.t("admin.social.errors.too_long.numbered", index: 2, count: 301, limit: Bluesky::MAX_GRAPHEMES))
+        expect(BlueskyPostJob.jobs).to be_empty
+      end
+
+      it "names the post with a link that is not a link" do
+        post "/social", params: { posts: [ { text: "One" }, { text: "Two", link: "nope" } ],
+                                  networks: [ "bluesky" ] }
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(response.body).to include(I18n.t("admin.social.errors.bad_link.numbered", index: 2))
+      end
+
+      it "refuses a post of the thread that has a link and no words" do
+        post "/social", params: {
+          posts: [ { text: "One" }, { text: "", link: "https://example.test/a/" } ],
+          networks: [ "bluesky" ]
         }
 
         expect(response).to have_http_status(:unprocessable_content)
-        expect(response.body).to include("tony.bsky.social")
-        expect(response.body).to include("Anthony Edwards")
-      end
-    end
-
-    # The preview dialog. ⚠️ It reads the same fields as POST /social and it calls the same private
-    # methods, thus it cannot show a text that the post does not send.
-    # ⚠️ The topic is THREAD-LEVEL and it belongs to Threads alone: `topic_tag` is a parameter of
-    # Meta, and Bluesky and Mastodon have no equivalent.
-    describe "POST /social with a Threads topic" do
-      before do
-        sign_in_as(email: owner_email)
-        connect(bluesky: true, mastodon: true, threads: true)
+        expect(response.body).to include(I18n.t("admin.social.errors.text_missing.numbered", index: 2))
       end
 
-      def submit(topic:, networks: [ "threads" ], posts: [ { text: "Read this", link: "" } ])
-        post "/social", params: { posts: posts, networks: networks, topic: topic }
-      end
-
-      # ⚠️ **Every post of a thread carries it**, and not the first one alone. Meta takes one topic
-      # for each post, and no documentation says that a reply inherits the topic of its root.
-      it "gives the topic to each post of the thread" do
-        submit(topic: "Cycling", posts: [ { text: "One", link: "" }, { text: "Two", link: "" } ])
-
-        expect(response).to redirect_to(social_path)
-        payload = ThreadsPostJob.jobs.first["args"].first
-        expect(payload.map { |entry| entry["topic"] }).to eq(%w[Cycling Cycling])
-      end
-
-      # ⚠️ The parameter of Meta takes the words alone. A "#" belongs to a tag that is IN the text.
-      it "removes a leading hash" do
-        submit(topic: " #Cycling ")
-
-        expect(ThreadsPostJob.jobs.first["args"].first.first["topic"]).to eq("Cycling")
-      end
-
-      it "gives the topic to Threads alone" do
-        submit(topic: "Cycling", networks: %w[bluesky mastodon threads])
-
-        expect(BlueskyPostJob.jobs.first["args"].first.first).not_to have_key("topic")
-        expect(MastodonPostJob.jobs.first["args"].first.first).not_to have_key("topic")
-        expect(ThreadsPostJob.jobs.first["args"].first.first["topic"]).to eq("Cycling")
-      end
-
-      it "sends no topic when the field is empty" do
-        submit(topic: "")
-
-        expect(response).to redirect_to(social_path)
-        expect(ThreadsPostJob.jobs.first["args"].first.first).not_to have_key("topic")
-      end
-
-      # ⚠️ Without this the container is refused at Meta, and the job then retries a draft that can
-      # never work, for 24 hours.
-      describe "a topic that Meta will not take" do
-        it "refuses a period and an ampersand" do
-          [ "bikes.and.things", "bikes & things" ].each do |bad|
-            ThreadsPostJob.jobs.clear
-            submit(topic: bad)
-
-            expect(response).to have_http_status(:unprocessable_content)
-            expect(flash[:alert])
-              .to eq(I18n.t("admin.social.errors.bad_topic", limit: Threads::TOPIC_MAX_CHARACTERS))
-            expect(ThreadsPostJob.jobs).to be_empty
-          end
-        end
-
-        it "refuses a topic past the limit" do
-          submit(topic: "a" * (Threads::TOPIC_MAX_CHARACTERS + 1))
-
-          expect(response).to have_http_status(:unprocessable_content)
-          expect(ThreadsPostJob.jobs).to be_empty
-        end
-
-        it "keeps the topic in the form after a refusal" do
-          submit(topic: "bikes & things")
-
-          expect(response.body).to include(%(<wa-option value="bikes &amp; things" selected>))
-        end
-
-        # ⚠️ The combobox shows a value only through an option that matches it.
-        it "selects a topic of the list after a refusal, and adds no option for it" do
-          submit(topic: "Triathlon", posts: [ { text: "x" * 301, link: "" } ])
-
-          expect(response).to have_http_status(:unprocessable_content)
-
-          expect(response.body).to include(%(<wa-option value="Triathlon" selected>))
-          expect(response.body.scan(%(<wa-option value="Triathlon")).size).to eq(1)
-        end
-
-        # ⚠️ The field stays in the form while the Threads row is not ticked, thus a value that the
-        # owner left there must not refuse a draft that goes nowhere near Threads.
-        it "ignores a topic that Threads will not see" do
-          submit(topic: "bikes & things", networks: [ "bluesky" ])
-
-          expect(response).to redirect_to(social_path)
-        end
-      end
-
-      it "shows the topic in the preview, on the Threads row of each post" do
-        post "/social/preview/text", params: { posts: [ { text: "One" }, { text: "Two" } ],
-                                               topic: "Cycling" }
-
-        body = JSON.parse(response.body)
-        by_key = body["networks"].index_by { |row| row["key"] }
-
-        # ⚠️ It is the topic ITSELF and not a sentence about it: the panel renders it as a badge.
-        expect(by_key["threads"]["posts"].map { |post| post["topic"] }).to eq(%w[Cycling Cycling])
-        # ⚠️ Bluesky and Mastodon have no equivalent, thus their cards never carry one.
-        expect(by_key["bluesky"]["posts"].map { |post| post["topic"] }).to all(be_nil)
-        expect(by_key["mastodon"]["posts"].map { |post| post["topic"] }).to all(be_nil)
-      end
-    end
-
-    # ⚠️ The field shows only while the Threads row can take a post and is ticked. The server
-    # renders that state, thus it does not show for a moment before the Stimulus controller runs.
-    describe "GET /social with the topic field" do
-      before { sign_in_as(email: owner_email) }
-
-      it "shows the field when Threads is connected" do
-        connect(bluesky: false, mastodon: false, threads: true)
-
-        get "/social"
-
-        expect(response.body).to include(%(<wa-combobox name="topic"))
-        SocialPresenter::TOPICS.each do |option|
-          expect(response.body).to include(%(<wa-option value="#{option}"))
-        end
-        expect(response.body).not_to match(/class="social__topic"[^>]*hidden/)
-      end
-
-      it "hides the field when Threads has no account" do
-        connect(bluesky: true, mastodon: false, threads: false)
-
-        get "/social"
-
-        expect(response.body).to match(/class="social__topic"[^>]*hidden/)
-      end
-    end
-
-    # ⚠️ The typography is a matter of CHARACTERS and not of rich text, thus each of the three
-    # networks gets it. That is the difference from a Markdown link, which Bluesky alone can take.
-    describe "POST /social with the typography" do
-      before do
-        sign_in_as(email: owner_email)
-        connect(bluesky: true, mastodon: true, threads: true)
-      end
-
-      it "curls the quotation marks of every network" do
-        post "/social", params: { posts: [ { text: %q(It's a "big" day... really), link: "" } ],
-                                  networks: %w[bluesky mastodon threads] }
-
-        expect(response).to redirect_to(social_path)
-        [ BlueskyPostJob, MastodonPostJob, ThreadsPostJob ].each do |job|
-          expect(job.jobs.first["args"].first.first["text"])
-            .to eq("It’s a “big” day… really"), "#{job} did not get the typography"
-        end
-      end
-
-      # ⚠️ This is the failure that this whole step is built around: SmartyPants reads the
-      # characters of an address as punctuation, and the link then goes nowhere.
-      it "leaves an address exactly as the owner wrote it" do
-        draft = %q(It's here: https://example.test/a--b... really)
-
-        post "/social", params: { posts: [ { text: draft, link: "" } ], networks: [ "bluesky" ] }
-
-        expect(BlueskyPostJob.jobs.first["args"].first.first["text"])
-          .to eq("It’s here: https://example.test/a--b… really")
-      end
-
-      it "counts the text that it will post" do
-        # 298 characters as the owner types it, and 296 after the ellipsis.
-        draft = "#{'a' * 295}..."
-
-        post "/social", params: { posts: [ { text: draft, link: "" } ], networks: [ "bluesky" ] }
-
-        expect(response).to redirect_to(social_path)
-        expect(Bluesky.post_length(BlueskyPostJob.jobs.first["args"].first.first["text"])).to eq(296)
-      end
-
-      # ⚠️ The message names the handles only when a MENTION made the text longer. The typography
-      # runs on every draft, thus a count of the finished text would name them for a post that
-      # mentions nobody.
-      it "does not name the handles when only the typography changed the text" do
-        post "/social", params: { posts: [ { text: "#{'a' * 300}..." } ], networks: [ "bluesky" ] }
-
-        expect(flash[:alert]).to eq(I18n.t("admin.social.errors.too_long.single", count: 301,
-                                                                                  limit: 300))
-      end
-
-      it "shows the typographic text in the preview" do
-        post "/social/preview/text", params: { posts: [ { text: %q(It's "big"...), link: "" } ] }
-
-        row = JSON.parse(response.body)["networks"].first["posts"].first
-        expect(row["text"]).to eq("It’s “big”…")
-        expect(row["length"]).to eq(11)
-      end
-    end
-
-    # ⚠️ Only Bluesky has rich text. The composer unticks and disables the other two rows, and this
-    # is not a repeat of that: a row that a browser cannot tick, a hand-written request can.
-    describe "POST /social with a Markdown link" do
-      before do
-        sign_in_as(email: owner_email)
-        connect(bluesky: true, mastodon: true, threads: true)
-      end
-
-      let(:draft) { "Read [my post](https://example.test/a) today" }
-
-      it "posts to Bluesky" do
-        post "/social", params: { posts: [ { text: draft, link: "" } ], networks: [ "bluesky" ] }
-
-        expect(response).to redirect_to(social_path)
-        # ⚠️ The job carries the words that the OWNER wrote. `Bluesky#post!` renders them, thus each
-        # attempt of that job makes the same record text and the same facets.
-        expect(BlueskyPostJob.jobs.first["args"].first.first["text"]).to eq(draft)
-      end
-
-      it "refuses a draft that also posts to a network with no rich text" do
-        post "/social", params: { posts: [ { text: draft, link: "" } ],
-                                  networks: %w[bluesky mastodon threads] }
+      it "refuses a thread past the limit" do
+        post "/social", params: {
+          posts: Array.new(SocialDraft::MAX_POSTS + 1) { |i| { text: "Post #{i}" } },
+          networks: [ "bluesky" ]
+        }
 
         expect(response).to have_http_status(:unprocessable_content)
-        expect(flash[:alert]).to eq(I18n.t("admin.social.errors.markdown_network",
-                                           networks: "Mastodon and Threads"))
+        expect(response.body).to include(I18n.t("admin.social.errors.too_many_posts", count: SocialDraft::MAX_POSTS))
         expect(BlueskyPostJob.jobs).to be_empty
-        expect(MastodonPostJob.jobs).to be_empty
+      end
+
+      # ⚠️ A refusal renders again and keeps every post. A redirect would lose what the owner
+      # wrote, and a thread is more of it.
+      it "puts every post back after a refusal, in order" do
+        post "/social", params: { posts: [ { text: "First words" }, { text: "a" * 301 } ],
+                                  networks: [ "bluesky" ] }
+
+        expect(response.body).to include("First words")
+        expect(response.body).to include("a" * 301)
+      end
+    end
+
+    # ⚠️ One job for each network, thus a failure at one service retries that service alone.
+    it "adds one job for each network, and gives all three the same key" do
+      connect(bluesky: true, mastodon: true, threads: true)
+
+      post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: %w[bluesky mastodon threads] }
+
+      expect(flash[:notice]).to eq(I18n.t("admin.social.flash.sent", networks: "Bluesky, Mastodon, and Threads"))
+      # ⚠️ It compares the KEY of each post and not the whole payload. The three networks get a
+      # different text when the draft names a person, and they must still share one key.
+      keys = [ BlueskyPostJob, MastodonPostJob, ThreadsPostJob ].map do |job|
+        expect(job.jobs.size).to eq(1)
+        job.jobs.first["args"].first.map { |post| post["key"] }
+      end
+      expect(keys.uniq.size).to eq(1)
+      expect(keys.first.compact.size).to eq(1)
+    end
+
+    # A request that a person writes by hand, and the shape that an empty `posts[]` sends.
+    it "refuses a body whose posts are not blocks, and does not give a 500" do
+      post "/social", params: { posts: "", mentions: "", networks: [ "bluesky" ] }
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(flash[:alert]).to eq(I18n.t("admin.social.errors.empty"))
+      expect(BlueskyPostJob.jobs).to be_empty
+    end
+
+    it "adds no job for a network that the owner did not tick" do
+      connect(bluesky: true, mastodon: true, threads: true)
+
+      post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [ "mastodon" ] }
+
+      expect(MastodonPostJob.jobs.size).to eq(1)
+      expect(BlueskyPostJob.jobs).to be_empty
+      expect(ThreadsPostJob.jobs).to be_empty
+    end
+
+    # ⚠️ A row with no account renders `disabled`, thus a browser cannot tick it. A request that
+    # a person writes by hand can, and the job would then retry "not connected" for 24 hours.
+    it "refuses a network that has no account" do
+      connect(bluesky: true, mastodon: false, threads: false)
+
+      post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [ "mastodon" ] }
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(MastodonPostJob.jobs).to be_empty
+    end
+
+    # ⚠️ The link field takes any URL, thus the owner can share a page on another site.
+    it "takes a link that is not an article of this site" do
+      post "/social", params: { posts: [ { text: "Good.", link: "https://someone-else.test/a-post/" } ],
+                               networks: [ "bluesky" ] }
+
+      expect(response).to redirect_to(social_path)
+      expect(BlueskyPostJob.jobs.first["args"].first.first["link"])
+        .to eq("https://someone-else.test/a-post/")
+    end
+
+    it "ignores a network key that this app does not know" do
+      post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: %w[bluesky myspace] }
+
+      expect(BlueskyPostJob.jobs.size).to eq(1)
+      expect(flash[:notice]).to eq(I18n.t("admin.social.flash.sent", networks: "Bluesky"))
+    end
+
+    # ⚠️ A dead Threads token is connected and cannot post. Without this check the job would
+    # raise at Meta and retry for 24 hours.
+    it "refuses the Threads row when its token expired" do
+      expire_threads
+
+      post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [ "threads" ] }
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(ThreadsPostJob.jobs).to be_empty
+    end
+
+    # ⚠️ The body is stripped one time, here. Without that a newline at its end went to Bluesky
+    # as it was and to Mastodon with the newline removed.
+    it "strips the body before it counts it and before it adds the job" do
+      post "/social", params: { posts: [ { text: "  A long day.\n\n", link: url } ], networks: [ "bluesky" ] }
+
+      expect(response).to redirect_to(social_path)
+      expect(BlueskyPostJob.jobs.first["args"].first.first["text"]).to eq("A long day.")
+    end
+
+    it "refuses a body that is only white space" do
+      post "/social", params: { posts: [ { text: " \n ", link: url } ], networks: [ "bluesky" ] }
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.body).to include(I18n.t("admin.social.errors.text_missing.single"))
+    end
+
+    # ⚠️ A submit that fails keeps the ticks of the owner, and an empty choice is a choice. The
+    # default ticks apply to the first load only.
+    it "keeps the rows unticked after a refusal when the owner unticked them" do
+      connect(bluesky: true, mastodon: true, threads: false)
+
+      post "/social", params: { posts: [ { text: "", link: url } ], networks: [] }
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.body).not_to match(/value="bluesky"[^>]*\schecked>/)
+      expect(response.body).not_to match(/value="mastodon"[^>]*\schecked>/)
+    end
+
+    describe "scheduling" do
+      # Any date in the future. ⚠️ It must not be a constant: a date that a person writes here
+      # becomes the past, and the action then refuses it and the example fails one day.
+      let(:on) { 10.days.from_now.strftime("%Y-%m-%d") }
+
+      # ⚠️ A date and a time carry no zone. The browser sends its own IANA id, thus "09:00" has
+      # one meaning. This is the difference from the Republish dialog, which takes minutes from
+      # now for exactly this reason.
+      it "reads the date and the time in the zone that the browser sent" do
+        post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [ "bluesky" ],
+                                 schedule: "1", date: on, time: "09:00",
+                                 time_zone: "America/New_York" }
+
+        expect(response).to redirect_to(social_path)
+        expected = Time.use_zone("America/New_York") { Time.zone.parse("#{on} 09:00") }
+        expect(BlueskyPostJob.jobs.first["at"]).to be_within(1).of(expected.to_f)
+      end
+
+      it "names the moment in the notice, in that same zone" do
+        post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [ "bluesky" ],
+                                 schedule: "1", date: on, time: "09:00",
+                                 time_zone: "America/New_York" }
+
+        expected = Time.use_zone("America/New_York") do
+          Time.zone.parse("#{on} 09:00").strftime("%B %-e at %-I:%M %p %Z")
+        end
+        expect(flash[:notice]).to eq(I18n.t("admin.social.flash.scheduled", networks: "Bluesky", at: expected))
+      end
+
+      # ⚠️ With no JavaScript the hidden field is empty. TIME_ZONE is then the meaning, and the
+      # form still works.
+      it "falls back to the configured zone with no time zone field" do
+        allow(TimeZoneResolver).to receive(:default).and_return("America/Denver")
+
+        post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [ "bluesky" ],
+                                 schedule: "1", date: on, time: "09:00" }
+
+        expected = Time.use_zone("America/Denver") { Time.zone.parse("#{on} 09:00") }
+        expect(BlueskyPostJob.jobs.first["at"]).to be_within(1).of(expected.to_f)
+      end
+
+      # That field comes from the browser, thus a value with a mistake must never raise.
+      it "falls back for a time zone that Rails does not know" do
+        post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [ "bluesky" ],
+                                 schedule: "1", date: on, time: "09:00",
+                                 time_zone: "Mars/Olympus_Mons" }
+
+        expect(response).to redirect_to(social_path)
+        expect(BlueskyPostJob.jobs.size).to eq(1)
+      end
+
+      it "posts now when the switch is off, and schedules nothing" do
+        post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [ "bluesky" ],
+                                 schedule: "0", date: on, time: "09:00" }
+
+        expect(flash[:notice]).to eq(I18n.t("admin.social.flash.sent", networks: "Bluesky"))
+        expect(BlueskyPostJob.jobs.first["at"]).to be_nil
+      end
+
+      # ⚠️ A moment that has PASSED is not an error: it is not a schedule, thus the post goes out
+      # at once. The label of the submit button says "Post now" for that same draft, and a
+      # refusal here would make that button a liar.
+      it "posts at once for a moment that has passed" do
+        post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [ "bluesky" ],
+                                 schedule: "1", date: "2020-01-01", time: "09:00" }
+
+        expect(response).to redirect_to(social_path)
+        expect(flash[:notice]).to eq(I18n.t("admin.social.flash.sent", networks: "Bluesky"))
+        expect(BlueskyPostJob.jobs.size).to eq(1)
+        expect(BlueskyPostJob.jobs.first["at"]).to be_nil
+      end
+
+      # ⚠️ There is no limit on how far ahead this can be, on purpose. A post about a race can
+      # wait for the race.
+      it "takes a moment years from now" do
+        far = 3.years.from_now
+
+        post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [ "bluesky" ],
+                                 schedule: "1", date: far.strftime("%Y-%m-%d"), time: "09:00" }
+
+        expect(response).to redirect_to(social_path)
+        expect(BlueskyPostJob.jobs.size).to eq(1)
+      end
+
+      # ⚠️ `Time.zone.parse("garbage 09:00")` gives today at 09:00. Without the check of the
+      # shape, a value with a mistake would schedule a post for today.
+      it "refuses a date that is not a date" do
+        post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [ "bluesky" ],
+                                 schedule: "1", date: "garbage", time: "09:00" }
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(response.body).to include(I18n.t("admin.social.errors.no_moment"))
+        expect(BlueskyPostJob.jobs).to be_empty
+      end
+
+      it "refuses a time that is not a time" do
+        post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [ "bluesky" ],
+                                 schedule: "1", date: on, time: "9 in the morning" }
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(BlueskyPostJob.jobs).to be_empty
+      end
+
+      it "refuses a schedule with no date, and keeps the fields open" do
+        post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [ "bluesky" ],
+                                 schedule: "1", date: "", time: "09:00" }
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(response.body).to include(I18n.t("admin.social.errors.no_moment"))
+        expect(response.body).to include(%(value="09:00"))
+        expect(response.body).to include("<wa-switch name=\"schedule\" value=\"1\" checked")
+        expect(BlueskyPostJob.jobs).to be_empty
+      end
+    end
+
+    # ⚠️ A refusal renders the page again and keeps the draft. A redirect would lose it.
+    context "when the draft is not good" do
+      it "refuses an empty body and keeps the picker" do
+        post "/social", params: { posts: [ { text: "", link: url } ], networks: [ "bluesky" ] }
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(response.body).to include(I18n.t("admin.social.errors.text_missing.single"))
+        expect(response.body).to include(%(value="#{url}"))
+        expect(BlueskyPostJob.jobs).to be_empty
+      end
+
+      it "refuses a body past the limit and keeps it in the field" do
+        long = "a" * (Bluesky::MAX_GRAPHEMES + 1)
+
+        post "/social", params: { posts: [ { text: long, link: url } ], networks: [ "bluesky" ] }
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(response.body).to include(I18n.t("admin.social.errors.too_long.single", count: 301, limit: Bluesky::MAX_GRAPHEMES))
+        expect(response.body).to include(long)
+        expect(BlueskyPostJob.jobs).to be_empty
+      end
+
+      it "refuses a value that is not a URL" do
+        post "/social", params: { posts: [ { text: "Hi.", link: "not a link" } ], networks: [ "bluesky" ] }
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(response.body).to include(I18n.t("admin.social.errors.bad_link.single"))
+        expect(BlueskyPostJob.jobs).to be_empty
+      end
+
+      # ⚠️ A page with no og: tags puts its link in the WORDS of the Bluesky post. Without this
+      # check the job composes a longer text than the page counted, `Bluesky#post!` raises, and
+      # the job retries for 24 hours.
+      it "counts the link when the page gives no card, and says so" do
+        allow_any_instance_of(OpenGraph).to receive(:fetch)
+          .and_return(OpenGraph::Card.new(url: url, title: nil, description: nil, image_url: nil))
+        text = "a" * 290
+
+        post "/social", params: { posts: [ { text: text, link: url } ], networks: [ "bluesky" ] }
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(response.body).to include(
+          ERB::Util.html_escape(
+            I18n.t("admin.social.errors.too_long_link.single",
+                   count: 290 + 2 + url.length, limit: Bluesky::MAX_GRAPHEMES)
+          )
+        )
+        expect(BlueskyPostJob.jobs).to be_empty
+      end
+
+      # The same draft fits when the page draws a card: that link is an embed and it uses none of
+      # the 300 characters.
+      it "counts no link when the page gives a card" do
+        post "/social", params: { posts: [ { text: "a" * 290, link: url } ], networks: [ "bluesky" ] }
+
+        expect(response).to redirect_to(social_path)
+      end
+
+      # ⚠️ The field is closed on a first load, thus a refusal must render it OPEN for a post that
+      # already holds a link. Without this the owner cannot see the link that they wrote, and the
+      # button would offer to add a second one.
+      #
+      # ⚠️ That button is DISABLED and it is never hidden: it is taller than the count beside it,
+      # thus a button that goes away moves that count up.
+      it "puts the link field back open after a refusal, and disables the button beside it" do
+        post "/social", params: { posts: [ { text: "", link: url } ], networks: [ "bluesky" ] }
+
+        expect(response).to have_http_status(:unprocessable_content)
+        field = open_tag("wa-input", "social-post__link")
+        expect(field).to include(%(value="#{url}"))
+        expect(field).not_to include("hidden")
+        expect(open_tag("wa-button", "social-post__tool")).to include("disabled")
+      end
+
+      it "refuses a draft with no network" do
+        post "/social", params: { posts: [ { text: "Hi.", link: url } ], networks: [] }
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(response.body).to include(I18n.t("admin.social.errors.no_network"))
+        expect(BlueskyPostJob.jobs).to be_empty
+      end
+    end
+  end
+
+  # The mention map of a draft. ⚠️ It is part of the draft and nothing stores it: the owner says
+  # what one person is called at each network, and the action writes those words into the text of
+  # each network before it adds the jobs.
+  describe "POST /social with mentions" do
+    before do
+      sign_in_as(email: owner_email)
+      connect(bluesky: true, mastodon: true, threads: true)
+      # The handle check must not reach the network in an example that is not about it.
+      allow_any_instance_of(Bluesky).to receive(:handle_missing?).and_return(false)
+    end
+
+    def text_of(job) = job.jobs.first["args"].first.first["text"]
+
+    def post_draft(text:, mentions: [], networks: %w[bluesky mastodon threads])
+      post "/social", params: { posts: [ { text: text, link: "" } ],
+                                mentions: mentions, networks: networks }
+    end
+
+    it "gives each network its own text from one body" do
+      post_draft(text: "Great ride with @tony.",
+                 mentions: [ { token: "@tony", bluesky: "tony.bsky.social",
+                               mastodon: "Anthony Edwards", threads: "@tony" } ])
+
+      expect(text_of(BlueskyPostJob)).to eq("Great ride with @tony.bsky.social.")
+      expect(text_of(MastodonPostJob)).to eq("Great ride with Anthony Edwards.")
+      expect(text_of(ThreadsPostJob)).to eq("Great ride with @tony.")
+    end
+
+    # ⚠️ The case of a person with no account at that network. It is a correct answer.
+    it "posts plain words with no @ where the owner gave a name" do
+      post_draft(text: "Great ride with @tony.",
+                 mentions: [ { token: "@tony", bluesky: "", mastodon: "Anthony Edwards",
+                               threads: "" } ])
+
+      expect(text_of(MastodonPostJob)).to eq("Great ride with Anthony Edwards.")
+    end
+
+    it "keeps the words of the token, with no @, for a field that is empty" do
+      post_draft(text: "Great ride with @Tony.",
+                 mentions: [ { token: "@Tony", bluesky: "", mastodon: "", threads: "" } ])
+
+      [ BlueskyPostJob, MastodonPostJob, ThreadsPostJob ].each do |job|
+        expect(text_of(job)).to eq("Great ride with Tony.")
+      end
+    end
+
+    # ⚠️ The server finds each token itself and reads the map as a lookup only. Thus a token that
+    # the browser sent no row for still loses its "@", and it can never tag a stranger.
+    it "removes the @ of a token that the form sent no row for" do
+      post_draft(text: "Great ride with @tony.", mentions: [])
+
+      expect(text_of(ThreadsPostJob)).to eq("Great ride with tony.")
+    end
+
+    it "reads a handle that the owner wrote with an @" do
+      post_draft(text: "cc @tony", networks: [ "bluesky" ],
+                 mentions: [ { token: "@tony", bluesky: "@tony.bsky.social", mastodon: "",
+                               threads: "" } ])
+
+      expect(text_of(BlueskyPostJob)).to eq("cc @tony.bsky.social")
+    end
+
+    it "leaves a draft with no mention alone" do
+      post_draft(text: "A long day.")
+
+      expect(text_of(BlueskyPostJob)).to eq("A long day.")
+    end
+
+    describe "the character count" do
+      # 292 words, and the handle adds 13 more. ⚠️ The raw body fits and the Bluesky text does not.
+      let(:body) { "#{'a' * 286} @tony" }
+
+      it "counts the text that Bluesky will get, and says so" do
+        post_draft(text: body, networks: [ "bluesky" ],
+                   mentions: [ { token: "@tony", bluesky: "tony.bsky.social", mastodon: "",
+                                 threads: "" } ])
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(flash[:alert]).to include(t_before("admin.social.errors.too_long_handles.single", :count, limit: Bluesky::MAX_GRAPHEMES))
+        expect(BlueskyPostJob.jobs).to be_empty
+      end
+
+      it "takes the same body when the handle is short enough" do
+        post_draft(text: body, networks: [ "bluesky" ],
+                   mentions: [ { token: "@tony", bluesky: "", mastodon: "", threads: "" } ])
+
+        expect(response).to redirect_to(social_path)
+      end
+    end
+
+    # ⚠️ A handle of another network in a field is otherwise mangled with no message.
+    describe "a handle in the field of the wrong network" do
+      it "refuses it, and names the field and the token" do
+        post_draft(text: "cc @tony", networks: [ "bluesky" ],
+                   mentions: [ { token: "@tony", bluesky: "tony@hachyderm.io", mastodon: "",
+                                 threads: "" } ])
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(flash[:alert]).to eq(I18n.t("admin.social.errors.mistaken_network", network: I18n.t("admin.networks.bluesky"),
+                                                          token: "@tony",
+                                                          other: I18n.t("admin.networks.mastodon")))
+        expect(BlueskyPostJob.jobs).to be_empty
+      end
+
+      # ⚠️ The check reads the ticked networks only.
+      it "says nothing about a field of a network that the draft does not post to" do
+        post_draft(text: "cc @tony", networks: [ "mastodon" ],
+                   mentions: [ { token: "@tony", bluesky: "tony@hachyderm.io",
+                                 mastodon: "tony@hachyderm.io", threads: "" } ])
+
+        expect(response).to redirect_to(social_path)
+      end
+
+      # ⚠️ The case that DIAGNOSTIC_SHAPES protects: a name is not a mistake in any field.
+      it "takes a plain name in every field" do
+        post_draft(text: "cc @tony",
+                   mentions: [ { token: "@tony", bluesky: "Tony", mastodon: "Tony",
+                                 threads: "Tony" } ])
+
+        expect(response).to redirect_to(social_path)
+      end
+    end
+
+    describe "the Bluesky handle check" do
+      let(:draft) do
+        { token: "@tony", bluesky: "nobody.bsky.social", mastodon: "", threads: "" }
+      end
+
+      it "refuses a handle that the PDS does not know, and names it" do
+        allow_any_instance_of(Bluesky).to receive(:handle_missing?).and_return(true)
+
+        post_draft(text: "cc @tony", mentions: [ draft ])
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(flash[:alert]).to include(I18n.t("admin.social.errors.bad_handle", handle: "nobody.bsky.social"))
+        expect(BlueskyPostJob.jobs).to be_empty
+      end
+
+      # ⚠️ Fail open. An outage of the PDS must never stop a post to Mastodon and Threads.
+      it "posts when the PDS does not answer" do
+        allow_any_instance_of(Bluesky).to receive(:handle_missing?).and_return(false)
+
+        post_draft(text: "cc @tony", mentions: [ draft ])
+
+        expect(response).to redirect_to(social_path)
+        expect(MastodonPostJob.jobs.size).to eq(1)
+      end
+
+      it "asks nothing when the owner does not post to Bluesky" do
+        expect_any_instance_of(Bluesky).not_to receive(:handle_missing?)
+
+        post_draft(text: "cc @tony", networks: %w[mastodon threads], mentions: [ draft ])
+
+        expect(response).to redirect_to(social_path)
+      end
+
+      # Plain words are not a handle, thus there is nothing to ask about.
+      it "asks nothing about a name" do
+        expect_any_instance_of(Bluesky).not_to receive(:handle_missing?)
+
+        post_draft(text: "cc @tony", networks: [ "bluesky" ],
+                   mentions: [ { token: "@tony", bluesky: "Anthony Edwards", mastodon: "",
+                                 threads: "" } ])
+
+        expect(response).to redirect_to(social_path)
+      end
+    end
+
+    # ⚠️ A refusal renders the page again, thus the owner must not lose the map that they filled.
+    it "puts each row back after a refusal" do
+      post "/social", params: {
+        posts: [ { text: "cc @tony", link: "" } ],
+        mentions: [ { token: "@tony", bluesky: "tony.bsky.social", mastodon: "Anthony Edwards",
+                      threads: "" } ],
+        networks: []
+      }
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.body).to include("tony.bsky.social")
+      expect(response.body).to include("Anthony Edwards")
+    end
+  end
+
+  # The preview dialog. ⚠️ It reads the same fields as POST /social and it calls the same private
+  # methods, thus it cannot show a text that the post does not send.
+  # ⚠️ The topic is THREAD-LEVEL and it belongs to Threads alone: `topic_tag` is a parameter of
+  # Meta, and Bluesky and Mastodon have no equivalent.
+  describe "POST /social with a Threads topic" do
+    before do
+      sign_in_as(email: owner_email)
+      connect(bluesky: true, mastodon: true, threads: true)
+    end
+
+    def submit(topic:, networks: [ "threads" ], posts: [ { text: "Read this", link: "" } ])
+      post "/social", params: { posts: posts, networks: networks, topic: topic }
+    end
+
+    # ⚠️ **Every post of a thread carries it**, and not the first one alone. Meta takes one topic
+    # for each post, and no documentation says that a reply inherits the topic of its root.
+    it "gives the topic to each post of the thread" do
+      submit(topic: "Cycling", posts: [ { text: "One", link: "" }, { text: "Two", link: "" } ])
+
+      expect(response).to redirect_to(social_path)
+      payload = ThreadsPostJob.jobs.first["args"].first
+      expect(payload.map { |entry| entry["topic"] }).to eq(%w[Cycling Cycling])
+    end
+
+    # ⚠️ The parameter of Meta takes the words alone. A "#" belongs to a tag that is IN the text.
+    it "removes a leading hash" do
+      submit(topic: " #Cycling ")
+
+      expect(ThreadsPostJob.jobs.first["args"].first.first["topic"]).to eq("Cycling")
+    end
+
+    it "gives the topic to Threads alone" do
+      submit(topic: "Cycling", networks: %w[bluesky mastodon threads])
+
+      expect(BlueskyPostJob.jobs.first["args"].first.first).not_to have_key("topic")
+      expect(MastodonPostJob.jobs.first["args"].first.first).not_to have_key("topic")
+      expect(ThreadsPostJob.jobs.first["args"].first.first["topic"]).to eq("Cycling")
+    end
+
+    it "sends no topic when the field is empty" do
+      submit(topic: "")
+
+      expect(response).to redirect_to(social_path)
+      expect(ThreadsPostJob.jobs.first["args"].first.first).not_to have_key("topic")
+    end
+
+    # ⚠️ Without this the container is refused at Meta, and the job then retries a draft that can
+    # never work, for 24 hours.
+    describe "a topic that Meta will not take" do
+      it "refuses a period and an ampersand" do
+        [ "bikes.and.things", "bikes & things" ].each do |bad|
+          ThreadsPostJob.jobs.clear
+          submit(topic: bad)
+
+          expect(response).to have_http_status(:unprocessable_content)
+          expect(flash[:alert])
+            .to eq(I18n.t("admin.social.errors.bad_topic", limit: Threads::TOPIC_MAX_CHARACTERS))
+          expect(ThreadsPostJob.jobs).to be_empty
+        end
+      end
+
+      it "refuses a topic past the limit" do
+        submit(topic: "a" * (Threads::TOPIC_MAX_CHARACTERS + 1))
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(ThreadsPostJob.jobs).to be_empty
+      end
+
+      it "keeps the topic in the form after a refusal" do
+        submit(topic: "bikes & things")
+
+        expect(response.body).to include(%(<wa-option value="bikes &amp; things" selected>))
+      end
+
+      # ⚠️ The combobox shows a value only through an option that matches it.
+      it "selects a topic of the list after a refusal, and adds no option for it" do
+        submit(topic: "Triathlon", posts: [ { text: "x" * 301, link: "" } ])
+
+        expect(response).to have_http_status(:unprocessable_content)
+
+        expect(response.body).to include(%(<wa-option value="Triathlon" selected>))
+        expect(response.body.scan(%(<wa-option value="Triathlon")).size).to eq(1)
+      end
+
+      # ⚠️ The field stays in the form while the Threads row is not ticked, thus a value that the
+      # owner left there must not refuse a draft that goes nowhere near Threads.
+      it "ignores a topic that Threads will not see" do
+        submit(topic: "bikes & things", networks: [ "bluesky" ])
+
+        expect(response).to redirect_to(social_path)
+      end
+    end
+
+    it "shows the topic in the preview, on the Threads row of each post" do
+      post "/social/preview/text", params: { posts: [ { text: "One" }, { text: "Two" } ],
+                                             topic: "Cycling" }
+
+      body = JSON.parse(response.body)
+      by_key = body["networks"].index_by { |row| row["key"] }
+
+      # ⚠️ It is the topic ITSELF and not a sentence about it: the panel renders it as a badge.
+      expect(by_key["threads"]["posts"].map { |post| post["topic"] }).to eq(%w[Cycling Cycling])
+      # ⚠️ Bluesky and Mastodon have no equivalent, thus their cards never carry one.
+      expect(by_key["bluesky"]["posts"].map { |post| post["topic"] }).to all(be_nil)
+      expect(by_key["mastodon"]["posts"].map { |post| post["topic"] }).to all(be_nil)
+    end
+  end
+
+  # ⚠️ The field shows only while the Threads row can take a post and is ticked. The server
+  # renders that state, thus it does not show for a moment before the Stimulus controller runs.
+  describe "GET /social with the topic field" do
+    before { sign_in_as(email: owner_email) }
+
+    it "shows the field when Threads is connected" do
+      connect(bluesky: false, mastodon: false, threads: true)
+
+      get "/social"
+
+      expect(response.body).to include(%(<wa-combobox name="topic"))
+      SocialPresenter::TOPICS.each do |option|
+        expect(response.body).to include(%(<wa-option value="#{option}"))
+      end
+      expect(response.body).not_to match(/class="social__topic"[^>]*hidden/)
+    end
+
+    it "hides the field when Threads has no account" do
+      connect(bluesky: true, mastodon: false, threads: false)
+
+      get "/social"
+
+      expect(response.body).to match(/class="social__topic"[^>]*hidden/)
+    end
+  end
+
+  # ⚠️ The typography is a matter of CHARACTERS and not of rich text, thus each of the three
+  # networks gets it. That is the difference from a Markdown link, which Bluesky alone can take.
+  describe "POST /social with the typography" do
+    before do
+      sign_in_as(email: owner_email)
+      connect(bluesky: true, mastodon: true, threads: true)
+    end
+
+    it "curls the quotation marks of every network" do
+      post "/social", params: { posts: [ { text: %q(It's a "big" day... really), link: "" } ],
+                                networks: %w[bluesky mastodon threads] }
+
+      expect(response).to redirect_to(social_path)
+      [ BlueskyPostJob, MastodonPostJob, ThreadsPostJob ].each do |job|
+        expect(job.jobs.first["args"].first.first["text"])
+          .to eq("It’s a “big” day… really"), "#{job} did not get the typography"
+      end
+    end
+
+    # ⚠️ This is the failure that this whole step is built around: SmartyPants reads the
+    # characters of an address as punctuation, and the link then goes nowhere.
+    it "leaves an address exactly as the owner wrote it" do
+      draft = %q(It's here: https://example.test/a--b... really)
+
+      post "/social", params: { posts: [ { text: draft, link: "" } ], networks: [ "bluesky" ] }
+
+      expect(BlueskyPostJob.jobs.first["args"].first.first["text"])
+        .to eq("It’s here: https://example.test/a--b… really")
+    end
+
+    it "counts the text that it will post" do
+      # 298 characters as the owner types it, and 296 after the ellipsis.
+      draft = "#{'a' * 295}..."
+
+      post "/social", params: { posts: [ { text: draft, link: "" } ], networks: [ "bluesky" ] }
+
+      expect(response).to redirect_to(social_path)
+      expect(Bluesky.post_length(BlueskyPostJob.jobs.first["args"].first.first["text"])).to eq(296)
+    end
+
+    # ⚠️ The message names the handles only when a MENTION made the text longer. The typography
+    # runs on every draft, thus a count of the finished text would name them for a post that
+    # mentions nobody.
+    it "does not name the handles when only the typography changed the text" do
+      post "/social", params: { posts: [ { text: "#{'a' * 300}..." } ], networks: [ "bluesky" ] }
+
+      expect(flash[:alert]).to eq(I18n.t("admin.social.errors.too_long.single", count: 301,
+                                                                                limit: 300))
+    end
+
+    it "shows the typographic text in the preview" do
+      post "/social/preview/text", params: { posts: [ { text: %q(It's "big"...), link: "" } ] }
+
+      row = JSON.parse(response.body)["networks"].first["posts"].first
+      expect(row["text"]).to eq("It’s “big”…")
+      expect(row["length"]).to eq(11)
+    end
+  end
+
+  # ⚠️ Only Bluesky has rich text. The composer unticks and disables the other two rows, and this
+  # is not a repeat of that: a row that a browser cannot tick, a hand-written request can.
+  describe "POST /social with a Markdown link" do
+    before do
+      sign_in_as(email: owner_email)
+      connect(bluesky: true, mastodon: true, threads: true)
+    end
+
+    let(:draft) { "Read [my post](https://example.test/a) today" }
+
+    it "posts to Bluesky" do
+      post "/social", params: { posts: [ { text: draft, link: "" } ], networks: [ "bluesky" ] }
+
+      expect(response).to redirect_to(social_path)
+      # ⚠️ The job carries the words that the OWNER wrote. `Bluesky#post!` renders them, thus each
+      # attempt of that job makes the same record text and the same facets.
+      expect(BlueskyPostJob.jobs.first["args"].first.first["text"]).to eq(draft)
+    end
+
+    it "refuses a draft that also posts to a network with no rich text" do
+      post "/social", params: { posts: [ { text: draft, link: "" } ],
+                                networks: %w[bluesky mastodon threads] }
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(flash[:alert]).to eq(I18n.t("admin.social.errors.markdown_network",
+                                         networks: "Mastodon and Threads"))
+      expect(BlueskyPostJob.jobs).to be_empty
+      expect(MastodonPostJob.jobs).to be_empty
+    end
+
+    # ⚠️ One link in one post decides the whole thread: a thread goes to a network as one unit.
+    it "reads a link in any post of the thread" do
+      post "/social", params: { posts: [ { text: "Plain words", link: "" },
+                                         { text: draft, link: "" } ],
+                                networks: %w[bluesky mastodon] }
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(flash[:alert]).to eq(I18n.t("admin.social.errors.markdown_network",
+                                         networks: "Mastodon"))
+    end
+
+    # ⚠️ A bare URL is not Markdown. Each of the three networks makes a link of one.
+    it "takes a bare URL at each network" do
+      post "/social", params: { posts: [ { text: "Read https://example.test/a today", link: "" } ],
+                                networks: %w[bluesky mastodon threads] }
+
+      expect(response).to redirect_to(social_path)
+    end
+
+    it "takes brackets that are not a link at each network" do
+      post "/social", params: { posts: [ { text: "That was [wild] today", link: "" } ],
+                                networks: %w[bluesky mastodon threads] }
+
+      expect(response).to redirect_to(social_path)
+    end
+
+    # ⚠️ The count measures the RECORD text: the address is in a facet and it uses none of the
+    # 300 characters. A count of the raw words would refuse this draft.
+    it "counts the words of a link and not its address" do
+      long = "#{'a' * 280} [words](https://example.test/#{'b' * 100})"
+
+      post "/social", params: { posts: [ { text: long, link: "" } ], networks: [ "bluesky" ] }
+
+      expect(response).to redirect_to(social_path)
+    end
+  end
+
+  describe "POST /social/preview/text" do
+    before do
+      sign_in_as(email: owner_email)
+      connect(bluesky: true, mastodon: true, threads: true)
+      # ⚠️ The action reads the og: tags of a link, for the Bluesky card. Without this stub each
+      # example here would make a true request.
+      allow_any_instance_of(OpenGraph).to receive(:fetch).and_return(card)
+    end
+
+    let(:url) { "https://example.test/2026/07/12/ironman-canada/" }
+    let(:card) do
+      OpenGraph::Card.new(url: url, title: "A title", description: "A summary.",
+                          image_url: "https://cdn.test/og.png")
+    end
+
+    def preview(posts:, mentions: [])
+      post "/social/preview/text", params: { posts: posts, mentions: mentions }
+      JSON.parse(response.body)
+    end
+
+    # ⚠️ The answer groups by NETWORK, and each group holds the posts of the thread in order.
+    # This gives one post of every network, by key, which is how most of these read it.
+    def rows(body, index = 0) = body["networks"].to_h { |row| [ row["key"], row["posts"][index] ] }
+
+    # ⚠️ Each card read is a live HTTP call to another site. Past the budget, a page gets a blank
+    # card and the request answers, and it does not pass the rack-timeout and lose the draft.
+    it "stops the card reads at the budget, and gives the rest a blank card" do
+      # A short budget and one slow read, on the true clock. The first read fits, and the second
+      # one comes after the deadline.
+      stub_const("SocialDraft::CARD_READ_BUDGET", 0.05)
+      allow_any_instance_of(OpenGraph).to receive(:fetch) { sleep 0.1; card }
+
+      body = preview(posts: [ { text: "One.", link: url }, { text: "Two.", link: "https://other.test/b/" } ])
+
+      expect(rows(body, 0)["bluesky"]["card"]).to be_present
+      expect(rows(body, 1)["bluesky"]["card"]).to be_nil
+      expect(rows(body, 1)["bluesky"]["text"]).to eq("Two.\n\nhttps://other.test/b/")
+    end
+
+    it "gives each network its own text from one body" do
+      body = preview(posts: [ { text: "Great ride with @tony.", link: "" } ],
+                     mentions: [ { token: "@tony", bluesky: "tony.bsky.social",
+                                   mastodon: "Anthony Edwards", threads: "@tony" } ])
+
+      expect(rows(body)["bluesky"]["text"]).to eq("Great ride with @tony.bsky.social.")
+      expect(rows(body)["mastodon"]["text"]).to eq("Great ride with Anthony Edwards.")
+      expect(rows(body)["threads"]["text"]).to eq("Great ride with @tony.")
+    end
+
+    # ⚠️ Mastodon joins the link into the TEXT, and the other two keep it out. This is the second
+    # thing that makes the three different, and the owner cannot see it before this dialog.
+    describe "the link" do
+      let(:body) { preview(posts: [ { text: "A long day.", link: url } ]) }
+
+      it "is in the Mastodon text and in no other one" do
+        expect(rows(body)["mastodon"]["text"]).to eq("A long day.\n\n#{url}")
+        expect(rows(body)["bluesky"]["text"]).to eq("A long day.")
+        expect(rows(body)["threads"]["text"]).to eq("A long day.")
+      end
+
+      # ⚠️ Threads makes an ATTACHMENT of the link and keeps it out of the text, thus the panel
+      # shows the address itself. Bluesky draws the card instead, and the link of a Mastodon post
+      # is already a segment of its text.
+      it "shows the address, for the network whose card it cannot draw" do
+        expect(rows(body)["threads"]["link"]).to eq(url)
+        expect(rows(body)["bluesky"]["link"]).to be_nil
+        expect(rows(body)["mastodon"]["link"]).to be_nil
+      end
+
+      # ⚠️ An attachment uses none of the 500 characters, thus the count must not hold it.
+      it "counts no link for Threads" do
+        expect(rows(body)["threads"]["length"]).to eq("A long day.".length)
+      end
+
+      # ⚠️ **Bluesky alone carries a card**, because this app BUILDS that embed from these same
+      # og: tags. `#card_json` answers the card below the link field as well, thus the two cannot
+      # describe one page differently.
+      it "gives Bluesky the website card of the link" do
+        expect(rows(body)["bluesky"]["card"]).to include("title" => card.title,
+                                                         "host" => "example.test")
+        expect(rows(body)["threads"]["card"]).to be_nil
+        expect(rows(body)["mastodon"]["card"]).to be_nil
+      end
+
+      it "gives no card to a post with no link" do
+        plain = preview(posts: [ { text: "A long day.", link: "" } ])
+
+        expect(rows(plain)["bluesky"]["card"]).to be_nil
+      end
+
+      it "says nothing about a post with no link" do
+        plain = preview(posts: [ { text: "A long day.", link: "" } ])
+
+        expect(rows(plain).values.map { |row| row["note"] }).to all(be_nil)
+      end
+
+      # ⚠️ An embed from a page with no og: tags is an empty box. Thus Bluesky gets the link in
+      # the WORDS, as Mastodon does, and `BlueskyPostJob` composes that same text.
+      describe "when the page gives no card" do
+        let(:card) do
+          OpenGraph::Card.new(url: url, title: nil, description: nil, image_url: nil)
+        end
+
+        it "puts the link in the Bluesky text" do
+          expect(rows(body)["bluesky"]["text"]).to eq("A long day.\n\n#{url}")
+        end
+
+        it "gives Bluesky no card to draw" do
+          expect(rows(body)["bluesky"]["card"]).to be_nil
+        end
+
+        # ⚠️ The link is in the words now, thus it uses characters. Without this the count on the
+        # page would be smaller than the post that goes out.
+        it "counts the link for Bluesky" do
+          expect(rows(body)["bluesky"]["length"]).to eq("A long day.\n\n#{url}".length)
+        end
+
+        # Threads still makes an attachment of it, and Mastodon already held it.
+        it "changes nothing for the other two networks" do
+          expect(rows(body)["threads"]["text"]).to eq("A long day.")
+          expect(rows(body)["mastodon"]["text"]).to eq("A long day.\n\n#{url}")
+        end
+      end
+    end
+
+    # ⚠️ The composition is SocialText.compose, which Mastodon#post! calls. Without one method the
+    # preview would show a text that the post does not send.
+    it "composes the Mastodon text the way that the service does" do
+      body = preview(posts: [ { text: "A long day.", link: url } ])
+
+      expect(rows(body)["mastodon"]["text"])
+        .to eq(SocialText.compose(text: "A long day.", url: url))
+    end
+
+    describe "the counts" do
+      it "counts graphemes for Bluesky, and an emoji as its UTF-8 bytes for Threads" do
+        body = preview(posts: [ { text: "Ride 🚴‍♂️", link: "" } ])
+
+        # The emoji is one grapheme at Bluesky. Meta counts it as its UTF-8 bytes.
+        expect(rows(body)["bluesky"]["length"]).to eq(6)
+        expect(rows(body)["threads"]["length"]).to eq(5 + "🚴‍♂️".bytesize)
+      end
+
+      # ⚠️ Mastodon counts a URL as URL_WEIGHT, whatever its true length.
+      it "counts a Mastodon link at its weight and not its length" do
+        long = "https://example.test/#{'a' * 200}"
+        body = preview(posts: [ { text: "Hi", link: long } ])
+
+        expect(rows(body)["mastodon"]["length"]).to eq(2 + 2 + Mastodon::URL_WEIGHT)
+      end
+
+      it "gives the limit of each network" do
+        body = preview(posts: [ { text: "Hi", link: "" } ])
+
+        expect(rows(body)["bluesky"]["limit"]).to eq(Bluesky::MAX_GRAPHEMES)
+        expect(rows(body)["mastodon"]["limit"]).to eq(Mastodon::DEFAULT_MAX_CHARACTERS)
+        expect(rows(body)["threads"]["limit"]).to eq(Threads::MAX_CHARACTERS)
+      end
+
+      # ⚠️ This is the check that stops the dialog and the action from drifting: a draft that the
+      # action refuses must be `over` in the preview, and one that it takes must not be.
+      it "marks over exactly when the action refuses the draft" do
+        draft = { text: "#{'a' * 286} @tony", link: "" }
+        mentions = [ { token: "@tony", bluesky: "tony.bsky.social", mastodon: "", threads: "" } ]
+
+        expect(rows(preview(posts: [ draft ], mentions: mentions))["bluesky"]["over"]).to be true
+
+        post "/social", params: { posts: [ draft ], mentions: mentions, networks: [ "bluesky" ] }
+        expect(response).to have_http_status(:unprocessable_content)
+      end
+
+      it "does not mark over a draft that the action takes" do
+        draft = { text: "a" * 290, link: "" }
+
+        expect(rows(preview(posts: [ draft ]))["bluesky"]["over"]).to be false
+
+        post "/social", params: { posts: [ draft ], networks: [ "bluesky" ] }
+        expect(response).to redirect_to(social_path)
+      end
+    end
+
+    it "gives the connected networks only" do
+      connect(bluesky: true, mastodon: false, threads: false)
+
+      body = preview(posts: [ { text: "Hi", link: "" } ])
+
+      expect(rows(body).keys).to eq([ "bluesky" ])
+    end
+
+    describe "a thread" do
+      let(:body) do
+        preview(posts: [ { text: "One", link: "" }, { text: "Two", link: "" } ])
+      end
+
+      it "gives each network the posts of the thread, in order" do
+        expect(body["networks"].map { |row| row["posts"].length }).to all(eq(2))
+        expect(rows(body, 0)["bluesky"]["text"]).to eq("One")
+        expect(rows(body, 1)["bluesky"]["text"]).to eq("Two")
+      end
+
+      # ⚠️ A card carries no number of its own. The order of the cards is the order of the
+      # thread, and the count line of each one names its length and no place.
+      it "names no place for a post" do
+        expect(body["networks"].first["posts"].first).not_to have_key("label")
+      end
+    end
+
+    it "gives no post for an empty draft" do
+      expect(preview(posts: [])["networks"].map { |row| row["posts"] }).to all(eq([]))
+    end
+
+    # ⚠️ It is a preview and not a submit: it must add no job and it must write nothing.
+    it "adds no job" do
+      preview(posts: [ { text: "Hi", link: url } ])
+
+      expect(BlueskyPostJob.jobs).to be_empty
+      expect(MastodonPostJob.jobs).to be_empty
+      expect(ThreadsPostJob.jobs).to be_empty
+    end
+
+    it "writes nothing to Redis" do
+      allow($redis).to receive(:set).and_raise("the preview must not write")
+      allow($redis).to receive(:hset).and_raise("the preview must not write")
+
+      expect { preview(posts: [ { text: "Hi", link: url } ]) }.not_to raise_error
+    end
+
+    it "asks Bluesky about no handle" do
+      # The handle check belongs to the submit. A preview must call no other service.
+      expect_any_instance_of(Bluesky).not_to receive(:handle_missing?)
+
+      preview(posts: [ { text: "cc @tony", link: "" } ],
+              mentions: [ { token: "@tony", bluesky: "nobody.bsky.social", mastodon: "",
+                            threads: "" } ])
+    end
+
+    # ⚠️ **A link must be a LINK in the dialog.** A Markdown link shows its words and never its
+    # address, thus an `<a>` is the only thing that says where those words point. A bare URL that
+    # the owner pasted is a link at each of the three networks, and it is one here as well.
+    describe "the links of a text" do
+      it "marks the words of a Markdown link, and holds its address" do
+        body = preview(posts: [ { text: "Read [my post](https://example.test/a) today", link: "" } ])
+
+        expect(rows(body)["bluesky"]["text"]).to eq("Read my post today")
+        expect(rows(body)["bluesky"]["segments"]).to eq([
+          { "text" => "Read " },
+          { "text" => "my post", "url" => "https://example.test/a" },
+          { "text" => " today" }
+        ])
+      end
+
+      it "marks a bare URL for each of the three networks" do
+        body = preview(posts: [ { text: "See https://example.test/x now", link: "" } ])
+
+        %w[bluesky mastodon threads].each do |key|
+          expect(rows(body)[key]["segments"]).to eq([
+            { "text" => "See " },
+            { "text" => "https://example.test/x", "url" => "https://example.test/x" },
+            { "text" => " now" }
+          ]), "#{key} does not mark a bare URL"
+        end
+      end
+
+      # ⚠️ Mastodon joins the link of the field into its TEXT, thus that URL is a link of the
+      # text as well. The other two keep it out, and their note says where it went.
+      it "marks the link that Mastodon joins into the text" do
+        body = preview(posts: [ { text: "A long day.", link: url } ])
+
+        expect(rows(body)["mastodon"]["segments"].last).to eq({ "text" => url, "url" => url })
+        expect(rows(body)["bluesky"]["segments"]).to eq([ { "text" => "A long day." } ])
+      end
+
+      it "gives one piece and no address to a text with no link" do
+        body = preview(posts: [ { text: "A long day.", link: "" } ])
+
+        expect(rows(body)["bluesky"]["segments"]).to eq([ { "text" => "A long day." } ])
+      end
+
+      # ⚠️ The browser writes each `url` into an `href`. Both patterns start with the scheme, thus
+      # no draft can ever make a `javascript:` link in the admin.
+      it "gives every address an http or https scheme" do
+        body = preview(posts: [ { text: "[x](javascript:alert(1)) and [y](https://ok.test)", link: "" } ])
+
+        addresses = rows(body)["bluesky"]["segments"].filter_map { |piece| piece["url"] }
+        expect(addresses).to all(start_with("http"))
+      end
+    end
+
+    # ⚠️ A Markdown link can go to Bluesky alone, thus the dialog must not show a Mastodon text
+    # that this app refuses to post.
+    describe "a draft with a Markdown link" do
+      let(:body) { preview(posts: [ { text: "Read [my post](https://example.test/a)", link: "" } ]) }
+
+      it "shows Bluesky alone" do
+        expect(body["networks"].map { |row| row["key"] }).to eq([ "bluesky" ])
+      end
+
+      it "shows each connected network for a draft with no Markdown" do
+        plain = preview(posts: [ { text: "Read https://example.test/a", link: "" } ])
+
+        expect(plain["networks"].map { |row| row["key"] }).to eq(%w[bluesky mastodon threads])
       end
 
       # ⚠️ One link in one post decides the whole thread: a thread goes to a network as one unit.
       it "reads a link in any post of the thread" do
-        post "/social", params: { posts: [ { text: "Plain words", link: "" },
-                                           { text: draft, link: "" } ],
-                                  networks: %w[bluesky mastodon] }
+        thread = preview(posts: [ { text: "Plain words", link: "" },
+                                  { text: "Read [my post](https://example.test/a)", link: "" } ])
 
-        expect(response).to have_http_status(:unprocessable_content)
-        expect(flash[:alert]).to eq(I18n.t("admin.social.errors.markdown_network",
-                                           networks: "Mastodon"))
-      end
-
-      # ⚠️ A bare URL is not Markdown. Each of the three networks makes a link of one.
-      it "takes a bare URL at each network" do
-        post "/social", params: { posts: [ { text: "Read https://example.test/a today", link: "" } ],
-                                  networks: %w[bluesky mastodon threads] }
-
-        expect(response).to redirect_to(social_path)
-      end
-
-      it "takes brackets that are not a link at each network" do
-        post "/social", params: { posts: [ { text: "That was [wild] today", link: "" } ],
-                                  networks: %w[bluesky mastodon threads] }
-
-        expect(response).to redirect_to(social_path)
-      end
-
-      # ⚠️ The count measures the RECORD text: the address is in a facet and it uses none of the
-      # 300 characters. A count of the raw words would refuse this draft.
-      it "counts the words of a link and not its address" do
-        long = "#{'a' * 280} [words](https://example.test/#{'b' * 100})"
-
-        post "/social", params: { posts: [ { text: long, link: "" } ], networks: [ "bluesky" ] }
-
-        expect(response).to redirect_to(social_path)
+        expect(thread["networks"].map { |row| row["key"] }).to eq([ "bluesky" ])
+        expect(thread["networks"].first["posts"].length).to eq(2)
       end
     end
 
-    describe "POST /social/preview/text" do
-      before do
-        sign_in_as(email: owner_email)
-        connect(bluesky: true, mastodon: true, threads: true)
-        # ⚠️ The action reads the og: tags of a link, for the Bluesky card. Without this stub each
-        # example here would make a true request.
-        allow_any_instance_of(OpenGraph).to receive(:fetch).and_return(card)
+    it "needs the owner session" do
+      reset!
+
+      post "/social/preview/text", params: { posts: [ { text: "Hi", link: "" } ] }
+
+      expect(response).to redirect_to("/signin")
+    end
+
+    # ⚠️ The admin does not skip the forgery protection, thus this POST needs the CSRF token, and
+    # `social_controller.js` sends it in a header. The test environment turns that protection OFF,
+    # thus each example above passes with no token and none of them can prove this. This one turns
+    # it on: without the header the action would give a 422 in production alone, and the dialog
+    # would say only that the preview could not be loaded.
+    context "when the forgery protection is on" do
+      around do |example|
+        was = ActionController::Base.allow_forgery_protection
+        ActionController::Base.allow_forgery_protection = true
+        example.run
+        ActionController::Base.allow_forgery_protection = was
       end
 
-      let(:url) { "https://example.test/2026/07/12/ironman-canada/" }
-      let(:card) do
-        OpenGraph::Card.new(url: url, title: "A title", description: "A summary.",
-                            image_url: "https://cdn.test/og.png")
+      it "takes the token of the page in a header" do
+        get "/social"
+        token = Nokogiri::HTML(response.body).at("meta[name=csrf-token]")&.[]("content")
+        expect(token).to be_present, "the page renders no CSRF token for the browser to send"
+
+        post "/social/preview/text", params: { posts: [ { text: "Hi", link: "" } ] },
+                                     headers: { "X-CSRF-Token" => token }
+
+        expect(response).to have_http_status(:ok)
       end
 
-      def preview(posts:, mentions: [])
-        post "/social/preview/text", params: { posts: posts, mentions: mentions }
-        JSON.parse(response.body)
-      end
-
-      # ⚠️ The answer groups by NETWORK, and each group holds the posts of the thread in order.
-      # This gives one post of every network, by key, which is how most of these read it.
-      def rows(body, index = 0) = body["networks"].to_h { |row| [ row["key"], row["posts"][index] ] }
-
-      # ⚠️ Each card read is a live HTTP call to another site. Past the budget, a page gets a blank
-      # card and the request answers, and it does not pass the rack-timeout and lose the draft.
-      it "stops the card reads at the budget, and gives the rest a blank card" do
-        # A short budget and one slow read, on the true clock. The first read fits, and the second
-        # one comes after the deadline.
-        stub_const("SocialDraft::CARD_READ_BUDGET", 0.05)
-        allow_any_instance_of(OpenGraph).to receive(:fetch) { sleep 0.1; card }
-
-        body = preview(posts: [ { text: "One.", link: url }, { text: "Two.", link: "https://other.test/b/" } ])
-
-        expect(rows(body, 0)["bluesky"]["card"]).to be_present
-        expect(rows(body, 1)["bluesky"]["card"]).to be_nil
-        expect(rows(body, 1)["bluesky"]["text"]).to eq("Two.\n\nhttps://other.test/b/")
-      end
-
-      it "gives each network its own text from one body" do
-        body = preview(posts: [ { text: "Great ride with @tony.", link: "" } ],
-                       mentions: [ { token: "@tony", bluesky: "tony.bsky.social",
-                                     mastodon: "Anthony Edwards", threads: "@tony" } ])
-
-        expect(rows(body)["bluesky"]["text"]).to eq("Great ride with @tony.bsky.social.")
-        expect(rows(body)["mastodon"]["text"]).to eq("Great ride with Anthony Edwards.")
-        expect(rows(body)["threads"]["text"]).to eq("Great ride with @tony.")
-      end
-
-      # ⚠️ Mastodon joins the link into the TEXT, and the other two keep it out. This is the second
-      # thing that makes the three different, and the owner cannot see it before this dialog.
-      describe "the link" do
-        let(:body) { preview(posts: [ { text: "A long day.", link: url } ]) }
-
-        it "is in the Mastodon text and in no other one" do
-          expect(rows(body)["mastodon"]["text"]).to eq("A long day.\n\n#{url}")
-          expect(rows(body)["bluesky"]["text"]).to eq("A long day.")
-          expect(rows(body)["threads"]["text"]).to eq("A long day.")
-        end
-
-        # ⚠️ Threads makes an ATTACHMENT of the link and keeps it out of the text, thus the panel
-        # shows the address itself. Bluesky draws the card instead, and the link of a Mastodon post
-        # is already a segment of its text.
-        it "shows the address, for the network whose card it cannot draw" do
-          expect(rows(body)["threads"]["link"]).to eq(url)
-          expect(rows(body)["bluesky"]["link"]).to be_nil
-          expect(rows(body)["mastodon"]["link"]).to be_nil
-        end
-
-        # ⚠️ An attachment uses none of the 500 characters, thus the count must not hold it.
-        it "counts no link for Threads" do
-          expect(rows(body)["threads"]["length"]).to eq("A long day.".length)
-        end
-
-        # ⚠️ **Bluesky alone carries a card**, because this app BUILDS that embed from these same
-        # og: tags. `#card_json` answers the card below the link field as well, thus the two cannot
-        # describe one page differently.
-        it "gives Bluesky the website card of the link" do
-          expect(rows(body)["bluesky"]["card"]).to include("title" => card.title,
-                                                           "host" => "example.test")
-          expect(rows(body)["threads"]["card"]).to be_nil
-          expect(rows(body)["mastodon"]["card"]).to be_nil
-        end
-
-        it "gives no card to a post with no link" do
-          plain = preview(posts: [ { text: "A long day.", link: "" } ])
-
-          expect(rows(plain)["bluesky"]["card"]).to be_nil
-        end
-
-        it "says nothing about a post with no link" do
-          plain = preview(posts: [ { text: "A long day.", link: "" } ])
-
-          expect(rows(plain).values.map { |row| row["note"] }).to all(be_nil)
-        end
-
-        # ⚠️ An embed from a page with no og: tags is an empty box. Thus Bluesky gets the link in
-        # the WORDS, as Mastodon does, and `BlueskyPostJob` composes that same text.
-        describe "when the page gives no card" do
-          let(:card) do
-            OpenGraph::Card.new(url: url, title: nil, description: nil, image_url: nil)
-          end
-
-          it "puts the link in the Bluesky text" do
-            expect(rows(body)["bluesky"]["text"]).to eq("A long day.\n\n#{url}")
-          end
-
-          it "gives Bluesky no card to draw" do
-            expect(rows(body)["bluesky"]["card"]).to be_nil
-          end
-
-          # ⚠️ The link is in the words now, thus it uses characters. Without this the count on the
-          # page would be smaller than the post that goes out.
-          it "counts the link for Bluesky" do
-            expect(rows(body)["bluesky"]["length"]).to eq("A long day.\n\n#{url}".length)
-          end
-
-          # Threads still makes an attachment of it, and Mastodon already held it.
-          it "changes nothing for the other two networks" do
-            expect(rows(body)["threads"]["text"]).to eq("A long day.")
-            expect(rows(body)["mastodon"]["text"]).to eq("A long day.\n\n#{url}")
-          end
-        end
-      end
-
-      # ⚠️ The composition is SocialText.compose, which Mastodon#post! calls. Without one method the
-      # preview would show a text that the post does not send.
-      it "composes the Mastodon text the way that the service does" do
-        body = preview(posts: [ { text: "A long day.", link: url } ])
-
-        expect(rows(body)["mastodon"]["text"])
-          .to eq(SocialText.compose(text: "A long day.", url: url))
-      end
-
-      describe "the counts" do
-        it "counts graphemes for Bluesky, and an emoji as its UTF-8 bytes for Threads" do
-          body = preview(posts: [ { text: "Ride 🚴‍♂️", link: "" } ])
-
-          # The emoji is one grapheme at Bluesky. Meta counts it as its UTF-8 bytes.
-          expect(rows(body)["bluesky"]["length"]).to eq(6)
-          expect(rows(body)["threads"]["length"]).to eq(5 + "🚴‍♂️".bytesize)
-        end
-
-        # ⚠️ Mastodon counts a URL as URL_WEIGHT, whatever its true length.
-        it "counts a Mastodon link at its weight and not its length" do
-          long = "https://example.test/#{'a' * 200}"
-          body = preview(posts: [ { text: "Hi", link: long } ])
-
-          expect(rows(body)["mastodon"]["length"]).to eq(2 + 2 + Mastodon::URL_WEIGHT)
-        end
-
-        it "gives the limit of each network" do
-          body = preview(posts: [ { text: "Hi", link: "" } ])
-
-          expect(rows(body)["bluesky"]["limit"]).to eq(Bluesky::MAX_GRAPHEMES)
-          expect(rows(body)["mastodon"]["limit"]).to eq(Mastodon::DEFAULT_MAX_CHARACTERS)
-          expect(rows(body)["threads"]["limit"]).to eq(Threads::MAX_CHARACTERS)
-        end
-
-        # ⚠️ This is the check that stops the dialog and the action from drifting: a draft that the
-        # action refuses must be `over` in the preview, and one that it takes must not be.
-        it "marks over exactly when the action refuses the draft" do
-          draft = { text: "#{'a' * 286} @tony", link: "" }
-          mentions = [ { token: "@tony", bluesky: "tony.bsky.social", mastodon: "", threads: "" } ]
-
-          expect(rows(preview(posts: [ draft ], mentions: mentions))["bluesky"]["over"]).to be true
-
-          post "/social", params: { posts: [ draft ], mentions: mentions, networks: [ "bluesky" ] }
-          expect(response).to have_http_status(:unprocessable_content)
-        end
-
-        it "does not mark over a draft that the action takes" do
-          draft = { text: "a" * 290, link: "" }
-
-          expect(rows(preview(posts: [ draft ]))["bluesky"]["over"]).to be false
-
-          post "/social", params: { posts: [ draft ], networks: [ "bluesky" ] }
-          expect(response).to redirect_to(social_path)
-        end
-      end
-
-      it "gives the connected networks only" do
-        connect(bluesky: true, mastodon: false, threads: false)
-
-        body = preview(posts: [ { text: "Hi", link: "" } ])
-
-        expect(rows(body).keys).to eq([ "bluesky" ])
-      end
-
-      describe "a thread" do
-        let(:body) do
-          preview(posts: [ { text: "One", link: "" }, { text: "Two", link: "" } ])
-        end
-
-        it "gives each network the posts of the thread, in order" do
-          expect(body["networks"].map { |row| row["posts"].length }).to all(eq(2))
-          expect(rows(body, 0)["bluesky"]["text"]).to eq("One")
-          expect(rows(body, 1)["bluesky"]["text"]).to eq("Two")
-        end
-
-        # ⚠️ A card carries no number of its own. The order of the cards is the order of the
-        # thread, and the count line of each one names its length and no place.
-        it "names no place for a post" do
-          expect(body["networks"].first["posts"].first).not_to have_key("label")
-        end
-      end
-
-      it "gives no post for an empty draft" do
-        expect(preview(posts: [])["networks"].map { |row| row["posts"] }).to all(eq([]))
-      end
-
-      # ⚠️ It is a preview and not a submit: it must add no job and it must write nothing.
-      it "adds no job" do
-        preview(posts: [ { text: "Hi", link: url } ])
-
-        expect(BlueskyPostJob.jobs).to be_empty
-        expect(MastodonPostJob.jobs).to be_empty
-        expect(ThreadsPostJob.jobs).to be_empty
-      end
-
-      it "writes nothing to Redis" do
-        allow($redis).to receive(:set).and_raise("the preview must not write")
-        allow($redis).to receive(:hset).and_raise("the preview must not write")
-
-        expect { preview(posts: [ { text: "Hi", link: url } ]) }.not_to raise_error
-      end
-
-      it "asks Bluesky about no handle" do
-        # The handle check belongs to the submit. A preview must call no other service.
-        expect_any_instance_of(Bluesky).not_to receive(:handle_missing?)
-
-        preview(posts: [ { text: "cc @tony", link: "" } ],
-                mentions: [ { token: "@tony", bluesky: "nobody.bsky.social", mastodon: "",
-                              threads: "" } ])
-      end
-
-      # ⚠️ **A link must be a LINK in the dialog.** A Markdown link shows its words and never its
-      # address, thus an `<a>` is the only thing that says where those words point. A bare URL that
-      # the owner pasted is a link at each of the three networks, and it is one here as well.
-      describe "the links of a text" do
-        it "marks the words of a Markdown link, and holds its address" do
-          body = preview(posts: [ { text: "Read [my post](https://example.test/a) today", link: "" } ])
-
-          expect(rows(body)["bluesky"]["text"]).to eq("Read my post today")
-          expect(rows(body)["bluesky"]["segments"]).to eq([
-            { "text" => "Read " },
-            { "text" => "my post", "url" => "https://example.test/a" },
-            { "text" => " today" }
-          ])
-        end
-
-        it "marks a bare URL for each of the three networks" do
-          body = preview(posts: [ { text: "See https://example.test/x now", link: "" } ])
-
-          %w[bluesky mastodon threads].each do |key|
-            expect(rows(body)[key]["segments"]).to eq([
-              { "text" => "See " },
-              { "text" => "https://example.test/x", "url" => "https://example.test/x" },
-              { "text" => " now" }
-            ]), "#{key} does not mark a bare URL"
-          end
-        end
-
-        # ⚠️ Mastodon joins the link of the field into its TEXT, thus that URL is a link of the
-        # text as well. The other two keep it out, and their note says where it went.
-        it "marks the link that Mastodon joins into the text" do
-          body = preview(posts: [ { text: "A long day.", link: url } ])
-
-          expect(rows(body)["mastodon"]["segments"].last).to eq({ "text" => url, "url" => url })
-          expect(rows(body)["bluesky"]["segments"]).to eq([ { "text" => "A long day." } ])
-        end
-
-        it "gives one piece and no address to a text with no link" do
-          body = preview(posts: [ { text: "A long day.", link: "" } ])
-
-          expect(rows(body)["bluesky"]["segments"]).to eq([ { "text" => "A long day." } ])
-        end
-
-        # ⚠️ The browser writes each `url` into an `href`. Both patterns start with the scheme, thus
-        # no draft can ever make a `javascript:` link in the admin.
-        it "gives every address an http or https scheme" do
-          body = preview(posts: [ { text: "[x](javascript:alert(1)) and [y](https://ok.test)", link: "" } ])
-
-          addresses = rows(body)["bluesky"]["segments"].filter_map { |piece| piece["url"] }
-          expect(addresses).to all(start_with("http"))
-        end
-      end
-
-      # ⚠️ A Markdown link can go to Bluesky alone, thus the dialog must not show a Mastodon text
-      # that this app refuses to post.
-      describe "a draft with a Markdown link" do
-        let(:body) { preview(posts: [ { text: "Read [my post](https://example.test/a)", link: "" } ]) }
-
-        it "shows Bluesky alone" do
-          expect(body["networks"].map { |row| row["key"] }).to eq([ "bluesky" ])
-        end
-
-        it "shows each connected network for a draft with no Markdown" do
-          plain = preview(posts: [ { text: "Read https://example.test/a", link: "" } ])
-
-          expect(plain["networks"].map { |row| row["key"] }).to eq(%w[bluesky mastodon threads])
-        end
-
-        # ⚠️ One link in one post decides the whole thread: a thread goes to a network as one unit.
-        it "reads a link in any post of the thread" do
-          thread = preview(posts: [ { text: "Plain words", link: "" },
-                                    { text: "Read [my post](https://example.test/a)", link: "" } ])
-
-          expect(thread["networks"].map { |row| row["key"] }).to eq([ "bluesky" ])
-          expect(thread["networks"].first["posts"].length).to eq(2)
-        end
-      end
-
-      it "needs the owner session" do
-        reset!
-
+      it "refuses the same request with no token" do
         post "/social/preview/text", params: { posts: [ { text: "Hi", link: "" } ] }
 
-        expect(response).to redirect_to("/signin")
+        expect(response).not_to have_http_status(:ok)
       end
+    end
 
-      # ⚠️ The admin does not skip the forgery protection, thus this POST needs the CSRF token, and
-      # `social_controller.js` sends it in a header. The test environment turns that protection OFF,
-      # thus each example above passes with no token and none of them can prove this. This one turns
-      # it on: without the header the action would give a 422 in production alone, and the dialog
-      # would say only that the preview could not be loaded.
-      context "when the forgery protection is on" do
-        around do |example|
-          was = ActionController::Base.allow_forgery_protection
-          ActionController::Base.allow_forgery_protection = true
-          example.run
-          ActionController::Base.allow_forgery_protection = was
-        end
+    it "does not store the response" do
+      preview(posts: [ { text: "Hi", link: "" } ])
 
-        it "takes the token of the page in a header" do
-          get "/social"
-          token = Nokogiri::HTML(response.body).at("meta[name=csrf-token]")&.[]("content")
-          expect(token).to be_present, "the page renders no CSRF token for the browser to send"
-
-          post "/social/preview/text", params: { posts: [ { text: "Hi", link: "" } ] },
-                                       headers: { "X-CSRF-Token" => token }
-
-          expect(response).to have_http_status(:ok)
-        end
-
-        it "refuses the same request with no token" do
-          post "/social/preview/text", params: { posts: [ { text: "Hi", link: "" } ] }
-
-          expect(response).not_to have_http_status(:ok)
-        end
-      end
-
-      it "does not store the response" do
-        preview(posts: [ { text: "Hi", link: "" } ])
-
-        expect(response.headers["Cache-Control"]).to include("no-store")
-      end
+      expect(response.headers["Cache-Control"]).to include("no-store")
     end
   end
 
@@ -1650,8 +1649,6 @@ RSpec.describe "Admin social media", type: :request do
         OpenGraph::Card.new(url: link, title: "A title", description: "A summary.", image_url: nil)
       end
     end
-
-    after { store.discard([ first, second ]) }
 
     def post_photos(photos:, alts:, text: "Two photos", link: "", networks: [ "bluesky" ], **rest)
       post "/social", params: { posts: [ { text: text, link: link, photos: photos, alts: alts } ],

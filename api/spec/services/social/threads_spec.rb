@@ -58,7 +58,6 @@ RSpec.describe Threads do
   let(:redirect_uri) { "https://admin.example.test/connected-apps/threads/callback" }
 
   before do
-    $redis.del(ThreadsCredentials::REDIS_KEY)
     stub_env("THREADS_APP_ID" => "app-id", "THREADS_APP_SECRET" => "app-secret")
   end
 
@@ -344,7 +343,6 @@ RSpec.describe Threads do
 
     before do
       connect!
-      $redis.del(container_key, published_key)
       # ⚠️ The publish waits for the status of the container. Meta answers 400 subcode 4279009 for
       # a publish that comes too early.
       allow(HTTParty).to receive(:get).and_return(http_response({ status: "FINISHED" }))

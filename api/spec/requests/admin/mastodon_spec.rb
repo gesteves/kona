@@ -4,10 +4,6 @@ RSpec.describe "Admin Mastodon connection", type: :request do
   include_context "the admin UI"
   let(:redirect_uri) { "http://www.example.com/connected-apps/mastodon/callback" }
 
-  before do
-    $redis.del(MastodonCredentials::REDIS_KEY)
-  end
-
   def sign_in! = sign_in_as(email: owner_email)
 
   def register_client!

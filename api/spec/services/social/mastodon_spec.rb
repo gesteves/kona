@@ -3,8 +3,6 @@ require "rails_helper"
 RSpec.describe Mastodon do
   let(:redirect_uri) { "https://admin.example.test/connected-apps/mastodon/callback" }
 
-  before { $redis.del(MastodonCredentials::REDIS_KEY) }
-
   def register_client!
     MastodonCredentials.store_client(
       instance: "mastodon.social", client_id: "client-id", client_secret: "client-secret",
@@ -204,7 +202,6 @@ RSpec.describe Mastodon do
 
     before do
       connect_account!
-      $redis.del(status_key)
       allow(HTTParty).to receive(:post)
         .and_return(http_response({ id: "1", url: "https://mastodon.social/@me/1" }))
     end

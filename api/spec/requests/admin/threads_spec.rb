@@ -6,7 +6,6 @@ RSpec.describe "Admin Threads connection", type: :request do
 
   before do
     stub_env("THREADS_APP_ID" => "app-id", "THREADS_APP_SECRET" => "app-secret")
-    $redis.del(ThreadsCredentials::REDIS_KEY)
   end
 
   def sign_in! = sign_in_as(email: owner_email)

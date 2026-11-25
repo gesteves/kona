@@ -4,12 +4,6 @@ RSpec.describe OpenGraph do
   subject(:service) { described_class.new }
 
   let(:url) { "https://example.test/a-post/" }
-  let(:cache_key) { "open_graph:#{Digest::SHA256.hexdigest(url)}" }
-
-  # ⚠️ #fetch caches in Redis by URL. Without this, the first example fills the key and each one
-  # after it reads that answer in place of its own page.
-  before { $redis.del(cache_key) }
-  after  { $redis.del(cache_key) }
 
   def stub_page(body, code: 200, **options)
     stub_streamed_get(body: body, code: code, headers: { "content-type" => "text/html; charset=utf-8" }, **options)

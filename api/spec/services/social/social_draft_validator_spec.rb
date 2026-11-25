@@ -76,8 +76,6 @@ RSpec.describe SocialDraftValidator do
   describe "the photos" do
     let(:stored) { SocialPhotos.new.store(image: "\xFF\xD8\xFF\xE0jpeg".b, width: 2, height: 1) }
 
-    after { SocialPhotos.new.discard([ stored ]) }
-
     it "takes a post with a photo that is in the store" do
       expect(error_of(posts: [ post("A photo", photos: [ stored ], alts: [ "A dog." ]) ])).to be_nil
     end

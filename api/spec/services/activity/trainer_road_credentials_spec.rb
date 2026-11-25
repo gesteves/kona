@@ -3,8 +3,6 @@ require "rails_helper"
 RSpec.describe TrainerRoadCredentials do
   let(:url) { "https://www.trainerroad.com/app/calendar/00000000-0000-4000-8000-000000000000" }
 
-  before { $redis.del(described_class::REDIS_KEY) }
-
   describe ".store and .fetch" do
     it "round-trips a stored URL" do
       described_class.store(calendar_url: url)

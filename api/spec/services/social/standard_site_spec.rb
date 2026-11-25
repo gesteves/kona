@@ -484,11 +484,6 @@ describe StandardSite do
       "#{StandardSite::PUBLICATION_COLLECTION}:#{StandardSite::PUBLICATION_RKEY}"
     end
 
-    def reset_keys = $redis.del(StandardSite::DID_CACHE_KEY, StandardSite::FINGERPRINTS_KEY, BlueskyCredentials::REDIS_KEY)
-
-    before { reset_keys }
-    after { reset_keys }
-
     it "stores the credentials once a session opens" do
       allow(client).to receive(:create_session).and_return(true)
 
@@ -554,8 +549,6 @@ describe StandardSite do
 
       expect(BlueskyCredentials.stored?).to be(false)
       expect($redis.get(StandardSite::DID_CACHE_KEY)).to eq("did:plc:abc")
-    ensure
-      $redis.del(StandardSite::DID_CACHE_KEY, BlueskyCredentials::REDIS_KEY)
     end
   end
 
