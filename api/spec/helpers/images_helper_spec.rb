@@ -77,6 +77,17 @@ RSpec.describe ImagesHelper do
       stub_images
       expect(helper.cdn_image_url(nil, w: 100)).to be_nil
     end
+
+    # ⚠️ A raise here is a 500 on each trending render. `host=` raises for a value with a scheme.
+    it "returns nil, and does not raise, for an IMAGE_HOST with a scheme" do
+      stub_images(image_host: "https://images.example")
+      expect(helper.cdn_image_url(asset_url, w: 100)).to be_nil
+    end
+
+    it "returns nil, and does not raise, for a URL that it cannot parse" do
+      stub_images
+      expect(helper.cdn_image_url("https://images.ctfassets.net/a b|c", w: 100)).to be_nil
+    end
   end
 
   describe "#cover_image_tag" do

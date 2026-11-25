@@ -434,6 +434,21 @@ RSpec.describe SiteHelpers do
     end
   end
 
+  describe '#optional_data' do
+    def data = OpenStruct.new(@files || {})
+
+    it 'gives the data of a file that the import wrote' do
+      @files = { related: { 'a' => [ 'b' ] } }
+      expect(optional_data(:related)).to eq('a' => [ 'b' ])
+    end
+
+    # ⚠️ A failed import writes no file, and `data` then has no method with that name. A direct
+    # read would stop the build.
+    it 'gives nil, and does not raise, when the file is absent' do
+      expect(optional_data(:standard_site)).to be_nil
+    end
+  end
+
   describe '#known_agent_rules' do
     let(:rules) { "User-agent: GPTBot\nDisallow: /" }
 

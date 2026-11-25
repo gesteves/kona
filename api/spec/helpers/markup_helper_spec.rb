@@ -52,6 +52,17 @@ RSpec.describe MarkupHelper do
       expect(result).to include('data-units-imperial-value="6.2 mi"')
     end
 
+    it "escapes the text of a unit span when it makes the toggle" do
+      result = helper.render_summary_body('Run <span data-imperial="6 mi">10 &lt;b&gt; km</span>.')
+      expect(result).to include("10 &lt;b&gt; km")
+      expect(result).not_to include("<b>")
+    end
+
+    it "leaves an absolute link with no host as it is" do
+      result = helper.render_summary_body('See <a href="https:///path">this</a>.')
+      expect(result).not_to include('target="_blank"')
+    end
+
     it "returns nil for blank input" do
       expect(helper.render_summary_body(nil)).to be_nil
       expect(helper.render_summary_body("")).to be_nil
@@ -80,6 +91,13 @@ RSpec.describe MarkupHelper do
       it "does not treat a lookalike host as Amazon" do
         result = helper.render_summary_body("See [this](https://notamazon.com/dp/B01?tag=x).")
         expect(result).not_to include("sponsored")
+      end
+
+      # The static build keeps the rel of the author on the same link, and both copies go on the
+      # same page.
+      it "keeps the rel that the author wrote on an affiliate link" do
+        result = helper.render_summary_body('Bought <a href="https://amzn.to/3abcdef" rel="ugc">these</a>.')
+        expect(result).to include('rel="sponsored nofollow noopener ugc"')
       end
 
       it "ignores a malformed href rather than raising" do

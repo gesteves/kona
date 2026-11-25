@@ -3,6 +3,17 @@ require "rails_helper"
 RSpec.describe TextHelper do
   subject(:helper) { Class.new { include TextHelper }.new }
 
+  describe "#fix_degrees" do
+    it "puts the degree sign in place of each masculine ordinal" do
+      expect(helper.fix_degrees("From 40º to 90ºF")).to eq("From 40° to 90°F")
+    end
+
+    it "returns nil for a blank text" do
+      expect(helper.fix_degrees(nil)).to be_nil
+      expect(helper.fix_degrees("")).to be_nil
+    end
+  end
+
   describe "#remove_widows" do
     it "joins the last two words with a non-breaking space" do
       expect(helper.remove_widows("one two three")).to eq("one two&nbsp;three")

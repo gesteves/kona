@@ -90,6 +90,24 @@ RSpec.describe "Owner sessions", type: :request do
     end
   end
 
+  # The stored path decides where the browser goes after the sign-in. A value that names another
+  # site must give the admin home page, and not an open redirect.
+  describe "the return path after the sign-in" do
+    def safe_return_path(path)
+      SessionsController.new.send(:safe_return_path, path)
+    end
+
+    it "keeps a path on this host, with its query" do
+      expect(safe_return_path("/connected-apps?tab=social")).to eq("/connected-apps?tab=social")
+    end
+
+    [ nil, "", "connected-apps", "https://evil.example", "//evil.example/x", "/\\evil.example/x" ].each do |path|
+      it "gives the admin home page for #{path.inspect}" do
+        expect(safe_return_path(path)).to eq("/")
+      end
+    end
+  end
+
   # ⚠️ Rack writes the cookie again at each request, thus `expire_after` alone never ends a session
   # that the owner uses. The sign-in time is the limit.
   describe "the maximum session age" do

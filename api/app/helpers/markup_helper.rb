@@ -34,7 +34,8 @@ module MarkupHelper
   def mark_affiliate_links(doc)
     doc.css("a").each do |a|
       next unless amazon_associates_link?(a["href"])
-      a["rel"] = "sponsored nofollow noopener"
+      # Add to the rel that the author wrote, as the web copy does: a `ugc` must stay.
+      a["rel"] = (%w[sponsored nofollow noopener] + a["rel"].to_s.split).uniq.join(" ")
       a["target"] = "_blank"
     end
     doc

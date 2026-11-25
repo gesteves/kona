@@ -6,6 +6,25 @@ RSpec.describe ArticleHelpers do
   include_context 'default helper stubs'
   include_context 'article doubles'
 
+  describe '#search_indexable?' do
+    it 'indexes a published article and a published short' do
+      expect(search_indexable?(article(slug: 'a'))).to be(true)
+      expect(search_indexable?(article(slug: 's', entry_type: 'Short', index_in_search_engines: false))).to be(true)
+    end
+
+    it 'never indexes a draft' do
+      expect(search_indexable?(article(slug: 'a', draft: true))).to be(false)
+    end
+
+    # ⚠️ /contact/success is a published Page with the flag off. Without this test it would appear
+    # in the search modal.
+    it 'indexes a Page only when it has index_in_search_engines' do
+      expect(search_indexable?(article(slug: 'about', entry_type: 'Page'))).to be(true)
+      expect(search_indexable?(article(slug: 'success', entry_type: 'Page', index_in_search_engines: false))).to be(false)
+      expect(search_indexable?(article(slug: 'success', entry_type: 'Page', index_in_search_engines: nil))).to be(false)
+    end
+  end
+
   describe '#article_word_count' do
     it 'counts words across the intro and body' do
       a = article(slug: 'a', intro: 'one two three', body: 'four five')
