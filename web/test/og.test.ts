@@ -1,7 +1,12 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { handleOg } from '../src/og';
 import { readOgTitle } from '../src/og-meta';
-import { makeCtx, assetsReturning, assetsRecording } from './helpers';
+import {
+  makeCtx,
+  assetsReturning,
+  assetsRecording,
+  useStubbedCache,
+} from './helpers';
 
 // ⚠️ This suite never imports ../src/og-render, and nothing that it loads imports that module.
 // That module imports the font and the logo as Data modules, and the module loader of the vitest
@@ -35,14 +40,8 @@ const request = (path: string, init?: RequestInit) =>
   new Request(`https://www.example.com${path}`, init);
 
 describe('handleOg', () => {
-  // The handler reads caches.default and writes to it. Replace both, thus a test never uses the
-  // true Cache storage. test/plausible.test.ts gives the reason. `match` gives a miss, which makes
-  // the code render. `put` does nothing.
-  beforeEach(() => {
-    vi.spyOn(caches.default, 'match').mockResolvedValue(undefined);
-    vi.spyOn(caches.default, 'put').mockResolvedValue(undefined);
-  });
-  afterEach(() => vi.restoreAllMocks());
+  // The handler reads caches.default and writes to it. The miss makes the code render.
+  useStubbedCache();
 
   describe('request validation', () => {
     it('405s a POST before touching the assets or the renderer', async () => {

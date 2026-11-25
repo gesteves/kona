@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import worker from '../src/index';
-import { makeCtx, interceptFetch } from './helpers';
+import { makeCtx, interceptFetch, useStubbedCache } from './helpers';
 
 const ORIGIN = 'https://origin.test';
 const SCRIPT_UPSTREAM = 'https://cdn.test/pa.js';
@@ -28,14 +28,8 @@ const get = (path: string, init?: RequestInit) =>
   );
 
 describe('worker routing (src/index)', () => {
-  // The /pa/script.js route calls getScript, which uses caches.default. Replace it, thus a test
-  // never uses the true Cache storage of that test. This prevents the miniflare storage teardown
-  // problem in CI.
-  beforeEach(() => {
-    vi.spyOn(caches.default, 'match').mockResolvedValue(undefined);
-    vi.spyOn(caches.default, 'put').mockResolvedValue(undefined);
-  });
-  afterEach(() => vi.restoreAllMocks());
+  // The /pa/script.js route calls getScript, which uses caches.default.
+  useStubbedCache();
 
   it('routes /widgets/* to the api proxy', async () => {
     interceptFetch(

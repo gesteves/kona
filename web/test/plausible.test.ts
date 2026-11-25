@@ -1,21 +1,14 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { handlePlausible } from '../src/plausible';
-import { makeCtx, interceptFetch } from './helpers';
+import { makeCtx, interceptFetch, useStubbedCache } from './helpers';
 
 const SCRIPT_UPSTREAM = 'https://cdn.test/js/pa-abc.js';
 const env = { PLAUSIBLE_SCRIPT_URL: SCRIPT_UPSTREAM } as Env;
 
 describe('handlePlausible', () => {
-  // getScript reads caches.default and writes to it. Replace both, thus a test never uses the true
-  // Cache storage, which the pool keeps separate for each test. Without this, the write causes a
-  // miniflare storage teardown problem with a .sqlite-shm WAL file, and the run fails in CI.
-  // `match` gives a miss, which makes the code call the upstream service. `put` does nothing. These
-  // tests check the proxy and the response, and not the cache.
-  beforeEach(() => {
-    vi.spyOn(caches.default, 'match').mockResolvedValue(undefined);
-    vi.spyOn(caches.default, 'put').mockResolvedValue(undefined);
-  });
-  afterEach(() => vi.restoreAllMocks());
+  // getScript reads caches.default and writes to it. The miss makes the code call the upstream
+  // service. These tests check the proxy and the response, and not the cache.
+  useStubbedCache();
 
   it('404s every path when PLAUSIBLE_SCRIPT_URL is unset (site built without analytics)', async () => {
     const res = await handlePlausible(

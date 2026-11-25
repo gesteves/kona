@@ -16,6 +16,8 @@
 // of a `data-turbo-track="reload"` element in its signature, thus a change to an attribute at run
 // time makes each navigation a full page load and stops the view transitions, with no message.
 
+import { insertBeforeFirstStylesheet } from './utils';
+
 const PRELOAD_SELECTOR = 'link[rel="preload"][as="style"][data-wa-theme]';
 
 let added = false;
@@ -40,10 +42,7 @@ export function loadWebAwesomeTheme() {
   // Put it before the first stylesheet of the site. Thus each `wa-*` layer of Web Awesome sorts
   // before each layer of the site, and a rule in a site layer wins. stylesheets/base/_props.scss
   // needs that for `color-scheme` and for `--wa-color-brand-50`.
-  document.head.insertBefore(
-    css,
-    document.head.querySelector('link[rel="stylesheet"]')
-  );
+  insertBeforeFirstStylesheet(css);
 }
 
 loadWebAwesomeTheme();

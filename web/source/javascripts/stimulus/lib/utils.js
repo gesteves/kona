@@ -13,6 +13,19 @@ export function sendNotification(message, status = 'success') {
   toast.create(message, { variant, duration: TOAST_DURATION_MS });
 }
 
+/**
+ * Puts a stylesheet element in the head, before the first stylesheet that is there. Thus each
+ * stylesheet of the site comes after it in the source order. With no stylesheet in the head, the
+ * element goes at the end.
+ * @param {HTMLLinkElement} link
+ */
+export function insertBeforeFirstStylesheet(link) {
+  document.head.insertBefore(
+    link,
+    document.head.querySelector('link[rel="stylesheet"]')
+  );
+}
+
 /** Puts the nodes from an HTML string in place of an element. */
 export function replaceElement(html, element) {
   const tempContainer = document.createElement('div');

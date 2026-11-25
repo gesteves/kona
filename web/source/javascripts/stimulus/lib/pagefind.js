@@ -4,8 +4,15 @@
 // which waits for the result. Thus nobody waits in practice, and nothing adds the elements two
 // times.
 
+import { insertBeforeFirstStylesheet } from './utils';
+
 const CSS_HREF = '/pagefind/pagefind-component-ui.css';
 const JS_SRC = '/pagefind/pagefind-component-ui.js';
+
+/** The longest wait for an idle moment before the preload starts. */
+const IDLE_TIMEOUT_MS = 3000;
+/** The wait before the preload in a browser with no requestIdleCallback. */
+const NO_IDLE_CALLBACK_DELAY_MS = 1000;
 
 // This is at the module level, thus it stays through a Turbo navigation, with the elements that
 // the code adds.
@@ -40,10 +47,7 @@ export function loadPagefind() {
   // Put this before the first stylesheet, and never at the end. The dark-mode `--pf-*` values in
   // stylesheets/components/_pagefind.scss win over the `:root` defaults of Pagefind only because
   // they are later in the source order. At the end, the modal stays light at night.
-  document.head.insertBefore(
-    css,
-    document.head.querySelector('link[rel="stylesheet"]')
-  );
+  insertBeforeFirstStylesheet(css);
 
   const js = document.createElement('script');
   js.type = 'module';
@@ -85,9 +89,11 @@ export function preloadPagefindWhenIdle() {
   const schedule = () => {
     // Some Safari versions have no requestIdleCallback. Use a plain timeout there.
     if (typeof window.requestIdleCallback === 'function') {
-      window.requestIdleCallback(() => loadPagefind(), { timeout: 3000 });
+      window.requestIdleCallback(() => loadPagefind(), {
+        timeout: IDLE_TIMEOUT_MS,
+      });
     } else {
-      setTimeout(() => loadPagefind(), 1000);
+      setTimeout(() => loadPagefind(), NO_IDLE_CALLBACK_DELAY_MS);
     }
   };
 

@@ -1,5 +1,3 @@
-import { vi } from 'vitest';
-
 // The shared code for the jsdom suite. It puts a Stimulus controller on real markup, it makes the
 // Stimulus MutationObserver run, and it replaces the read-only `navigator` properties that these
 // controllers look for.
@@ -99,22 +97,4 @@ export function stopMountedApplications() {
   while (mountedApplications.length > 0) {
     mountedApplications.pop().stop();
   }
-}
-
-/**
- * Adds a `window.plausible` spy with the same parameters as the real queue stub.
- * @returns {Function} The spy, thus a test can read `mock.calls`.
- */
-export function stubPlausible() {
-  const plausible = vi.fn((_event, options) => options?.callback?.());
-  window.plausible = plausible;
-  return plausible;
-}
-
-/**
- * A `fetch` stub that returns one HTML fragment, for the live-update controller.
- * @returns {Function} A vi.fn() for `vi.stubGlobal('fetch', …)`.
- */
-export function stubFetchReturning(body, status = 200) {
-  return vi.fn(async () => new Response(body, { status }));
 }

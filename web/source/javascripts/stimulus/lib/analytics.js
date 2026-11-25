@@ -1,3 +1,8 @@
+/** The longest time that a navigation waits for an event to go out. */
+const NAVIGATION_WAIT_MS = 150;
+/** The pause in the typing after which a search query counts as final. */
+const SEARCH_PAUSE_MS = 1200;
+
 /**
  * Calls Plausible if it is available. Thus the tracking does nothing when the page has no such
  * script, for example in development, and it does not raise a ReferenceError.
@@ -52,7 +57,7 @@ export function trackEventThen(event, props, done) {
 
   track(event, { props, callback: go });
   // This lets the navigation continue if the function never runs.
-  setTimeout(go, 150);
+  setTimeout(go, NAVIGATION_WAIT_MS);
 }
 
 let searchTrackingReady = false;
@@ -84,7 +89,7 @@ export function initSearchTracking() {
       if (term === lastTracked) return;
       lastTracked = term;
       trackEvent('Search', { search_query: term, results });
-    }, 1200);
+    }, SEARCH_PAUSE_MS);
   });
 }
 

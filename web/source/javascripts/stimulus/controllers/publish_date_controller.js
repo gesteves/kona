@@ -39,6 +39,9 @@ function dateFormatter(shape, timeZone) {
   return dateFormatters.get(key);
 }
 
+/** The time between two renders of a relative date. */
+const REFRESH_MS = 60_000;
+
 /**
  * Renders in the browser the parts of the meta line of an article that depend on the publish date.
  * Thus they stay correct with no new build: the "New" badge, the clock icon or the calendar icon,
@@ -123,7 +126,7 @@ export default class extends Controller {
       relativeTime.setAttribute('sync', '');
       this.timestampTarget.replaceChildren(relativeTime);
     }
-    this.timer = setTimeout(() => this.render(), 60000);
+    this.timer = setTimeout(() => this.render(), REFRESH_MS);
   }
 
   /**

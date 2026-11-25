@@ -1,4 +1,5 @@
 import { Controller } from '@hotwired/stimulus';
+import { loadTurnstile } from '../lib/turnstile';
 import { sendNotification } from '../lib/utils';
 
 const SUCCESS_MESSAGE = 'Thanks! Your message is on its way.';
@@ -7,13 +8,6 @@ const ERROR_MESSAGE =
 const RATE_LIMIT_MESSAGE =
   'You have sent a few messages already. Please wait an hour and try again.';
 
-// This uses the explicit-render mode. Thus connect and disconnect control the life of the widget,
-// and the widget continues through a Turbo navigation. The `onload` parameter of Turnstile says
-// when it is ready, because turnstile.ready() raises for a script that the page loads at
-// runtime.
-const TURNSTILE_ONLOAD = '__konaTurnstileOnload';
-const TURNSTILE_SRC = `https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=${TURNSTILE_ONLOAD}`;
-
 /**
  * Adds behavior to the contact form. The form is a true POST to /api/contact that works with no
  * JavaScript: a native submit, then a redirect to the Thank-You page. This code takes the submit,
@@ -21,7 +15,8 @@ const TURNSTILE_SRC = `https://challenges.cloudflare.com/turnstile/v0/api.js?ren
  * instead of a navigation.
  *
  * With a sitekey in the configuration, it also renders a Cloudflare Turnstile widget and sends its
- * token. The API checks that token on the server, on the JavaScript path.
+ * token. The API checks that token on the server, on the JavaScript path. connect and disconnect
+ * control the life of the widget, and lib/turnstile.js loads its script.
  */
 export default class extends Controller {
   static targets = ['submit', 'turnstile'];
@@ -30,7 +25,7 @@ export default class extends Controller {
   /** Renders the Turnstile widget, if the configuration has one, after its script is ready. */
   connect() {
     if (!this.siteKeyValue || !this.hasTurnstileTarget) return;
-    this.loadTurnstile()
+    loadTurnstile()
       .then(() => {
         // A Turbo navigation away from /contact can occur between the script request and its
         // result. Without this check, the widget renders into an element that is not in the
@@ -144,34 +139,6 @@ export default class extends Controller {
     if (this.widgetId && window.turnstile) {
       window.turnstile.reset(this.widgetId);
     }
-  }
-
-  /**
-   * Loads the Turnstile script one time for each page, and each controller instance uses it. The
-   * `onload` callback of Turnstile resolves the promise, when window.turnstile is ready. The load
-   * event of the script does not.
-   * @returns {Promise<void>}
-   */
-  loadTurnstile() {
-    if (window.turnstile) return Promise.resolve();
-    if (!window.__konaTurnstileLoad) {
-      window.__konaTurnstileLoad = new Promise((resolve, reject) => {
-        window[TURNSTILE_ONLOAD] = resolve;
-        const script = document.createElement('script');
-        script.src = TURNSTILE_SRC;
-        script.async = true;
-        script.onerror = (error) => {
-          // Remove the stored value, thus a later visit tries again. A promise with an error in
-          // the cache would stop the challenge for the rest of the life of the page after one
-          // small network problem.
-          window.__konaTurnstileLoad = null;
-          script.remove();
-          reject(error);
-        };
-        document.head.appendChild(script);
-      });
-    }
-    return window.__konaTurnstileLoad;
   }
 
   /**

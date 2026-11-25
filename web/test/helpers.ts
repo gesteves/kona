@@ -3,6 +3,24 @@
 // an env that it makes and controls each dependency. ASSETS is a stub, and KONA_API_URL and
 // PLAUSIBLE_SCRIPT_URL point at test origins.
 
+import { afterEach, beforeEach, vi } from 'vitest';
+
+/**
+ * Replaces caches.default for each test of the suite that calls this: `match` gives a miss, and
+ * `put` does nothing.
+ *
+ * ⚠️ A test must never use the true Cache storage, which the pool keeps separate for each test. A
+ * write to it causes a miniflare storage teardown problem with a .sqlite-shm WAL file, and the run
+ * fails in CI.
+ */
+export function useStubbedCache(): void {
+  beforeEach(() => {
+    vi.spyOn(caches.default, 'match').mockResolvedValue(undefined);
+    vi.spyOn(caches.default, 'put').mockResolvedValue(undefined);
+  });
+  afterEach(() => vi.restoreAllMocks());
+}
+
 // This collects the background work that a handler gives to ctx.waitUntil(), for example the cache
 // write of the Plausible script. Thus setup.ts can complete that work after each test. Without it,
 // a caches.default write in progress races the storage teardown of the pool for that test, and the

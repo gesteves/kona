@@ -2,6 +2,9 @@ import { Controller } from '@hotwired/stimulus';
 import { absoluteUrl, sendNotification } from '../lib/utils';
 import { trackEvent } from '../lib/analytics';
 
+/** The time that the check stays in place of the link icon after a copy. */
+const CONFIRMATION_MS = 2000;
+
 export default class extends Controller {
   static classes = ['hidden'];
   static targets = ['link', 'check'];
@@ -45,7 +48,7 @@ export default class extends Controller {
   }
 
   /**
-   * Puts a check in place of the link icon for two seconds, shows a toast, and records the copy.
+   * Puts a check in place of the link icon for a short time, shows a toast, and records the copy.
    */
   successfulCopy(permalink) {
     if (this.hasLinkTarget && this.hasCheckTarget) {
@@ -54,7 +57,7 @@ export default class extends Controller {
       this.revertTimer = setTimeout(() => {
         this.linkTarget.classList.remove(this.hiddenClass);
         this.checkTarget.classList.add(this.hiddenClass);
-      }, 2000);
+      }, CONFIRMATION_MS);
     }
 
     sendNotification(this.successMessageValue);
