@@ -1,28 +1,9 @@
 require 'spec_helper'
-require 'ostruct'
-require 'padrino-helpers'
-require 'hashie'
 
 # spec_helper.rb includes each helper module, thus an example calls the instance methods of
 # RedirectHelpers directly.
 RSpec.describe RedirectHelpers do
   include_context 'default helper stubs'
-
-  # Makes a site double with the shape of `data.site`.
-  def site(socials: [], logo: 'logo', author_name: 'Jane Doe', profile_picture: nil)
-    OpenStruct.new(
-      title: 'My Site',
-      logo: logo,
-      socials_collection: OpenStruct.new(items: socials.map { |t, d| OpenStruct.new(title: t, destination: d) }),
-      author: OpenStruct.new(name: author_name, profile_picture: profile_picture)
-    )
-  end
-
-  # No example in this file calls these three methods, or the `site` double above. Each group that
-  # reads `data` defines its own.
-  def data = OpenStruct.new(site: @site || site)
-  def site_icon_url(w:) = "https://example.com/icon-#{w}.png"
-  def cdn_image_url(url, params = {}) = "#{url}?w=#{params[:w]}"
 
   describe '#taxonomy_synonym_redirects' do
     def data

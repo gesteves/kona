@@ -1,5 +1,4 @@
 require 'spec_helper'
-require 'ostruct'
 require 'yaml'
 
 RSpec.describe EntryMarkdownHelpers do

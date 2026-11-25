@@ -1,10 +1,7 @@
 require 'spec_helper'
-require 'ostruct'
-require 'padrino-helpers'
 
 RSpec.describe MarkupEmbedHelpers do
   include Padrino::Helpers
-  include SiteHelpers
   include Padrino::Helpers::TagHelpers
 
   describe '#add_figure_elements_to_iframes' do

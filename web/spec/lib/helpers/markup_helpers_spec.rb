@@ -1,10 +1,7 @@
 require 'spec_helper'
-require 'ostruct'
-require 'padrino-helpers'
 
 RSpec.describe MarkupHelpers do
   include Padrino::Helpers
-  include SiteHelpers
   include Padrino::Helpers::TagHelpers
 
   let(:affiliate_link) { 'https://www.amazon.com/abc123?tag=example-20' }
@@ -184,8 +181,6 @@ RSpec.describe MarkupHelpers do
   end
 
   describe '#render_body' do
-    before { MemoizationHelpers.collection_store.clear }
-
     let(:articles) { [] }
     let(:assets) { [] }
 
@@ -235,8 +230,6 @@ RSpec.describe MarkupHelpers do
   end
 
   describe '#render_feed_body' do
-    before { MemoizationHelpers.collection_store.clear }
-
     let(:articles) { [] }
     let(:assets) { [] }
 

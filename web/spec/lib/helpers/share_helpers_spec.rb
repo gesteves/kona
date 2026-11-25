@@ -1,5 +1,4 @@
 require 'spec_helper'
-require 'ostruct'
 
 RSpec.describe ShareHelpers do
   include_context 'default helper stubs'

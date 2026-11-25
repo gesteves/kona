@@ -1,10 +1,7 @@
 require 'spec_helper'
-require 'ostruct'
-require 'padrino-helpers'
 
 RSpec.describe MarkupImageHelpers do
   include Padrino::Helpers
-  include SiteHelpers
   include Padrino::Helpers::TagHelpers
 
   describe '#set_caption_credit' do

@@ -1,28 +1,10 @@
 require 'spec_helper'
-require 'ostruct'
-require 'padrino-helpers'
 require 'hashie'
 
 # spec_helper.rb includes each helper module, thus an example calls the instance methods of
 # SiteHelpers directly.
 RSpec.describe SiteHelpers do
   include_context 'default helper stubs'
-
-  # Makes a site double with the shape of `data.site`.
-  def site(socials: [], logo: 'logo', author_name: 'Jane Doe', profile_picture: nil)
-    OpenStruct.new(
-      title: 'My Site',
-      logo: logo,
-      socials_collection: OpenStruct.new(items: socials.map { |t, d| OpenStruct.new(title: t, destination: d) }),
-      author: OpenStruct.new(name: author_name, profile_picture: profile_picture)
-    )
-  end
-
-  # No example in this file calls these three methods, or the `site` double above. Each group that
-  # reads `data` defines its own.
-  def data = OpenStruct.new(site: @site || site)
-  def site_icon_url(w:) = "https://example.com/icon-#{w}.png"
-  def cdn_image_url(url, params = {}) = "#{url}?w=#{params[:w]}"
 
   describe '#alternate_feed_links' do
     def data = OpenStruct.new(site: OpenStruct.new(meta_title: 'My Site'))
@@ -377,22 +359,15 @@ RSpec.describe SiteHelpers do
   end
 
   describe 'plausible proxy helpers' do
-    around do |example|
-      original = ENV['PLAUSIBLE_SCRIPT_URL']
-      example.run
-    ensure
-      original.nil? ? ENV.delete('PLAUSIBLE_SCRIPT_URL') : ENV['PLAUSIBLE_SCRIPT_URL'] = original
-    end
-
     it 'exposes the fixed first-party proxy paths' do
       expect(plausible_script_path).to eq('/pa/script.js')
       expect(plausible_event_path).to eq('/pa/event')
     end
 
     it 'is installed only when the upstream script URL is configured' do
-      ENV.delete('PLAUSIBLE_SCRIPT_URL')
+      stub_env('PLAUSIBLE_SCRIPT_URL' => nil)
       expect(plausible_installed?).to be(false)
-      ENV['PLAUSIBLE_SCRIPT_URL'] = 'https://plausible.example/js/script.js'
+      stub_env('PLAUSIBLE_SCRIPT_URL' => 'https://plausible.example/js/script.js')
       expect(plausible_installed?).to be(true)
     end
   end

@@ -20,13 +20,7 @@ RSpec.describe DevApiProxy do
     }.merge(overrides)
   end
 
-  around do |example|
-    original = ENV.values_at('KONA_API_URL', 'API_TOKEN')
-    ENV['KONA_API_URL'] = 'http://localhost:3000'
-    ENV['API_TOKEN'] = 'test-token'
-    example.run
-    ENV['KONA_API_URL'], ENV['API_TOKEN'] = original
-  end
+  before { stub_env('KONA_API_URL' => 'http://localhost:3000', 'API_TOKEN' => 'test-token') }
 
   describe 'paths it does not claim' do
     it 'passes a page request to the inner app' do
@@ -93,7 +87,7 @@ RSpec.describe DevApiProxy do
     end
 
     it 'answers an unset KONA_API_URL with an empty 502 rather than raising' do
-      ENV['KONA_API_URL'] = ''
+      stub_env('KONA_API_URL' => '')
       expect(HTTParty).not_to receive(:get)
 
       status, _headers, body = proxy.call(env_for('/widgets/whoop'))

@@ -1,5 +1,4 @@
 require 'spec_helper'
-require 'ostruct'
 
 RSpec.describe IconHelpers do
   describe '#icon_svg' do

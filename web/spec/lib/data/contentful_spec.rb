@@ -328,8 +328,7 @@ RSpec.describe Contentful do
 
   describe '#rewrite_image_urls' do
     def stub_image_host(host)
-      allow(ENV).to receive(:[]).and_call_original
-      allow(ENV).to receive(:[]).with('IMAGE_HOST').and_return(host)
+      stub_env('IMAGE_HOST' => host)
     end
 
     before { stub_image_host('images.example.com') }

@@ -1,9 +1,6 @@
 require 'spec_helper'
-require 'ostruct'
 
 RSpec.describe CspHelpers do
-  include MemoizationHelpers
-
   def plausible_event_path = '/pa/event'
 
   let(:articles) do

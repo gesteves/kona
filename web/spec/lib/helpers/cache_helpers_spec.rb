@@ -30,23 +30,17 @@ RSpec.describe CacheHelpers do
     end
 
     it 'reads the URL from REDIS_URL' do
-      original = ENV['REDIS_URL']
-      ENV['REDIS_URL'] = 'rediss://cache.example:6380'
+      stub_env('REDIS_URL' => 'rediss://cache.example:6380')
       expect(Redis).to receive(:new).with(hash_including(url: 'rediss://cache.example:6380')).and_return(double('redis'))
 
       redis
-    ensure
-      ENV['REDIS_URL'] = original
     end
 
     it 'falls back to a local Redis when REDIS_URL is unset' do
-      original = ENV['REDIS_URL']
-      ENV.delete('REDIS_URL')
+      stub_env('REDIS_URL' => nil)
       expect(Redis).to receive(:new).with(hash_including(url: 'redis://localhost:6379')).and_return(double('redis'))
 
       redis
-    ensure
-      ENV['REDIS_URL'] = original
     end
   end
 end

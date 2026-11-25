@@ -1,8 +1,5 @@
 require 'spec_helper'
-require 'ostruct'
 require 'yaml'
-# `tag` comes from Padrino, which Middleman gives to a template but not to an example group.
-require 'padrino-helpers'
 
 RSpec.describe ImageHelpers do
   # The real data/srcsets.yml, thus a spec reads the same card shape and widths as the build.
@@ -36,12 +33,7 @@ RSpec.describe ImageHelpers do
   # IMAGES_URL is the host that Cloudflare serves each transformation from, and each environment
   # needs it. There is no fallback to a Contentful resize, thus no value means a raise.
   # `cdn_image_url` reads no other variable: DEPLOY_CONTEXT and URL do not change its result.
-  def stub_env(images_url: 'https://example.com')
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with('IMAGES_URL').and_return(images_url)
-  end
-
-  before { stub_env }
+  before { stub_env('IMAGES_URL' => 'https://example.com') }
 
   describe '#get_asset_id' do
     it 'extracts the asset id segment from a Contentful URL' do
@@ -92,7 +84,7 @@ RSpec.describe ImageHelpers do
     end
 
     it 'trims a trailing slash on IMAGES_URL' do
-      stub_env(images_url: 'https://example.com/')
+      stub_env('IMAGES_URL' => 'https://example.com/')
       expect(cdn_image_url(original, w: 100)).to eq("https://example.com/cdn-cgi/image/width=100/#{original}")
     end
 
@@ -114,7 +106,7 @@ RSpec.describe ImageHelpers do
     # A fallback to a Contentful resize looks correct, and it uses the Contentful bandwidth with no
     # message. Thus the value is necessary.
     context 'when IMAGES_URL is unset' do
-      before { stub_env(images_url: nil) }
+      before { stub_env('IMAGES_URL' => nil) }
 
       it 'raises rather than silently falling back to Contentful resizing' do
         expect { cdn_image_url(original, w: 100) }.to raise_error(ImageHelpers::ImagesUrlMissing, /IMAGES_URL is unset/)
@@ -197,7 +189,7 @@ RSpec.describe ImageHelpers do
   describe '#cdn_image_url exact Cloudflare output' do
     let(:source) { 'https://images.ctfassets.net/space/asset-1/token/photo.jpg' }
 
-    before { stub_env(images_url: 'https://example.com') }
+    before { stub_env('IMAGES_URL' => 'https://example.com') }
 
     it 'pins the option order, and renames fm=jpg to format=jpeg' do
       url = cdn_image_url(source, w: 100, h: 50, fm: 'jpg', fit: 'cover')
@@ -251,7 +243,7 @@ RSpec.describe ImageHelpers do
       # The rescue below exists for a site entry with no logo. It must not also change a build with
       # an incorrect configuration into an icon that is absent with no message.
       it 'lets a missing IMAGES_URL raise through its rescue' do
-        stub_env(images_url: nil)
+        stub_env('IMAGES_URL' => nil)
         expect { site_icon_url(w: 32) }.to raise_error(ImageHelpers::ImagesUrlMissing)
       end
     end

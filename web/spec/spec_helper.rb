@@ -1,5 +1,8 @@
 require 'middleman-core'
 require 'middleman-core/load_paths'
+# Most specs make a double with OpenStruct, and the helpers call the tag helpers of Padrino.
+require 'ostruct'
+require 'padrino-helpers'
 
 # `.rspec` requires this file for each run, thus no spec file requires it.
 Dir[File.expand_path('../support/**/*.rb', __FILE__)].sort.each { |file| require file }
@@ -27,4 +30,8 @@ RSpec.configure do |config|
 
   # The random numbers in an example come from the same seed.
   Kernel.srand config.seed
+
+  # A helper keeps some values for the life of the process, by collection. An example starts with
+  # none, thus it never reads a value that another example made.
+  config.before { MemoizationHelpers.collection_store.clear }
 end

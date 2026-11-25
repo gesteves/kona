@@ -1,16 +1,10 @@
 require 'spec_helper'
-require 'ostruct'
 
 RSpec.describe BlurhashHelpers do
   def data = OpenStruct.new(assets: @assets || [])
 
   # The thumbnail of a placeholder comes through Cloudflare Images, thus it needs IMAGES_URL.
-  def stub_env(images_url: 'https://example.com')
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with('IMAGES_URL').and_return(images_url)
-  end
-
-  before { stub_env }
+  before { stub_env('IMAGES_URL' => 'https://example.com') }
 
   describe 'blurhash pipeline' do
     # A published JPEG of 1600x900. The blurhash thumbnail at 32px wide is 32x18.
@@ -82,7 +76,7 @@ RSpec.describe BlurhashHelpers do
       # Cloudflare resizes the thumbnail, as it resizes each other image on the site. A resize by
       # Contentful would use the metered asset bandwidth.
       it 'resizes the thumbnail through Cloudflare Images' do
-        stub_env(images_url: 'https://example.com')
+        stub_env('IMAGES_URL' => 'https://example.com')
         allow(URI).to receive(:open).and_raise(StandardError, 'stop here')
         allow(self).to receive(:warn)
 
@@ -106,7 +100,7 @@ RSpec.describe BlurhashHelpers do
             width: 1600, height: 900, content_type: 'image/jpeg'
           )
         ]
-        stub_env(images_url: 'https://example.com')
+        stub_env('IMAGES_URL' => 'https://example.com')
         allow(URI).to receive(:open).and_raise(StandardError, 'stop here')
         allow(self).to receive(:warn)
 
@@ -123,7 +117,7 @@ RSpec.describe BlurhashHelpers do
       # The rescue of encode_blurhash also catches ImagesUrlMissing. Thus the warning must name
       # IMAGES_URL, or the placeholders go away with no message.
       it 'warns and returns nil when IMAGES_URL is unset' do
-        stub_env(images_url: nil)
+        stub_env('IMAGES_URL' => nil)
         allow(self).to receive(:warn)
 
         expect(encode_blurhash('asset-1', 32, 18)).to be_nil

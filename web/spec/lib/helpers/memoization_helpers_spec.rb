@@ -1,8 +1,6 @@
 require 'spec_helper'
 
 RSpec.describe MemoizationHelpers do
-  before { MemoizationHelpers.collection_store.clear }
-
   describe '#memoize_by_collection' do
     it 'computes once per collection identity' do
       collection = [ 1, 2, 3 ]

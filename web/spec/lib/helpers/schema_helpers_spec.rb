@@ -1,7 +1,4 @@
 require 'spec_helper'
-require 'ostruct'
-require 'padrino-helpers'
-require 'hashie'
 
 # spec_helper.rb includes each helper module, thus an example calls the instance methods of
 # SchemaHelpers directly.
@@ -208,6 +205,124 @@ RSpec.describe SchemaHelpers do
       schema = JSON.parse(profile_page_schema)
       expect(schema['@type']).to eq('ProfilePage')
       expect(schema['mainEntity']).to eq('@id' => 'https://example.com/about#person')
+    end
+  end
+end
+
+# The schema of one entry. These examples need the article doubles, and not the site double of
+# the group above.
+RSpec.describe SchemaHelpers, 'for one entry' do
+  include_context 'default helper stubs'
+  include_context 'article doubles'
+
+  # The canonical URL of the article under test. The schema groups below share it.
+  def canonical_url = 'https://example.com/2024/01/01/post/'
+
+  describe '#article_schema' do
+    # These replace the methods of other helper modules, and the `current_page` of Middleman. Thus
+    # the test runs the schema builder alone.
+    def content_summary(content) = content.summary
+    def schema_entity_id(fragment, path: '/') = "https://example.com#{path == '/' ? '/' : "#{path}/"}##{fragment}"
+    def cdn_image_url(url, params = {}) = "#{url}?w=#{params[:w]}&h=#{params[:h]}"
+    def open_graph_card_url(path, version) = "https://example.com#{path.chomp('/')}/og.png?v=#{version}"
+    def current_page = OpenStruct.new(url: '/2024/01/01/post/')
+
+    def schema_article(**overrides)
+      cover_image = overrides.delete(:cover_image)
+      defaults = {
+        slug: 'post', title: 'A Post', summary: 'A summary.', draft: false,
+        intro: 'one two three four', body: 'five six',
+        published_at: '2024-01-01T10:00:00Z', tags: %w[running marathon]
+      }
+      a = article(**defaults.merge(overrides))
+      a.sys = OpenStruct.new(published_at: '2024-02-01T10:00:00Z', published_version: 1082)
+      a.cover_image = cover_image
+      a
+    end
+
+    it 'returns nil for drafts' do
+      expect(article_schema(schema_article(draft: true))).to be_nil
+    end
+
+    it 'emits machine-readable facts and references the sitewide entities by @id' do
+      schema = JSON.parse(article_schema(schema_article))
+      expect(schema).to include(
+        '@type' => 'BlogPosting',
+        'inLanguage' => 'en-US',
+        'isAccessibleForFree' => true,
+        'wordCount' => 6,
+        'timeRequired' => 'PT1M',
+        'keywords' => %w[Running Marathon],
+        'articleSection' => 'Running'
+      )
+      expect(schema['author']).to eq('@id' => 'https://example.com/about/#person')
+      expect(schema['publisher']).to eq('@id' => 'https://example.com/#organization')
+      expect(schema['isPartOf']).to eq('@id' => 'https://example.com/#website')
+      expect(schema['mainEntityOfPage']).to eq('@type' => 'WebPage', '@id' => canonical_url)
+    end
+
+    it 'omits keywords when the article has no tags' do
+      schema = JSON.parse(article_schema(schema_article(tags: [])))
+      expect(schema).not_to have_key('keywords')
+      expect(schema).not_to have_key('articleSection')
+    end
+
+    it 'folds each concept\'s synonyms into the keywords, deduped' do
+      a = schema_article
+      a.contentful_metadata = OpenStruct.new(tags: [
+        OpenStruct.new(name: 'Ironman 70.3', synonyms: [ 'Half Ironman', '70.3' ]),
+        OpenStruct.new(name: 'Race Reports', synonyms: [])
+      ])
+      schema = JSON.parse(article_schema(a))
+      expect(schema['keywords']).to eq([ 'Ironman 70.3', 'Half Ironman', '70.3', 'Race Reports' ])
+      expect(schema['articleSection']).to eq('Ironman 70.3')
+    end
+
+    it 'emits cover images as ImageObjects with dimensions' do
+      cover = OpenStruct.new(url: '//images/cover.jpg')
+      schema = JSON.parse(article_schema(schema_article(cover_image: cover)))
+      expect(schema['image']).to all(include('@type' => 'ImageObject'))
+      expect(schema['image'].map { |i| [ i['width'], i['height'] ] })
+        .to eq([ [ 1000, 1000 ], [ 1600, 900 ], [ 1600, 1200 ] ])
+    end
+
+    it 'falls back to the generated Open Graph card when there is no cover image (e.g. a Short)' do
+      schema = JSON.parse(article_schema(schema_article(cover_image: nil)))
+      expect(schema['image']).to eq([ {
+        '@type' => 'ImageObject',
+        'url' => 'https://example.com/2024/01/01/post/og.png?v=1082',
+        'width' => 1200,
+        'height' => 630
+      } ])
+    end
+  end
+
+  describe '#breadcrumb_schema' do
+    it 'builds a Home > Blog > title breadcrumb for both articles and shorts' do
+      %w[Article Short].each do |type|
+        schema = JSON.parse(breadcrumb_schema(article(slug: 'post', title: 'A Post', entry_type: type)))
+        expect(schema['@type']).to eq('BreadcrumbList')
+        expect(schema['itemListElement'].map { |i| i['name'] }).to eq(%w[Home Blog] + [ 'A Post' ])
+      end
+    end
+
+    it 'returns nil for drafts and for non-article/short entries' do
+      expect(breadcrumb_schema(article(slug: 'draft', draft: true))).to be_nil
+      expect(breadcrumb_schema(article(slug: 'about', entry_type: 'Page'))).to be_nil
+    end
+  end
+
+  describe '#breadcrumb_schema with a taxonomy trail' do
+    include_context 'a taxonomy'
+
+    it 'inserts the deepest trail between Blog and the article, numbered in order' do
+      art = tagged_article(slug: 'post', title: 'A Post', concepts: [
+        concept('gear', 'Gear', path: '/tagged/tech/gear/', parent_id: 'tech', scheme: 'topics')
+      ])
+      schema = JSON.parse(breadcrumb_schema(art))
+      expect(schema['itemListElement'].map { |i| i['name'] }).to eq([ 'Home', 'Blog', 'Tech', 'Gear', 'A Post' ])
+      expect(schema['itemListElement'].map { |i| i['position'] }).to eq([ 1, 2, 3, 4, 5 ])
+      expect(schema['itemListElement'][2]['item']).to eq('https://example.com/tagged/tech/')
     end
   end
 end

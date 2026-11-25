@@ -1,6 +1,4 @@
 require 'spec_helper'
-require 'ostruct'
-require 'padrino-helpers'
 
 RSpec.describe EventHelpers do
   include_context 'default helper stubs'

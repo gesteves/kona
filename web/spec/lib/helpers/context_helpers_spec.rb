@@ -2,8 +2,7 @@ require 'spec_helper'
 
 RSpec.describe ContextHelpers do
   def with_env(deploy_context: nil)
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with('DEPLOY_CONTEXT').and_return(deploy_context)
+    stub_env('DEPLOY_CONTEXT' => deploy_context)
   end
 
   it 'is not production without any context' do
