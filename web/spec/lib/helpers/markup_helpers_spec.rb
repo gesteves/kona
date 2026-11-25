@@ -196,21 +196,21 @@ RSpec.describe MarkupHelpers do
 
     # ⚠️ A listing page renders the same intro many times, and each feed renders the same body.
     it 'renders a body with no first image one time, and gives the same HTML again' do
-      allow(self).to receive(:render_body_now).and_call_original
+      allow(self).to receive(:compute_render_body).and_call_original
 
       first = render_body('Hello *there*.')
       second = render_body('Hello *there*.')
 
       expect(second).to eq(first)
-      expect(self).to have_received(:render_body_now).once
+      expect(self).to have_received(:compute_render_body).once
     end
 
     it 'renders a body with a first image each time, because the LCP mark is for one page' do
-      allow(self).to receive(:render_body_now).and_call_original
+      allow(self).to receive(:compute_render_body).and_call_original
 
       2.times { render_body('Hello.', first_image: :eager) }
 
-      expect(self).to have_received(:render_body_now).twice
+      expect(self).to have_received(:compute_render_body).twice
     end
 
     it 'records the icons of a body that it gives again, for the sprite of this page' do
@@ -257,13 +257,13 @@ RSpec.describe MarkupHelpers do
     end
 
     it 'renders one text one time, and gives the same HTML again' do
-      allow(self).to receive(:render_feed_body_now).and_call_original
+      allow(self).to receive(:compute_render_feed_body).and_call_original
 
       first = render_feed_body('Hello *there*.')
       second = render_feed_body('Hello *there*.')
 
       expect(second).to eq(first)
-      expect(self).to have_received(:render_feed_body_now).once
+      expect(self).to have_received(:compute_render_feed_body).once
     end
   end
 

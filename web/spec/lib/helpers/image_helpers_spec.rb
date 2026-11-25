@@ -263,7 +263,7 @@ RSpec.describe ImageHelpers do
     end
   end
 
-  describe '#generate_open_graph_image_url' do
+  describe '#open_graph_card_url' do
     # This replaces the root_url of UrlHelpers, which reads DEPLOY_CONTEXT and URL. The Worker of
     # the site serves the card route, thus the site origin is the only host of a card.
     def root_url = @root_url || 'https://example.com'
@@ -276,7 +276,7 @@ RSpec.describe ImageHelpers do
     # The card URL comes from the path of the page. Thus the Worker can find the page from the
     # request path, and not from a ?path= parameter. Refer to web/src/og.ts.
     it 'hangs the card off the page’s own path, with a version cache buster' do
-      result = generate_open_graph_image_url('/articles/foo/', 1082)
+      result = open_graph_card_url('/articles/foo/', 1082)
       parsed = URI.parse(result)
       expect("#{parsed.scheme}://#{parsed.host}#{parsed.path}")
         .to eq('https://example.com/articles/foo/og.png')
@@ -284,31 +284,31 @@ RSpec.describe ImageHelpers do
     end
 
     it 'serves the home page’s card from the root' do
-      expect(generate_open_graph_image_url('/', 7))
+      expect(open_graph_card_url('/', 7))
         .to eq("https://example.com/og.png?v=#{template}-7")
     end
 
     it 'trims a trailing slash on root_url' do
       @root_url = 'https://example.com/'
-      expect(generate_open_graph_image_url('/', 7))
+      expect(open_graph_card_url('/', 7))
         .to eq("https://example.com/og.png?v=#{template}-7")
     end
 
     it 'busts on OG_TEMPLATE_VERSION alone when version and title are both nil' do
-      result = generate_open_graph_image_url('/blog/', nil)
+      result = open_graph_card_url('/blog/', nil)
       expect(result).to eq("https://example.com/blog/og.png?v=#{template}")
     end
 
     # A listing page has no sys. Its card is a Cache API entry with no `Cache-Tag`, thus the title
     # must address the card.
     it 'busts on a CRC32 of the title when version is nil' do
-      result = generate_open_graph_image_url('/blog/', nil, title: 'Blog')
+      result = open_graph_card_url('/blog/', nil, title: 'Blog')
       expect(result).to eq("https://example.com/blog/og.png?v=#{template}-#{Zlib.crc32('Blog')}")
-      expect(generate_open_graph_image_url('/blog/', nil, title: 'Archive')).not_to eq(result)
+      expect(open_graph_card_url('/blog/', nil, title: 'Archive')).not_to eq(result)
     end
 
     it 'prefers the published version to the title' do
-      expect(generate_open_graph_image_url('/post/', 7, title: 'Post'))
+      expect(open_graph_card_url('/post/', 7, title: 'Post'))
         .to eq("https://example.com/post/og.png?v=#{template}-7")
     end
 
@@ -316,8 +316,8 @@ RSpec.describe ImageHelpers do
     # is the thing to pin, and not the number.
     it 'keeps the v<number> shape that the Worker checks' do
       expect(template).to match(/\Av\d+\z/)
-      expect(generate_open_graph_image_url('/blog/', 7)).to match(/\?v=v\d+-7\z/)
-      expect(generate_open_graph_image_url('/blog/', nil, title: 'Blog')).to match(/\?v=v\d+-\d+\z/)
+      expect(open_graph_card_url('/blog/', 7)).to match(/\?v=v\d+-7\z/)
+      expect(open_graph_card_url('/blog/', nil, title: 'Blog')).to match(/\?v=v\d+-\d+\z/)
     end
   end
 

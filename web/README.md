@@ -109,7 +109,7 @@ One row for each feature, and each file that it goes through. A helper is a modu
 | Contact form | — | `site_helpers` (`turnstile_site_key`) | `_contact_form`, from `article/_body` on the page with the slug `contact` | `contact`, `lib/utils` (the toast) | `api-proxy.ts` (`POST /api/contact`) |
 | Search | The Pagefind index in `build/pagefind/` | — | `_search_trigger`, `_nav`, `_footer` | `search`, `lib/pagefind` | — |
 | Analytics | — | `site_helpers` (`plausible_*`, `article_click_classes`), `csp_helpers` | `_analytics` | `lib/analytics`, which `page`, `search`, `share`, and `clipboard` call | `plausible.ts` (`/pa/*`) |
-| Open Graph image | `assets.json` | `image_helpers` (`open_graph_image_url`, `generate_open_graph_image_url`) | `_open_graph_and_social` | — | `og.ts`, `og-render.ts` (a page with no cover image) |
+| Open Graph image | `assets.json` | `image_helpers` (`open_graph_image_url`, `open_graph_card_url`) | `_open_graph_and_social` | — | `og.ts`, `og-render.ts` (a page with no cover image) |
 | Structured data (JSON-LD) | — | `schema_helpers`, `event_helpers` | `schema/*`, from `_head` | — | — |
 | Feeds | `articles.json`, `tags.json` | `article_helpers` (`feed_articles`), `markup_helpers` (`render_feed_body`), `site_helpers` (`feed_title`) | `feed.xml.erb`, `tag_feed.xml.erb` → `_feed` | — | — |
 | Markdown copies | `articles.json`, `pages.json` | `entry_markdown_helpers`, `about_helpers`, `markdown_document_helpers` | `entry_md.txt.erb`, `about_md.txt.erb` | — | — |

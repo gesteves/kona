@@ -66,7 +66,7 @@ A page with no cover image gets a card that the Worker renders (`src/og.ts`, `sr
 - ⚠️ **`satori` stays below 0.33.** `.github/dependabot.yml` gives the reason and holds the
   `ignore` entry.
 - A listing page has no `published_version`, thus the `v` of its card holds a CRC32 of its
-  `og:title` (`generate_open_graph_image_url`).
+  `og:title` (`open_graph_card_url`).
 
 ## File names that the zone permits
 

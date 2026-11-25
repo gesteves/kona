@@ -10,10 +10,10 @@
   <%= partial 'partials/schema/profile' if page && page.entry_type == 'Page' && page.slug == 'about' %>
   <%= partial 'partials/schema/collection' if page && page.template == '/tag.html' %>
   <%= partial 'partials/schema/blog' if page && page.template == '/articles.html' %>
-  <% if data.respond_to?(:standard_site) && data.standard_site&.publication_uri.present? %>
-    <link rel="site.standard.publication" href="<%= data.standard_site.publication_uri %>">
-    <% if page && published_post?(page) && data.standard_site.did.present? %>
-      <link rel="site.standard.document" href="at://<%= data.standard_site.did %>/site.standard.document/<%= document_rkey(page.sys.id) %>">
+  <% if standard_site&.publication_uri.present? %>
+    <link rel="site.standard.publication" href="<%= standard_site.publication_uri %>">
+    <% if page && published_post?(page) && standard_site.did.present? %>
+      <link rel="site.standard.document" href="at://<%= standard_site.did %>/site.standard.document/<%= document_rkey(page.sys.id) %>">
     <% end %>
   <% end %>
   <link rel="canonical" href="<%= canonical_url %>">

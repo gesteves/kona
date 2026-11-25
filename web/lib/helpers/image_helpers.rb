@@ -94,8 +94,7 @@ module ImageHelpers
     asset_url = get_asset_url(asset_id)
     original_url = asset_url if asset_url.present?
 
-    original_url = "https:#{original_url}" if original_url.start_with?("//")
-    "#{ENV['IMAGES_URL'].chomp('/')}#{CDN_IMAGE_PATH}#{cdn_image_options(params)}/#{original_url}"
+    "#{ENV['IMAGES_URL'].chomp('/')}#{CDN_IMAGE_PATH}#{cdn_image_options(params)}/#{with_https_scheme(original_url)}"
   end
 
   # Changes the transformation parameters into the Cloudflare option string, with a comma
@@ -268,7 +267,7 @@ module ImageHelpers
   # @param title [String, nil] The og:title of the page. With no version, a CRC32 of it addresses
   #   the card, thus a new title makes a new URL.
   # @return [String] The URL of the card.
-  def generate_open_graph_image_url(path, version = nil, title: nil)
+  def open_graph_card_url(path, version = nil, title: nil)
     v = if version.present?
       "#{OG_TEMPLATE_VERSION}-#{version}"
     elsif title.present?

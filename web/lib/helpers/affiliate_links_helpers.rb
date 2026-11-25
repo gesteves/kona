@@ -14,12 +14,12 @@ module AffiliateLinksHelpers
   def has_amazon_associates_links?(content)
     collections = respond_to?(:data) ? [ data.articles, data.pages ] : [ nil ]
     memoize_entry(:amazon_associates_links, content.sys&.id, *collections) do
-      scan_for_amazon_associates_links(content)
+      compute_has_amazon_associates_links?(content)
     end
   end
 
   # @see #has_amazon_associates_links?
-  def scan_for_amazon_associates_links(content)
+  def compute_has_amazon_associates_links?(content)
     entry_fragment(content).css("a").any? { |a| amazon_associates_link?(a["href"]) }
   end
 

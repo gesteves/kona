@@ -1,6 +1,18 @@
 # The taxonomy of an entry: the chain of concepts from a tag to its root, the breadcrumbs, and
 # the tag links of the meta line. `data.tags` holds the concepts.
 module TaxonomyHelpers
+  # Gives the path of the Atom feed of a tag. config.rb calls this before the helpers load.
+  # @param tag_path [String] The path of the archive of the tag, for example `/tagged/triathlon/`.
+  # @return [String] The path of its feed, for example `/tagged/triathlon/feed.xml`.
+  def self.tag_feed_path(tag_path)
+    "#{tag_path}feed.xml"
+  end
+
+  # @see TaxonomyHelpers.tag_feed_path
+  def tag_feed_path(tag_path)
+    TaxonomyHelpers.tag_feed_path(tag_path)
+  end
+
   # The chain of parents of the most deeply nested concept of an article, in the two schemes. If
   # two concepts are at the same depth, the number of articles in the archive of the concept
   # selects one.

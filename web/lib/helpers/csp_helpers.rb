@@ -62,9 +62,7 @@ module CspHelpers
   # @param url [String, nil] The `src` of an element. It can have no scheme.
   # @return [String, nil] The origin, with the https scheme, or nil for a URL with no host.
   def embed_origin(url)
-    value = url.to_s.strip
-    value = "https:#{value}" if value.start_with?("//")
-    uri = URI.parse(value)
+    uri = URI.parse(with_https_scheme(url.to_s.strip))
     return unless uri.is_a?(URI::HTTP) && uri.host.present?
 
     "https://#{uri.host.downcase}"

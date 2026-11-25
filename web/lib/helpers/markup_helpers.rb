@@ -29,7 +29,7 @@ module MarkupHelpers
   # @return [String] The HTML after the transforms.
   def render_body(text, image_variant: :entry, first_image: nil, link_section: nil)
     if first_image
-      return render_body_now(text, image_variant: image_variant, first_image: first_image,
+      return compute_render_body(text, image_variant: image_variant, first_image: first_image,
                              link_section: link_section)
     end
 
@@ -37,7 +37,7 @@ module MarkupHelpers
     key = [ text, image_variant, link_section ]
     html = memoize_entry(:rendered_bodies, key, data.articles, data.assets) do
       rendered = true
-      render_body_now(text, image_variant: image_variant, first_image: nil, link_section: link_section)
+      compute_render_body(text, image_variant: image_variant, first_image: nil, link_section: link_section)
     end
     # The icons of a body that another page rendered go in the sprite of this page as well.
     record_icons_in(html) unless rendered
@@ -45,7 +45,7 @@ module MarkupHelpers
   end
 
   # @see #render_body
-  def render_body_now(text, image_variant:, first_image:, link_section: nil)
+  def compute_render_body(text, image_variant:, first_image:, link_section: nil)
     srcset = data.srcsets[image_variant]
     render_markup(text) do |doc|
       open_external_links_in_new_tabs(doc)
@@ -82,11 +82,11 @@ module MarkupHelpers
   # without the memo the build renders its body again for each one.
   # @return [String] The HTML after the transforms.
   def render_feed_body(text)
-    memoize_entry(:rendered_feed_bodies, text, data.articles, data.assets) { render_feed_body_now(text) }
+    memoize_entry(:rendered_feed_bodies, text, data.articles, data.assets) { compute_render_feed_body(text) }
   end
 
   # @see #render_feed_body
-  def render_feed_body_now(text)
+  def compute_render_feed_body(text)
     render_markup(text) do |doc|
       add_image_data_attributes(doc)
       add_figure_elements_to_images(doc)
@@ -327,9 +327,9 @@ module MarkupHelpers
   # @return [Nokogiri::HTML::DocumentFragment]
   def entry_fragment(entry)
     id = entry.sys&.id
-    return parse_entry_fragment(entry) if id.blank? || !respond_to?(:data)
+    return compute_entry_fragment(entry) if id.blank? || !respond_to?(:data)
 
-    memoize_entry(:entry_fragments, id, data.articles, data.pages) { parse_entry_fragment(entry) }
+    memoize_entry(:entry_fragments, id, data.articles, data.pages) { compute_entry_fragment(entry) }
   end
 
   # The shared shape of the render_*_body pipelines: render the Markdown, parse it one time, give
@@ -365,7 +365,7 @@ module MarkupHelpers
   private
 
   # @see #entry_fragment
-  def parse_entry_fragment(entry)
+  def compute_entry_fragment(entry)
     text = [ entry.intro, entry.body ].reject(&:blank?).join("\n\n")
     Nokogiri::HTML::DocumentFragment.parse(markdown_to_html(text))
   end

@@ -26,7 +26,7 @@ module EntryMarkdownHelpers
     front_matter = {
       "title" => title,
       "url" => url,
-      "published" => DateTime.parse(entry.published_at).iso8601,
+      "published" => published_datetime(entry).iso8601,
       "summary" => sanitize(entry.summary)
     }.compact
     sections = [

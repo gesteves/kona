@@ -5,6 +5,12 @@ module StandardSiteHelpers
   # @see https://atproto.com/specs/tid
   TID_ALPHABET = "234567abcdefghijklmnopqrstuvwxyz".freeze
 
+  # The DID and the publication URI that `rake import:standard_site` writes.
+  # @return [Object, nil] The data, or nil when the import wrote no file.
+  def standard_site
+    optional_data(:standard_site)
+  end
+
   # Makes the document record key of a Contentful entry: the low 63 bits of the SHA-256 digest of
   # the sys.id, as a TID, because the site.standard.document lexicon needs one.
   # This must stay the same as StandardSite#document_rkey of the api. If it does not, the AT URI

@@ -153,13 +153,24 @@ module SiteHelpers
     (value.is_a?(String) ? DateTime.parse(value) : value).iso8601
   end
 
+  # The data of a file that an optional import writes: `related`, `known_agents`, or
+  # `standard_site`.
+  #
+  # ⚠️ Read such a file through this method. A failed import writes no file, and `rake clobber`
+  # removes the file of the last run. `data` then has no method with that name, and a direct read
+  # stops the build.
+  # @param name [Symbol] The name of the data file, with no extension.
+  # @return [Object, nil] The data, or nil when the file is absent.
+  def optional_data(name)
+    data.public_send(name) if data.respond_to?(name)
+  end
+
   # The robots.txt rules that block the AI scrapers, for source/robots.txt.erb. `rake import` gets
   # them from Known Agents and writes data/known_agents.json.
-  # ⚠️ A failed import writes no file, and `rake clobber` removes the file of the last run. Thus
-  # the guard here is necessary: a bare data.known_agents is nil, and it stops the build.
+  # Refer to #optional_data for the reason that this does not read data.known_agents directly.
   # @return [String] The rules and a blank line after them, or "" when the file is absent.
   def known_agent_rules
-    rules = data.respond_to?(:known_agents) ? data.known_agents&.robots_txt.to_s.strip : ""
+    rules = optional_data(:known_agents)&.robots_txt.to_s.strip
     rules.present? ? "#{rules}\n\n" : ""
   end
 
@@ -194,7 +205,7 @@ module SiteHelpers
       []
     end
     tags.each do |t|
-      links << { href: full_url("#{t[:path]}feed.xml"), title: sanitize("#{feed_title}: #{t[:name]}") }
+      links << { href: full_url(tag_feed_path(t[:path])), title: sanitize("#{feed_title}: #{t[:name]}") }
     end
     links
   end
@@ -219,12 +230,19 @@ module SiteHelpers
     "data-clipboard-success-message-value": "The link to the feed has been copied to your clipboard."
   }.freeze
 
+  # Tells if a link of the nav or of the social list is the link to the Atom feed. Such a link
+  # copies its URL, and it has its own icon.
+  # @param title [String] The title of the link in Contentful.
+  def feed_link?(title)
+    title.downcase == "feed"
+  end
+
   # Makes a social media link. A "Feed" link copies its URL instead of navigation.
   # @param title [String] The name of the platform.
   # @param destination [String] The profile URL.
   # @return [String] An anchor element that contains an SVG icon.
   def social_media_link(title:, destination:, css_class: nil, open_in_new_tab: true)
-    icon = if title.downcase == "feed"
+    icon = if feed_link?(title)
       icon_svg("classic", "solid", "rss")
     else
       icon_svg("classic", "brands", title.downcase)
@@ -232,7 +250,7 @@ module SiteHelpers
 
     icon = icon_svg("classic", "solid", "link") if icon.blank?
 
-    options = if title.downcase == "feed"
+    options = if feed_link?(title)
       {
         "title": "Subscribe to the feed",
         "aria-label": "Subscribe to the feed",
@@ -259,7 +277,7 @@ module SiteHelpers
   # @param item [Object] A menu item with title, destination, and open_in_new_tab.
   # @return [String] An anchor element.
   def shortcut_link(item)
-    if item.title.downcase == "feed"
+    if feed_link?(item.title)
       link_to item.title, item.destination, **FEED_CLIPBOARD_ATTRS
     elsif item.open_in_new_tab
       link_to item.title, item.destination, rel: "noopener", target: "_blank"

@@ -9,6 +9,14 @@ module UrlHelpers
     url.to_s
   end
 
+  # Gives the https scheme to a URL that starts with `//`. Contentful writes an asset URL in
+  # that form.
+  # @param url [String]
+  # @return [String] The URL with a scheme. Each other URL does not change.
+  def with_https_scheme(url)
+    url.start_with?("//") ? "https:#{url}" : url
+  end
+
   # @return [String] The origin of the site: `URL` in a production build, and localhost in each
   #   other condition. There is no remote build that is not production: the deploy workflow sends
   #   only main, and the Worker has no preview URL.

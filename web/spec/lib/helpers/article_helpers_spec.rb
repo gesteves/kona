@@ -133,7 +133,7 @@ RSpec.describe ArticleHelpers do
     def content_summary(content) = content.summary
     def schema_entity_id(fragment, path: '/') = "https://example.com#{path == '/' ? '/' : "#{path}/"}##{fragment}"
     def cdn_image_url(url, params = {}) = "#{url}?w=#{params[:w]}&h=#{params[:h]}"
-    def generate_open_graph_image_url(path, version) = "https://example.com#{path.chomp('/')}/og.png?v=#{version}"
+    def open_graph_card_url(path, version) = "https://example.com#{path.chomp('/')}/og.png?v=#{version}"
     def current_page = OpenStruct.new(url: '/2024/01/01/post/')
 
     def schema_article(**overrides)

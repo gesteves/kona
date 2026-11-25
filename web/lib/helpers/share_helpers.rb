@@ -46,7 +46,7 @@ module ShareHelpers
   # @return [String] The heading of the share section, with the type of the entry in it.
   def share_heading(article)
     # The match uses the concept id and not the name on the screen, as each other taxonomy check in
-    # the app does (refer to race_report? in article_helpers.rb). A new name in Contentful would
+    # the app does (refer to RecirculationHelpers#race_report?). A new name in Contentful would
     # change this to the general "Share this post", with no message.
     tag_ids = Array(article&.contentful_metadata&.tags).map(&:id)
     type = if tag_ids.include?("race-reports")

@@ -47,9 +47,10 @@ module RecirculationHelpers
   # each neighbor that it names is now unpublished.
   # @return [Array<Object>] The related entries, the nearest first.
   def related_articles(article, count: 4)
-    return [] unless data.respond_to?(:related)
+    related = optional_data(:related)
+    return [] if related.nil?
 
-    ids = Array(data.related[article.sys&.id])
+    ids = Array(related[article.sys&.id])
     return [] if ids.empty?
 
     index = published_articles_by_id

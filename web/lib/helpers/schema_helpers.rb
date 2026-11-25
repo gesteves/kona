@@ -120,7 +120,7 @@ module SchemaHelpers
   def author_same_as
     return [] if data.site.socials_collection.items.blank?
     data.site.socials_collection.items
-      .reject { |s| s.title.downcase == "feed" }
+      .reject { |s| feed_link?(s.title) }
       .map { |s| s.destination }
   end
 
@@ -224,7 +224,7 @@ module SchemaHelpers
     else
       # There is no cover image. Use the Open Graph card that the app makes, thus the
       # BlogPosting still has an image.
-      card_url = generate_open_graph_image_url(current_page.url, content.sys&.published_version)
+      card_url = open_graph_card_url(current_page.url, content.sys&.published_version)
       schema["image"] = [ image_object(card_url, 1200, 630) ]
     end
     schema.to_json

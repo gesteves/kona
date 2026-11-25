@@ -61,7 +61,7 @@ end
 # Each tag also gets an Atom feed at "<tag path>feed.xml". It lists the entries of that tag, which
 # are the same articles as on its archive page, with the newest first.
 @app.data.tags.each do |tag|
-  proxy "#{tag.tag.path}feed.xml", "/tag_feed.xml", locals: { content: tag }, ignore: true
+  proxy TaxonomyHelpers.tag_feed_path(tag.tag.path), "/tag_feed.xml", locals: { content: tag }, ignore: true
 end
 
 # The standard.site verification endpoint.

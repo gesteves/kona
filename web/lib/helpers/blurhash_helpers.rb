@@ -38,7 +38,7 @@ module BlurhashHelpers
   def blurhash_jpeg_data_uri(asset_id, width: 32)
     key = [ asset_id, width ]
     memoize_entry(:blurhash_jpegs, key, data.assets) do
-      BlurhashHelpers.warm_blurhashes[key] || build_blurhash_jpeg_data_uri(asset_id, width)
+      BlurhashHelpers.warm_blurhashes[key] || compute_blurhash_jpeg_data_uri(asset_id, width)
     end
   end
 
@@ -104,9 +104,8 @@ module BlurhashHelpers
 
   # Gets the placeholder from Redis, or makes it and puts it there.
   # @return [String, nil] The data URI, or nil for a GIF or if the encode fails.
-  def build_blurhash_jpeg_data_uri(asset_id, width)
-    content_type = get_asset_content_type(asset_id)
-    return if content_type == "image/gif"
+  def compute_blurhash_jpeg_data_uri(asset_id, width)
+    return if gif_asset?(asset_id)
 
     original_width, original_height = get_asset_dimensions(asset_id)
     published_version = get_asset_published_version(asset_id)
