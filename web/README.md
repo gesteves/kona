@@ -120,7 +120,7 @@ One row for each feature, and each file that it goes through. A helper is a modu
 | `robots.txt`, `llms.txt`, sitemap, IndexNow | `known_agents.json` | `site_helpers`, `article_helpers` (`llms_articles`) | `robots.txt.erb`, `llms.txt.erb`, `sitemap.xml.erb`, `indexnow.txt.erb` | — | — |
 | standard.site verification | `standard_site.json` | `standard_site_helpers` | `_head`, `.well-known/site.standard.publication.erb` | — | — |
 
-Two more places: `lib/utils/dev_api_proxy.rb` does the work of `api-proxy.ts` for `middleman server`, and `lib/utils/index_now.rb` holds the IndexNow submission that `rake indexnow:submit` runs.
+`src/routes.ts` lists the paths that come to the Worker, and `src/index.ts` sends each one to its module. Two more places: `lib/utils/dev_api_proxy.rb` does the work of `api-proxy.ts` for `middleman server`, and `lib/utils/index_now.rb` holds the IndexNow submission that `rake indexnow:submit` runs.
 
 ## Which template renders what
 

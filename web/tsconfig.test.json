@@ -18,8 +18,14 @@
     // each `caches.default` in the suite is a type error.
     "lib": ["es2022"]
   },
-  // src/assets.d.ts is here, and src/env.d.ts is NOT. tsc follows the import of src/og.ts in
-  // test/og.test.ts to the binary-module imports of og-render.ts, which need those declarations.
-  // The Worker globals of env.d.ts are what conflict with @cloudflare/workers-types.
-  "include": ["test/**/*.ts", "vitest.config.mts", "src/assets.d.ts"]
+  // src/assets.d.ts and src/bindings.d.ts are here, and src/env.d.ts is NOT. tsc follows the
+  // import of src/og.ts in test/og.test.ts to the binary-module imports of og-render.ts, which
+  // need the first file, and each test needs the `Env` of the second. The Worker globals of
+  // env.d.ts are what conflict with @cloudflare/workers-types.
+  "include": [
+    "test/**/*.ts",
+    "vitest.config.mts",
+    "src/assets.d.ts",
+    "src/bindings.d.ts"
+  ]
 }

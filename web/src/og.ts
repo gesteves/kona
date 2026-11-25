@@ -4,125 +4,27 @@
 // that version only. Thus each page has one card in the cache, and a card never needs a purge.
 // Refer to web/CLAUDE.md.
 
-import { withSecurityHeaders } from './headers';
+import { requestLogLine } from './log';
+import { readOgMeta } from './og-meta';
+import {
+  READ_METHODS,
+  methodNotAllowed,
+  securedResponse,
+  withoutBodyForHead,
+} from './responses';
+import { OG_FILENAME, isOgPath } from './routes';
 
 /** The renderer from the route. Thus a test can use the handler and not import ./og-render. */
-export type RenderCard = (title: string) => Promise<Uint8Array<ArrayBuffer>>;
+type RenderCard = (title: string) => Promise<Uint8Array<ArrayBuffer>>;
 
 /** This is lazy, thus a widget, contact, or analytics request never runs the satori module code. */
 const lazyRender: RenderCard = async (title) =>
   (await import('./og-render')).renderCard(title);
 
-// Keep the ".png": the run_worker_first globs use it, and wrangler.jsonc gives the reason.
-const OG_FILENAME = 'og.png';
-export const OG_SUFFIX = `/${OG_FILENAME}`;
-
-/** True for each path of this route: `/og.png` and `/<page path>og.png`. */
-export const isOgPath = (pathname: string): boolean =>
-  pathname.endsWith(OG_SUFFIX);
-
 /** The (path, v) pair addresses a rendered card, thus a card never changes. */
 const IMMUTABLE = 'public, max-age=31536000, immutable';
 /** All the other responses, thus a temporary failure never stays in the cache. */
 const SHORT = 'public, max-age=300';
-
-const ALLOWED_METHODS = ['GET', 'HEAD'];
-
-/**
- * Decodes the HTML entities that an og:title can contain.
- * `&amp;` comes last: if it came first, `&amp;lt;` would become `<` in a second pass.
- *
- * ⚠️ This is necessary with HTMLRewriter. `Element#getAttribute` gives the attribute **as the
- * source writes it**, with the entities. It does not decode them.
- */
-export function decodeEntities(text: string): string {
-  return text
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#0*39;|&#x0*27;|&apos;/gi, "'")
-    .replace(/&#(\d+);/g, (match, d: string) => fromCodePoint(d, 10, match))
-    .replace(/&#x([0-9a-f]+);/gi, (match, x: string) =>
-      fromCodePoint(x, 16, match)
-    )
-    .replace(/&amp;/g, '&');
-}
-
-/**
- * Decodes one numeric character reference. If it cannot, it returns `match`, the full entity
- * text, with no change.
- *
- * ⚠️ A code point outside the range makes `String.fromCodePoint` raise, and this runs on the path
- * of the OG route that catches nothing. One bad entity in an `og:title` would 500 the card.
- * @param raw The digits of the entity.
- */
-function fromCodePoint(raw: string, radix: number, match: string): string {
-  const n = parseInt(raw, radix);
-  if (!Number.isInteger(n) || n < 0 || n > 0x10ffff) return match;
-  return String.fromCodePoint(n);
-}
-
-/** The og:title and the og:image of a page. Each is null when the page has no such tag. */
-export type OgMeta = { title: string | null; image: string | null };
-
-/**
- * Reads the og:title and the og:image of a page from its markup.
- *
- * This uses HTMLRewriter on a stream, and it does not buffer the page. An article page is large,
- * this route is near the Worker CPU limit, and the tags are in `<head>`. Thus the read stops when
- * it has both tags, or at the end of `<head>`.
- * @returns The title and the image URL, each one decoded.
- */
-export async function readOgMeta(response: Response): Promise<OgMeta> {
-  let title: string | null = null;
-  let image: string | null = null;
-  let headEnded = false;
-
-  const transformed = new HTMLRewriter()
-    .on('meta[property="og:title"]', {
-      element(element) {
-        title ??= element.getAttribute('content');
-      },
-    })
-    .on('meta[property="og:image"]', {
-      element(element) {
-        image ??= element.getAttribute('content');
-      },
-    })
-    .on('head', {
-      element(element) {
-        element.onEndTag(() => {
-          headEnded = true;
-        });
-      },
-    })
-    .transform(response);
-
-  const reader = transformed.body?.getReader();
-  if (!reader) return { title: null, image: null };
-
-  try {
-    while (!headEnded && (title === null || image === null)) {
-      const { done } = await reader.read();
-      if (done) break;
-    }
-  } finally {
-    await reader.cancel();
-  }
-
-  return {
-    title: title === null ? null : decodeEntities(title),
-    image: image === null ? null : decodeEntities(image),
-  };
-}
-
-/**
- * Reads the og:title of a page from its markup.
- * @returns The decoded title, or null if the page has no og:title.
- */
-export async function readOgTitle(response: Response): Promise<string | null> {
-  return (await readOgMeta(response)).title;
-}
 
 /**
  * The `v` that a page declares for this card, from its og:image.
@@ -175,25 +77,38 @@ const STATUS_TEXT: Record<number, string> = {
   500: 'Internal Server Error',
 };
 
+const STATUS_HEADERS = {
+  'content-type': 'text/plain; charset=utf-8',
+  'cache-control': SHORT,
+};
+
+const statusLine = (status: number): string =>
+  `${status} ${STATUS_TEXT[status]}`;
+
 /**
  * Makes a response that is not an image, and its body is only its status line. The callers are
  * crawlers and unfurlers that use the status. The cause of a failure goes in the logs, not in the
  * body.
  */
-function statusResponse(
-  status: number,
-  extraHeaders?: Record<string, string>
-): Response {
-  return new Response(`${status} ${STATUS_TEXT[status]}`, {
+function statusResponse(status: number): Response {
+  return securedResponse(statusLine(status), {
     status,
-    headers: withSecurityHeaders(
-      new Headers({
-        'content-type': 'text/plain; charset=utf-8',
-        'cache-control': SHORT,
-        ...extraHeaders,
-      })
-    ),
+    headers: STATUS_HEADERS,
   });
+}
+
+/**
+ * The URL of a card with `v` as its only param.
+ *
+ * With an unknown param in the URL, `?x=<random>` makes an unlimited number of cache entries, and
+ * each one costs a full render.
+ */
+function cardUrl(incoming: URL, version: string): URL {
+  const url = new URL(incoming);
+  url.search = '';
+  url.hash = '';
+  url.searchParams.set('v', version);
+  return url;
 }
 
 /**
@@ -207,8 +122,8 @@ export async function handleOg(
   ctx: ExecutionContext,
   render: RenderCard = lazyRender
 ): Promise<Response> {
-  if (!ALLOWED_METHODS.includes(request.method)) {
-    return statusResponse(405, { allow: ALLOWED_METHODS.join(', ') });
+  if (!READ_METHODS.includes(request.method)) {
+    return methodNotAllowed(READ_METHODS, statusLine(405), STATUS_HEADERS);
   }
 
   const incoming = new URL(request.url);
@@ -222,14 +137,9 @@ export async function handleOg(
   // shape.
   const path = incoming.pathname.slice(0, -OG_FILENAME.length);
 
-  // Make the cache key from the path and `v` only. With an unknown param in the key,
-  // `?x=<random>` makes an unlimited number of entries, and each one costs a full render. The key
-  // must be a GET, because caches.default serves only GET and put() raises for another method.
-  const cacheUrl = new URL(incoming);
-  cacheUrl.search = '';
-  cacheUrl.hash = '';
-  cacheUrl.searchParams.set('v', version);
-  const cacheKey = new Request(cacheUrl.toString());
+  // The cache key is the path and `v` only. The key must be a GET, because caches.default serves
+  // only GET and put() raises for another method.
+  const cacheKey = new Request(cardUrl(incoming, version).toString());
 
   const cached = await caches.default.match(cacheKey);
   if (cached) {
@@ -264,15 +174,12 @@ export async function handleOg(
   const declared = declaredVersion(meta.image, incoming.pathname);
   if (declared === null) return statusResponse(404);
   if (declared !== version) {
-    const canonical = new URL(incoming);
-    canonical.search = '';
-    canonical.hash = '';
-    canonical.searchParams.set('v', declared);
-    return new Response(null, {
+    return securedResponse(null, {
       status: 301,
-      headers: withSecurityHeaders(
-        new Headers({ location: canonical.toString(), 'cache-control': SHORT })
-      ),
+      headers: {
+        location: cardUrl(incoming, declared).toString(),
+        'cache-control': SHORT,
+      },
     });
   }
 
@@ -283,27 +190,34 @@ export async function handleOg(
     // This is the only record of a render failure. The response is only a status line, and a
     // bad template shows only as a social embed with no image.
     console.error(
-      'OG render failed:',
-      path,
-      error instanceof Error ? error.message : String(error)
+      requestLogLine(
+        request,
+        'OG render failed',
+        path,
+        error instanceof Error ? error.message : String(error)
+      )
     );
     return statusResponse(500);
   }
 
-  const response = new Response(png, {
+  const response = securedResponse(png, {
     status: 200,
-    headers: withSecurityHeaders(
-      new Headers({
-        'content-type': 'image/png',
-        'cache-control': IMMUTABLE,
-      })
-    ),
+    headers: { 'content-type': 'image/png', 'cache-control': IMMUTABLE },
   });
 
   ctx.waitUntil(
     caches.default
       .put(cacheKey, response.clone())
-      .catch((error) => console.error('OG card cache put failed:', path, error))
+      .catch((error) =>
+        console.error(
+          requestLogLine(
+            request,
+            'OG card cache put failed',
+            path,
+            String(error)
+          )
+        )
+      )
   );
-  return request.method === 'HEAD' ? new Response(null, response) : response;
+  return withoutBodyForHead(request, response);
 }

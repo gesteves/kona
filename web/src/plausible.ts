@@ -4,12 +4,18 @@
 // Do not change the /pa/ path to a clearer name: a content blocker stops a path that contains
 // "plausible", "analytics", "tracking", or "stats". The unclear prefix is the purpose.
 
-import { withSecurityHeaders } from './headers';
+import { requestLogLine } from './log';
+import {
+  READ_METHODS,
+  methodNotAllowed,
+  securedResponse,
+  withoutBodyForHead,
+} from './responses';
+import {
+  PLAUSIBLE_EVENT_PATH as EVENT_PATH,
+  PLAUSIBLE_SCRIPT_PATH as SCRIPT_PATH,
+} from './routes';
 
-// These must agree with PLAUSIBLE_SCRIPT_PATH and PLAUSIBLE_EVENT_PATH in
-// web/lib/helpers/site_helpers.rb, which make the inline init code.
-const SCRIPT_PATH = '/pa/script.js';
-const EVENT_PATH = '/pa/event';
 const EVENT_UPSTREAM = 'https://plausible.io/api/event';
 
 /** The analytics must never keep a request open. A stop goes to the fallback with no message. */
@@ -29,31 +35,27 @@ export async function handlePlausible(
   ctx: ExecutionContext
 ): Promise<Response> {
   // This is the same as plausible_installed? in the Ruby code.
-  if (!env.PLAUSIBLE_SCRIPT_URL) return notFound();
+  const scriptUrl = env.PLAUSIBLE_SCRIPT_URL;
+  if (!scriptUrl) return notFound();
 
   const pathname = new URL(request.url).pathname;
   try {
-    if (pathname === SCRIPT_PATH) return await getScript(request, env, ctx);
+    if (pathname === SCRIPT_PATH) {
+      return await getScript(request, scriptUrl, ctx);
+    }
     if (pathname === EVENT_PATH) return await postEvent(request);
     return notFound();
   } catch (error) {
-    console.error('Plausible proxy failed:', pathname, error);
+    console.error(
+      requestLogLine(request, 'Plausible proxy failed', pathname, String(error))
+    );
     return pathname === EVENT_PATH ? emptyEvent() : emptyScript();
   }
 }
 
-/**
- * ⚠️ Each response from this module goes through withSecurityHeaders. src/headers.ts gives the
- * reason. This route also serves JavaScript that runs, from the origin of the site, and that is
- * the place where `nosniff` is the most important.
- */
-function securedResponse(
-  body: BodyInit | null,
-  init: ResponseInit = {}
-): Response {
-  const headers = withSecurityHeaders(new Headers(init.headers));
-  return new Response(body, { ...init, headers });
-}
+// ⚠️ Each response from this module goes through securedResponse. This route serves JavaScript
+// that runs, from the origin of the site, and that is the place where `nosniff` is the most
+// important.
 
 function notFound(): Response {
   return securedResponse(null, { status: 404 });
@@ -79,14 +81,11 @@ function emptyEvent(): Response {
  */
 async function getScript(
   request: Request,
-  env: Env,
+  scriptUrl: string,
   ctx: ExecutionContext
 ): Promise<Response> {
-  if (request.method !== 'GET' && request.method !== 'HEAD') {
-    return securedResponse(null, {
-      status: 405,
-      headers: { allow: 'GET, HEAD' },
-    });
+  if (!READ_METHODS.includes(request.method)) {
+    return methodNotAllowed(READ_METHODS);
   }
 
   // Use the script path alone as the key, and not the request that comes in. The Cache API uses
@@ -97,7 +96,7 @@ async function getScript(
 
   let response = await caches.default.match(cacheKey);
   if (!response) {
-    const upstream = await fetch(env.PLAUSIBLE_SCRIPT_URL!, {
+    const upstream = await fetch(scriptUrl, {
       signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
     });
     if (!upstream.ok) return emptyScript();
@@ -105,7 +104,7 @@ async function getScript(
     // the upstream headers. Each other header of the CDN of Plausible, for example a Set-Cookie,
     // would go to the browser under this origin AND stay in caches.default for its full TTL. The
     // list also removes set-cookie and vary, and caches.default.put() refuses those two.
-    const headers = withSecurityHeaders(new Headers());
+    const headers = new Headers();
     headers.set(
       'content-type',
       upstream.headers.get('content-type') ?? 'application/javascript'
@@ -114,7 +113,7 @@ async function getScript(
       const value = upstream.headers.get(name);
       if (value) headers.set(name, value);
     }
-    response = new Response(upstream.body, {
+    response = securedResponse(upstream.body, {
       status: upstream.status,
       headers,
     });
@@ -122,11 +121,17 @@ async function getScript(
       caches.default
         .put(cacheKey, response.clone())
         .catch((error) =>
-          console.error('Plausible script cache put failed:', error)
+          console.error(
+            requestLogLine(
+              request,
+              'Plausible script cache put failed',
+              String(error)
+            )
+          )
         )
     );
   }
-  return request.method === 'HEAD' ? new Response(null, response) : response;
+  return withoutBodyForHead(request, response);
 }
 
 /**
@@ -135,9 +140,7 @@ async function getScript(
  * Worker and puts each event at one location, which breaks its unique-visitor hash.
  */
 async function postEvent(request: Request): Promise<Response> {
-  if (request.method !== 'POST') {
-    return securedResponse(null, { status: 405, headers: { allow: 'POST' } });
-  }
+  if (request.method !== 'POST') return methodNotAllowed(['POST']);
   // An event is a small JSON body. A larger one is not from the script, and the relay would
   // only pay to send it.
   const length = Number(request.headers.get('content-length') ?? 0);

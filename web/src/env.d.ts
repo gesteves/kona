@@ -1,19 +1,8 @@
-// The binding types, which a person writes, until the tools use `wrangler types`.
-// These are for tsc (`npm run check`) and the editor: wrangler makes the bundle and checks no type.
-
-interface Env {
-  // The Static Assets binding, from `assets.binding` in wrangler.jsonc.
-  ASSETS: Fetcher;
-
-  // The kona-api origin on fly.io, and the shared bearer token that its endpoints need: the
-  // /widgets/* proxy and the POST /api/contact of the contact form.
-  KONA_API_URL?: string;
-  API_TOKEN?: string;
-
-  // The upstream URL of the Plausible script of this site. With no value, the proxy does nothing,
-  // as plausible_installed? does in the Ruby code.
-  PLAUSIBLE_SCRIPT_URL?: string;
-}
+// The Worker globals, which a person writes, until the tools use `wrangler types`. These are for
+// tsc (`npm run check`) and the editor: wrangler makes the bundle and checks no type.
+// ⚠️ tsconfig.test.json does NOT include this file: the tests get these globals from
+// @cloudflare/workers-types, and the two would conflict. `Env` is in src/bindings.d.ts for that
+// reason.
 
 interface Fetcher {
   fetch(request: Request): Promise<Response>;
@@ -31,7 +20,7 @@ interface CacheStorage {
 
 // The HTML parser of Workers, which reads a stream. src/og.ts uses it to read two <meta> tags and
 // the end of <head>, and it holds no copy of the page. This file declares only the parts that
-// this app calls. getAttribute does not decode an entity: refer to decodeEntities in og.ts.
+// this app calls. getAttribute does not decode an entity: refer to decodeEntities in og-meta.ts.
 interface HTMLRewriterElement {
   getAttribute(name: string): string | null;
   onEndTag(handler: (endTag: unknown) => void | Promise<void>): void;

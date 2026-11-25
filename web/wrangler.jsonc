@@ -27,7 +27,8 @@
     // `!/*.js` also stops the Worker for /pa/script.js, and nothing reports it.
     //
     // No route in this list has a static asset, thus the asset layer would answer each one with a
-    // 404. Refer to src/index.ts:
+    // 404. ⚠️ src/routes.ts holds the same list for the code, and
+    // test/browser/worker_routes.test.js compares the two:
     //   /widgets/*, /api/contact  → the kona-api proxy
     //   /pa/*                     → the Plausible proxy
     //   /og.png, /*/og.png        → the Open Graph card renderer (src/og.ts)

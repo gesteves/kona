@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { handleOg, readOgTitle } from '../src/og';
+import { handleOg } from '../src/og';
+import { readOgTitle } from '../src/og-meta';
 import { makeCtx, assetsReturning, assetsRecording } from './helpers';
 
 // ⚠️ This suite never imports ../src/og-render, and nothing that it loads imports that module.
@@ -431,7 +432,7 @@ describe('readOgTitle', () => {
     ).resolves.toBe('Early');
   });
 
-  // ⚠️ HTMLRewriter does not decode an entity. Refer to decodeEntities in src/og.ts.
+  // ⚠️ HTMLRewriter does not decode an entity. Refer to decodeEntities in src/og-meta.ts.
   it.each([
     ['&amp;', '&'],
     ['&lt;tag&gt;', '<tag>'],
