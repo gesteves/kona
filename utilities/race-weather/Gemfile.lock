@@ -1,7 +1,7 @@
 GEM
   remote: https://rubygems.org/
   specs:
-    anthropic (2.10.0)
+    anthropic (2.12.0)
       base64 (~> 0.1)
       connection_pool (>= 2, < 4)
       opentelemetry-api (>= 1.2.4, < 2)
@@ -10,9 +10,9 @@ GEM
     bigdecimal (4.1.3)
     concurrent-ruby (1.3.8)
     connection_pool (3.0.3)
-    csv (3.3.6)
+    csv (3.3.7)
     dotenv (3.2.0)
-    httparty (0.24.3)
+    httparty (0.25.1)
       csv
       mini_mime (>= 1.0.0)
       multi_xml (>= 0.5.2)
@@ -41,14 +41,14 @@ DEPENDENCIES
   tzinfo
 
 CHECKSUMS
-  anthropic (2.10.0) sha256=783245675b938a4c6d067922ce807f7b7ae91d794524a1185636f38b7a138c56
+  anthropic (2.12.0) sha256=5f3cbda0f7bee5aafa7338af66ad36c1191f21eb69c496da8ee1db7b73bb63dd
   base64 (0.3.0) sha256=27337aeabad6ffae05c265c450490628ef3ebd4b67be58257393227588f5a97b
   bigdecimal (4.1.3) sha256=61ebe1e5e559bdc3cc6f2c0ee7f427321fc838f59611c294356eb04d6e21cf66
   concurrent-ruby (1.3.8) sha256=b2f1be836e968ccc78ccfce277ea79c72a88633f22306782c16ff23fb415d1e1
   connection_pool (3.0.3) sha256=e0f8ee3ee0039396753e06e8a2dde0ef028e40f7df29e97f57da7577c489cb5e
-  csv (3.3.6) sha256=aba61e7e507a66f03d45cb1f3c4b6359861c3504038b422962875dce099e4456
+  csv (3.3.7) sha256=15a3f16f6628da8664d455eb634e7f22031bcf53044923caf56975109e71b9f8
   dotenv (3.2.0) sha256=e375b83121ea7ca4ce20f214740076129ab8514cd81378161f11c03853fe619d
-  httparty (0.24.3) sha256=5c95cf29ca70d5bfd834e56140ddfca6e94166c3b870cde9c25d157cdb5a00d2
+  httparty (0.25.1) sha256=354f84b766f9a3e077d64fc8b61a71c88e7c8a890eac4178d30d3269458c1dc5
   jwt (3.3.0) sha256=44cc34fbc341c148233cf66641522b4bce0dfb1ce55e8073f05c56f44f4ee546
   logger (1.7.0) sha256=196edec7cc44b66cfb40f9755ce11b392f21f7967696af15d274dde7edff0203
   mini_mime (1.1.5) sha256=8681b7e2e4215f2a159f9400b5816d85e9d8c6c6b491e96a12797e798f8bccef
