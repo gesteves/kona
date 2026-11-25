@@ -18,6 +18,23 @@ RSpec.describe Threads do
     end
   end
 
+  # Meta: "Text posts are limited to 500 characters", and "emojis are counted as the number of
+  # UTF-8 bytes".
+  describe ".post_length" do
+    it "counts each character of plain text, with an accent as one" do
+      expect(described_class.post_length("Hello")).to eq(5)
+      expect(described_class.post_length("café")).to eq(4)
+      expect(described_class.post_length(nil)).to eq(0)
+    end
+
+    it "counts an emoji as its UTF-8 bytes" do
+      expect(described_class.post_length("🙂")).to eq(4)
+      expect(described_class.post_length("Go 🙂")).to eq(3 + 4)
+      expect(described_class.post_length("🇺🇸")).to eq(8)
+      expect(described_class.post_length("👨‍👩‍👧‍👦")).to eq("👨‍👩‍👧‍👦".bytesize)
+    end
+  end
+
   describe ".valid_topic?" do
     it "takes an ordinary topic" do
       expect(described_class.valid_topic?("Cycling")).to be(true)

@@ -57,17 +57,17 @@ change one:
 
 | Logic | api | web |
 |---|---|---|
-| `markdown_to_html` + `smartypants` + `heading_text` | `helpers/markdown_helper.rb` | `helpers/markdown_helpers.rb` |
-| `clock_icon_svg` | `helpers/icons_helper.rb` | `helpers/icon_helpers.rb` |
-| `article_permalink_timestamp` | `helpers/articles_helper.rb` | `helpers/article_helpers.rb` |
+| `markdown_to_html` + `smartypants` + `heading_text` | `helpers/markdown_helper.rb` | `lib/helpers/markdown_helpers.rb` |
+| `clock_icon_svg` | `helpers/icons_helper.rb` | `lib/helpers/icon_helpers.rb` |
+| `article_permalink_timestamp` | `helpers/articles_helper.rb` | `lib/helpers/article_helpers.rb` |
 | Canonical article path | `services/article_attributes.rb` | `lib/data/contentful.rb` |
-| `units_tag` / `add_unit_data_attributes` | `helpers/markup_helper.rb` | `helpers/markup_helpers.rb` |
-| `fix_degrees` | `helpers/text_helper.rb` | `helpers/text_helpers.rb` |
-| Cover image URL and its `<img>` | `helpers/images_helper.rb` | `helpers/image_helpers.rb` |
-| The blurhash placeholder | `services/blurhash_placeholder.rb` | `helpers/image_helpers.rb` |
+| `units_tag` / `add_unit_data_attributes` | `helpers/markup_helper.rb` | `lib/helpers/markup_helpers.rb` |
+| `fix_degrees` | `helpers/text_helper.rb` | `lib/helpers/text_helpers.rb` |
+| Cover image URL and its `<img>` | `helpers/images_helper.rb` | `lib/helpers/image_helpers.rb` |
+| The blurhash placeholder | `services/blurhash_placeholder.rb` | `lib/helpers/image_helpers.rb` |
 | The card `sizes` and its widths | `config/srcsets.yml` | `data/srcsets.yml` |
-| `article_click_classes` + `ARTICLE_CLICK_EVENT` | `helpers/plausible_helper.rb` | `helpers/site_helpers.rb` |
-| `upcoming_races`, `event_collection_variant`, `event_timestamp_tag`, `parse_event_date` | `helpers/events_helper.rb` | `helpers/event_helpers.rb` |
+| `article_click_classes` + `ARTICLE_CLICK_EVENT` | `helpers/plausible_helper.rb` | `lib/helpers/site_helpers.rb` |
+| `upcoming_races`, `event_collection_variant`, `event_timestamp_tag`, `parse_event_date` | `helpers/events_helper.rb` | `lib/helpers/event_helpers.rb` |
 
 ⚠️ **The cover image of a card is in two places, and no check compares them.** The api renders the
 card of the trending widget, and the build renders each other card, and the two go on the same page.

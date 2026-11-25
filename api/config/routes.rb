@@ -170,9 +170,6 @@ Rails.application.routes.draw do
       get  "social" => "social#show", as: :social
       post "social" => "social#create"
 
-      # ⚠️ Each route below must stay above `social/preview`, or Rails reads it as part of that
-      # path.
-
       # The photos of a draft. The composer uploads each one at the moment the owner picks it, and
       # the form then carries the id.
       post "social/photos"     => "social_photos#create", as: :social_photos

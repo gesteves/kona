@@ -41,8 +41,7 @@ namespace :related do
     puts format("  mean %+.4f   sd %.4f", report[:spread][:mean], report[:spread][:sd])
   end
 
-  desc "Prints the recall of the section against the real navigation of the readers, from " \
-       "Plausible. The lists of 2026-09-05 gave 0.389 before the links and the prior."
+  desc "Prints the recall of the section against the real navigation of the readers, from Plausible."
   task evaluate: :environment do
     report = RelatedInspector.new.evaluate
 

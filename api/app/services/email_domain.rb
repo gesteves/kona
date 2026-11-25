@@ -6,7 +6,7 @@ require "resolv"
 #
 # It is not an ApplicationService, because it makes no HTTP call.
 module EmailDomain
-  # The DNS lookup did not give an answer in time.
+  # The DNS lookup gave no answer: it timed out, or the name server failed.
   class LookupError < StandardError; end
 
   # The time for each attempt of the lookup, in seconds. The lookup runs in the request.
@@ -19,7 +19,7 @@ module EmailDomain
   # @param email [String] An address that already matches `URI::MailTo::EMAIL_REGEXP`.
   # @return [Boolean] True if the domain has an MX record that is not a null MX (RFC 7505). False
   #   for a domain that does not exist.
-  # @raise [LookupError] If the lookup times out.
+  # @raise [LookupError] If the lookup times out or fails.
   def accepts_mail?(email)
     domain = email.to_s.split("@").last.to_s.downcase
     return false if domain.empty?
@@ -28,7 +28,7 @@ module EmailDomain
   end
 
   # @return [Array<Resolv::DNS::Resource::IN::MX>] Empty for NXDOMAIN and for an answer with no MX.
-  # @raise [LookupError] If the lookup times out.
+  # @raise [LookupError] If the lookup times out or fails.
   def mx_records(domain)
     # ⚠️ A configuration Hash replaces the system configuration, thus the flag goes into the
     # default Hash. Without the nameservers of resolv.conf, Resolv asks 0.0.0.0 and each lookup

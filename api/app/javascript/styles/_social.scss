@@ -2,9 +2,9 @@
 // rows, and the preview. The form controls come from Web Awesome.
 .social {
   &__schedule {
-    // ⚠️ `[hidden]` needs this rule. The `display: none` of the browser has the specificity of
-    // this class, and our stylesheet comes after it. Without it, the fields show while the switch
-    // is off.
+    // ⚠️ `[hidden]` needs this rule. This class sets a display, and an author rule wins over the
+    // `[hidden]` rule of the browser at each specificity. Without it, the fields show while the
+    // switch is off.
     &[hidden] {
       display: none;
     }
@@ -131,8 +131,8 @@
     align-self: start;
     margin-block-end: var(--wa-space-2xs);
 
-    // ⚠️ It needs a rule of its own: `[hidden] { display: none }` of the browser is at the same
-    // specificity as this class, and <wa-badge> gives its own host a display as well.
+    // ⚠️ It needs a rule of its own: this class sets a display, which wins over the `[hidden]` rule
+    // of the browser, and <wa-badge> gives its own host a display as well.
     &[hidden] {
       display: none;
     }

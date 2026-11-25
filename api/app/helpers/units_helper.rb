@@ -4,6 +4,7 @@ module UnitsHelper
   # Changes a distance in meters into metric units or imperial units.
   # @param units [String] The unit system: "si", "metric", or "imperial".
   # @return [String] The distance with its unit.
+  # @raise [ArgumentError] For each other unit system.
   def distance(meters, units: "si")
     case units
     when "si", "metric"
@@ -12,6 +13,8 @@ module UnitsHelper
     when "imperial"
       imperial_distance, imperial_units = meters_to_imperial_units(meters)
       formatted_distance(imperial_distance, imperial_units, determine_precision(imperial_distance))
+    else
+      raise ArgumentError, "unknown unit system: #{units.inspect}"
     end
   end
 

@@ -96,4 +96,32 @@ RSpec.describe "SocialMentions Ruby ↔ JavaScript contract" do
         "#{text.inspect}; the browser gives #{from_js[index].inspect}."
     end
   end
+
+  # Each end that an address can have in a sentence. ⚠️ The count on the page masks each address,
+  # thus the browser and the server must end an address at the same character.
+  URL_ENDS = [
+    "https://example.com/a", "https://example.com/a.", "https://example.com/a,", "https://example.com/a?!",
+    "https://example.com/a\"", "https://example.com/a'", "https://example.com/a…", "https://example.com/a/",
+    "https://example.com/a#", "https://example.com/a%20", "https://example.com/Kona_(Hawaii)",
+    "https://example.com/a)", "https://example.com/a))", "https://example.com/(a))", "https://example.com/a]",
+    "https://example.com/a>", "https://example.com/a}", "https://example.com/{a}", "https://example.com/café",
+    "https://example.com/日本", "https://example.com/日本。", "https://example.com/a🙂", "https://example.com/a🙂.", "…"
+  ].freeze
+
+  it "ends an address at the same character as the browser" do
+    node = which_node
+    skip "node is not on the PATH; `npm run build` needs it as well." if node.nil?
+
+    from_js = run_javascript(
+      node, libs: %w[social_mentions], drafts: URL_ENDS,
+            imports: 'import { trimUrl } from "./social_mentions.mjs";',
+            answer: "drafts.map((url) => trimUrl(url))"
+    )
+
+    URL_ENDS.each_with_index do |url, index|
+      expect(from_js[index]).to eq(Bluesky.trim_url(url)),
+        "The two files end #{url.inspect} differently. Ruby gives #{Bluesky.trim_url(url).inspect}; " \
+        "the browser gives #{from_js[index].inspect}."
+    end
+  end
 end

@@ -1,7 +1,7 @@
 // The styles of the admin UI of the owner. esbuild, with esbuild-sass-plugin, puts them into
-// app/assets/builds/admin.css, after the stylesheet of Web Awesome. Refer to the note about the
-// order in admin.js. Each rule here has no layer, thus it wins over each `wa-*` layer and needs no
-// change to its specificity.
+// app/assets/builds/admin.css, after the stylesheet of Web Awesome. Each rule here has no layer,
+// thus it wins over each `wa-*` layer and needs no change to its specificity. Refer to the note in
+// admin.js.
 //
 // There is one BEM block for each partial, and `plain-list` is the exception. The layout, the
 // spacing, and the type come from the utilities and the `--wa-*` custom properties of Web Awesome,

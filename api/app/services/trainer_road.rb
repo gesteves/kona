@@ -210,7 +210,7 @@ class TrainerRoad < ApplicationService
 
     {
       name: strip_duration_prefix(summary),
-      sport: detect_sport(summary, raw_description(event)),
+      sport: detect_sport(summary),
       description: clean_description(raw_description(event)),
       duration_minutes: planned_duration_minutes(event)
     }
@@ -274,7 +274,7 @@ class TrainerRoad < ApplicationService
   # Finds the sport of a workout, in this order: "Endless Pool" means swimming, then
   # ActivityMatcher reads the full name, then the code looks for a keyword. The default is
   # cycling, because TrainerRoad is a cycling platform.
-  def detect_sport(name, description)
+  def detect_sport(name)
     return "Swimming" if name.match?(/\bendless pool\b/i)
 
     normalized = ActivityMatcher.normalize_type(name)

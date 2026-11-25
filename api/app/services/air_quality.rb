@@ -1,5 +1,5 @@
 # Finds the current air quality. It uses PurpleAir first, with the nearest sensor, and then the
-# Google Air Quality API. The import code of the web app does the same.
+# Google Air Quality API.
 # `data` returns the AQI in an object with dot access, with aqi, category, and description, or nil.
 class AirQuality
   include UpstreamIsolation

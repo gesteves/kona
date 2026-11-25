@@ -186,8 +186,9 @@ class SocialDraft
 
   # The length of one post at one network, by the rule of that network.
   #
-  # ⚠️ Bluesky counts graphemes and the other two count characters, and Mastodon counts a URL as
-  # `URL_WEIGHT`. This is one method, thus the preview and the check cannot disagree.
+  # ⚠️ Each network has its own rule: Bluesky counts graphemes, Mastodon counts graphemes and a URL
+  # as `URL_WEIGHT`, and Threads counts characters and an emoji as its UTF-8 bytes. This is one
+  # method, thus the preview and the check cannot disagree.
   # @return [Integer]
   def length_for(network, post)
     text = text_for(network, post[:text])
@@ -195,7 +196,7 @@ class SocialDraft
     case network
     when "bluesky"  then Bluesky.post_length(bluesky_text(post))
     when "mastodon" then Mastodon.post_length(text: text, url: post[:link])
-    else                 text.length
+    else                 Threads.post_length(text)
     end
   end
 

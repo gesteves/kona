@@ -24,9 +24,8 @@ module Admin
     # Finds the location that the page is ready to save: an `address` to geocode, or a pair of
     # coordinates to name. Thus a pin, a race shortcut, or a search shows its name before a save.
     #
-    # ⚠️ This must never write. It is the half of this page that anyone can use as much as they
-    # want, and the purpose of the Save button is that nothing before it changes what the widgets
-    # read.
+    # ⚠️ This must never write. The owner can use it as many times as they want, and the purpose of
+    # the Save button is that nothing before it changes what the widgets read.
     def lookup
       coordinates = requested_coordinates
       return head :unprocessable_content if coordinates.nil?

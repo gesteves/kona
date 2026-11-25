@@ -59,8 +59,8 @@ module AdminHelper
   # ⚠️ JavaScript cannot read config/locales/en.yml. Thus the server reads the locale file and the
   # browser reads this attribute, through app/javascript/lib/i18n.js.
   #
-  # ⚠️ It is a plain `data-` attribute and not a Stimulus value. A value arrives through a
-  # MutationObserver, thus it is not synchronous, and a controller reads this table at `connect()`.
+  # It is a plain `data-` attribute, which a controller parses one time at `connect()`. It is not
+  # a Stimulus value, which the controller would parse again at each read.
   #
   # @param scope [String] The translation scope of the words of that controller. A scope with no
   #   key of its own gives the nested scopes alone.

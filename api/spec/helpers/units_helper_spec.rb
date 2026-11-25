@@ -15,6 +15,10 @@ RSpec.describe UnitsHelper do
   end
 
   describe "#distance" do
+    it "refuses a unit system that it does not know" do
+      expect { helper.distance(500, units: "nautical") }.to raise_error(ArgumentError, /nautical/)
+    end
+
     it "uses meters under 1 km (metric)" do
       expect(helper.distance(500, units: "metric")).to match(/\bmeters?\b/)
     end

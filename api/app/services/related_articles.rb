@@ -76,7 +76,8 @@ class RelatedArticles < ApplicationService
   # same methods as `all`, thus the report can never describe a different ranking.
   # @param id [String] The Contentful id of the query article.
   # @param count [Integer] The number of neighbors that the section shows.
-  # @return [Hash, nil] { rows: }, or nil when the corpus or the text is absent.
+  # @return [Hash, nil] { rows: }, or nil when the corpus is absent, when no published article has
+  #   that id, or when the index holds no text for it.
   def explain(id, count: 4)
     pool = candidates
     published = @articles.list.reject(&:draft)

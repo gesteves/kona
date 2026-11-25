@@ -1408,12 +1408,12 @@ RSpec.describe "Admin social media", type: :request do
       end
 
       describe "the counts" do
-        it "counts graphemes for Bluesky and characters for the other two" do
+        it "counts graphemes for Bluesky, and an emoji as its UTF-8 bytes for Threads" do
           body = preview(posts: [ { text: "Ride 🚴‍♂️", link: "" } ])
 
-          # The emoji is one grapheme at Bluesky and more than one UTF-16 unit here.
+          # The emoji is one grapheme at Bluesky. Meta counts it as its UTF-8 bytes.
           expect(rows(body)["bluesky"]["length"]).to eq(6)
-          expect(rows(body)["threads"]["length"]).to eq("Ride 🚴‍♂️".length)
+          expect(rows(body)["threads"]["length"]).to eq(5 + "🚴‍♂️".bytesize)
         end
 
         # ⚠️ Mastodon counts a URL as URL_WEIGHT, whatever its true length.

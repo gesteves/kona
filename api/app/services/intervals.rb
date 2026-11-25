@@ -28,8 +28,9 @@ class Intervals < ApplicationService
     summarize_activities(activities)
   end
 
-  # The temperature unit that the athlete prefers. The cache holds it for an hour. A fahrenheit
-  # flag has the highest importance. In all other conditions a metric athlete gets celsius.
+  # The temperature unit that the athlete prefers. The cache holds it for an hour. An athlete with
+  # the fahrenheit flag, or with the `feet` measurement preference, gets fahrenheit. Each other
+  # athlete gets celsius.
   # @return [Symbol] :celsius or :fahrenheit.
   def temperature_unit
     cached = cached_json("intervals.icu:temperature_unit:#{@athlete_id}", expires_in: 1.hour) do

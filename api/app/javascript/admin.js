@@ -3,9 +3,9 @@
 // app/assets/builds/admin.js and admin.css. Propshaft then adds a fingerprint to each name. The
 // build configuration is in esbuild.config.mjs.
 
-// ⚠️ The order is important: Web Awesome puts each rule in `@layer wa-native, wa-base, …`, and an
-// unlayered rule wins over a rule in a layer, at each specificity. Thus our styles win because of
-// the cascade origin, but only because esbuild puts them after webawesome.css.
+// ⚠️ Web Awesome puts each rule in `@layer wa-native, wa-base, …`, and an unlayered rule wins over
+// a rule in a layer, at each specificity and in each order. Thus our styles, which have no
+// layer, win.
 // ⚠️ Import the full stylesheet. `layers.css` defines `.wa-mobile-only` and the rule that hides
 // `[data-toggle-nav]` on the desktop, and `utilities/fouce.css` gives `.wa-cloak`. A selection of
 // the theme only, as web/ does, would remove both with no message.

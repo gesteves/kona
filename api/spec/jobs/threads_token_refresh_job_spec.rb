@@ -23,6 +23,14 @@ RSpec.describe ThreadsTokenRefreshJob do
     expect { described_class.new.perform }.not_to raise_error
   end
 
+  it "writes a line, and does not raise, when another refresh holds the lock" do
+    allow_any_instance_of(Threads).to receive(:refresh!).and_return(:busy)
+    allow(Rails.logger).to receive(:info)
+
+    expect { described_class.new.perform }.not_to raise_error
+    expect(Rails.logger).to have_received(:info).with(/holds the lock/)
+  end
+
   it "does nothing when no account is connected" do
     allow_any_instance_of(Threads).to receive(:refresh!).and_return(:skipped)
 

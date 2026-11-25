@@ -32,31 +32,38 @@ export function isBlueskyHandle(value) {
   return BLUESKY_HANDLE.test(value ?? "");
 }
 
-// The punctuation of a sentence at the end of an address, and the characters that close something
-// that holds it. `URL_SOURCE` takes each character up to a space, thus `trimUrl` decides where an
-// address ends.
-// ⚠️ `Bluesky.trim_url` does this on the server with a different rule (`Bluesky::URL_TERMINAL`
-// and `Bluesky::URL_WRAPPERS`). The two can give a different end for an address that ends in a
-// quotation mark, a `}`, or an ellipsis.
-const URL_TRAILING_PUNCTUATION = /[.,;:!?]+$/;
-const URL_TRAILING_WRAPPERS = { ")": "(", "]": "[", ">": "<" };
+// The characters that an address can end with, and the characters that close something that holds
+// it. `URL_SOURCE` takes each character up to a space, thus `trimUrl` decides where an address
+// ends.
+// ⚠️ They are the copy of `Bluesky::URL_TERMINAL` and `Bluesky::URL_WRAPPERS`, and `trimUrl` is
+// the copy of `Bluesky.trim_url`. spec/contracts/social_mentions_contract_spec.rb runs the two
+// over the same addresses. `\p{Alphabetic}\p{Nd}` is what Ruby names `\p{Alnum}`.
+const URL_TERMINAL = /[\p{Alphabetic}\p{Nd}\-_~\/#@$&*+=%]/u;
+const URL_WRAPPERS = { ")": "(", "]": "[", ">": "<", "}": "{" };
 
 /**
  * Removes the punctuation of the sentence from the end of an address.
  *
- * ⚠️ A closing bracket comes off only when the address holds no opening one, thus
+ * ⚠️ A closing bracket belongs to the address only when the address opened it, thus
  * `…/Kona_(Hawaii)` keeps its bracket and `(see …/a)` gives up the one that closes the aside.
+ * ⚠️ It reads code points, as Ruby does, and not UTF-16 code units: an emoji is one character.
  * @param {string} url The address, as the pattern matched it.
  * @returns {string} The address alone.
  */
 export function trimUrl(url) {
-  let out = String(url ?? "").replace(URL_TRAILING_PUNCTUATION, "");
+  const chars = [ ...String(url ?? "") ];
+  const count = (wanted) => chars.filter((char) => char === wanted).length;
+  const endsHere = () => {
+    const last = chars.at(-1);
+    if (URL_TERMINAL.test(last)) return true;
 
-  while (URL_TRAILING_WRAPPERS[out.at(-1)] && !out.includes(URL_TRAILING_WRAPPERS[out.at(-1)])) {
-    out = out.slice(0, -1).replace(URL_TRAILING_PUNCTUATION, "");
-  }
+    const opener = URL_WRAPPERS[last];
+    return !!opener && count(opener) >= count(last);
+  };
 
-  return out;
+  while (chars.length > 0 && !endsHere()) chars.pop();
+
+  return chars.join("");
 }
 
 /**

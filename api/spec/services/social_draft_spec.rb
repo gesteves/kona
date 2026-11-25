@@ -143,6 +143,15 @@ RSpec.describe SocialDraft do
       expect(built.over_limit?("threads", post)).to be(false)
       expect(built.over_limit?("threads", post.merge(text: "a" * (Threads::MAX_CHARACTERS + 1)))).to be(true)
     end
+
+    # ⚠️ Meta counts an emoji as its UTF-8 bytes, thus 126 emoji are 504 and not 126.
+    it "counts an emoji at Threads as Meta does" do
+      post = { text: "🙂" * 126, link: "", photos: [] }
+
+      expect(draft.length_for("threads", post)).to eq(504)
+      expect(draft.over_limit?("threads", post)).to be(true)
+      expect(draft.over_limit?("bluesky", post)).to be(false)
+    end
   end
 
   describe "#markdown? and #takes_photos?" do

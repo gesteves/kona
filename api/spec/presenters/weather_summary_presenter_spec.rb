@@ -313,6 +313,13 @@ RSpec.describe WeatherSummaryPresenter do
       expect(text).to include("with a low of")
       expect(text).not_to include("high of")
     end
+
+    it "says nothing, and does not raise, when the forecast has no condition" do
+      build_weather(rest_of_day: { condition_code: nil })
+      allow(presenter.weather).to receive(:evening?).and_return(false)
+
+      expect(presenter.forecast).to be_nil
+    end
   end
 
   describe "#precipitation" do

@@ -16,6 +16,7 @@ module WorkerCheck
     Sidekiq::ProcessSet.new.size.positive?
   rescue StandardError => e
     Rails.logger.warn("#{self.class.name}: could not read Sidekiq's process set (#{e.class}: #{e.message})")
-    true # Don't cry wolf if the check itself is what's broken.
+    # A check that fails is not a worker that is down, thus this gives no false alarm.
+    true
   end
 end

@@ -151,8 +151,13 @@ class WeatherSummaryPresenter
   end
 
   def forecast
+    # The condition is the content of the sentence. Without it there is nothing to say, thus the
+    # code removes the full sentence and does not call a method on nil.
+    condition = format_forecasted_condition(weather.rest_of_day.condition_code)
+    return if condition.blank?
+
     text = []
-    text << "#{weather.today_or_tonight}'s forecast #{format_forecasted_condition(weather.rest_of_day.condition_code).downcase}"
+    text << "#{weather.today_or_tonight}'s forecast #{condition.downcase}"
     # This uses the readings that are available. Without the check, a day forecast with one of the
     # two values absent would read "with a high of  and a low of 12°C".
     temperatures = []

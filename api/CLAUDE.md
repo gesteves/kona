@@ -54,8 +54,9 @@ Each rule below protects a boundary. Do not remove one, and do not make one weak
 - ⚠️ **The contact jobs do not use the 24-hour window.** They inherit from `ContactJob`, which sets
   `retry_for: nil`, thus Sidekiq uses its default of 25 attempts, approximately 21 days. A contact
   message must never go away, and the subject line is the only step that can fail and be skipped.
-  A message that Akismet or `ContactModeration` marks goes to the quarantine (`SpamQuarantine`). The
-  app does not delete it: the owner sends it or deletes it on the Spam page.
+  A message that Akismet or `ContactModeration` marks goes to the quarantine (`SpamQuarantine`), and
+  the owner sends it or deletes it on the Spam page. ⚠️ The quarantine keeps a message for 30 days,
+  and it holds 200 messages at the most. After that, the app removes the message.
 - ⚠️ No Strava data goes to the LLM, and this integration shows no Strava data to another person.
   ⚠️ **The GPX comes from Intervals.icu, and never from Strava.** Intervals.icu refuses the GPX of
   an activity that came from Strava. Thus no Strava data goes into a map.

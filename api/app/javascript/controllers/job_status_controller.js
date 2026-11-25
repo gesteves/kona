@@ -13,7 +13,7 @@ const INTERVAL = 5000;
  * A row carries `data-job-status-id` and `data-job-status-state`, and the endpoint answers
  * `{ id: state }`.
  * ⚠️ The in-progress state is the word `processing`, in this file and in each store that feeds
- * it. A store that uses another word polls for all time.
+ * it. A row with another word gets no check, and it stays as it is until a reload.
  */
 export default class extends Controller {
   static values = { url: String };

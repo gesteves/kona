@@ -1,7 +1,7 @@
 <%#
-  The summary card of an article, for the trending section. Its local is `article`. This code comes
-  from partials/article/_summary.html.erb of the static site. The small renderer makes the body
-  text.
+  The summary card of an article, for the trending section. Its locals are `article`, `section_id`,
+  and `tracking_section`. The copy is partials/article/_summary.html.erb of the static site. The
+  small renderer makes the body text.
 %>
 <% published_at = DateTime.parse(article.published_at) %>
 <%# The section is part of each id: the same article can be here and in a section from the build on

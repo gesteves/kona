@@ -37,7 +37,8 @@ class Threads < ApplicationService
     threads_share_to_instagram
   ].join(",").freeze
 
-  # The limit of the text of a post. Meta counts characters, and this class makes no check.
+  # The limit of the text of a post. Refer to .post_length for the rule that counts it. This class
+  # makes no check.
   # ⚠️ The Threads text of a draft can be longer than its Bluesky text, because a mention grows the
   # text of each network by a different amount. SocialDraftValidator#post_error checks this limit
   # before it adds the job.
@@ -50,6 +51,20 @@ class Threads < ApplicationService
   TOPIC_MAX_CHARACTERS = 50
   # The two characters that Meta refuses in a topic.
   TOPIC_FORBIDDEN = /[.&]/
+
+  # An emoji, for .post_length: a pictograph, a flag letter, or the keycap mark.
+  EMOJI = /\p{Extended_Pictographic}|\p{Regional_Indicator}|\u20E3/
+
+  # The length that Meta counts for the text of a post.
+  #
+  # ⚠️ Meta counts characters, and it counts an emoji as the number of its UTF-8 bytes. Thus a post
+  # with many emoji reaches the limit before 500 characters.
+  # @see https://developers.facebook.com/documentation/threads/posts
+  # @param text [String, nil]
+  # @return [Integer]
+  def self.post_length(text)
+    text.to_s.scan(/\X/).sum { |cluster| cluster.match?(EMOJI) ? cluster.bytesize : cluster.length }
+  end
 
   # @param value [String, nil] The topic as the owner wrote it.
   # @return [String] The topic with no leading "#" and no space at either end. ⚠️ The parameter of

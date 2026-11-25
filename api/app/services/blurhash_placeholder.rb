@@ -177,9 +177,9 @@ class BlurhashPlaceholder < ApplicationService
 
   # Gets the thumbnail and encodes its blurhash.
   #
-  # ⚠️ `fm=jpg` is necessary. With no format, Contentful returns the source format, and a libvips
-  # with no loader for that format fails the decode into the rescue. There is then no placeholder
-  # and no message.
+  # ⚠️ The `fm=jpg` of #images_api_url is necessary. With no format, Contentful returns the source
+  # format, and a libvips with no loader for that format fails the decode into the rescue. There is
+  # then no placeholder, and only a warning in the log.
   # @return [String, nil] The blurhash, or nil on a failure.
   def encode(url, width, height)
     thumbnail_url = images_api_url(url, width, height)

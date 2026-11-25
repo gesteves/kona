@@ -390,9 +390,9 @@ export default class extends Controller {
   /**
    * The Bluesky field of each mention of the draft, by key.
    *
-   * ⚠️ It is a plain data attribute and NOT a Stimulus value. A value arrives through a
-   * MutationObserver, which is not synchronous, and `social#canPost` reads `blocked` at
-   * once. `social#pushMentions` writes this attribute and then calls `count()`.
+   * ⚠️ It is a plain data attribute and NOT a Stimulus value. The change callback of a value runs
+   * from a MutationObserver, which is not synchronous, and `social#canPost` reads `blocked` at
+   * once. Thus `social#pushMentions` writes this attribute and then calls `count()` itself.
    * @returns {Object<string, string>}
    */
   get blueskyMentions() {

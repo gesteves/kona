@@ -3,8 +3,8 @@ namespace :redis do
   # in that keyspace is a cache with a TTL, a lock, a Sidekiq queue, or the `contentful:uploads`
   # history, and each one of those comes back by itself or is not needed.
   #
-  # ⚠️ These tasks name each key from a constant, and they use no SCAN. Refer to
-  # `standard_site:migrate_fingerprints` for the one place that a SCAN is permitted, and why.
+  # ⚠️ These tasks name each key from a constant, and they use no SCAN, because the Sidekiq queues
+  # share this keyspace.
   #
   # ⚠️ The file holds each secret exactly as Redis holds it: encrypted with `secret_key_base`. Thus
   # an import needs the same `RAILS_MASTER_KEY`. With a different key,

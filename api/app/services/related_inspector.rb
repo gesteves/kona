@@ -10,8 +10,9 @@ class RelatedInspector < ApplicationService
   SAMPLE_SIZE = 120
   # The number of cards that the section renders. The build takes this many from the list.
   SECTION_COUNT = 4
-  # The number of neighbors that the build gets for each entry, and the largest number of cards
-  # that it removes: the reports of the same race, and the two adjacent entries.
+  # The number of neighbors that the build gets for each entry: SECTION_COUNT, plus the most cards
+  # that the build can remove because another section shows them. Those are the reports of the
+  # same race, and the two adjacent entries.
   FETCH_COUNT = 10
   # A page with fewer transitions than this does not go into the metric.
   MIN_TRANSITIONS = 5
