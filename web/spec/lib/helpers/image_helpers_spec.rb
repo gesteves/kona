@@ -5,10 +5,10 @@ require 'yaml'
 require 'padrino-helpers'
 
 RSpec.describe ImageHelpers do
-  # This has the shape of data.assets. Each example sets @assets before the code makes the index.
   # The real data/srcsets.yml, thus a spec reads the same card shape and widths as the build.
   def real_srcsets = OpenStruct.new(YAML.load_file('data/srcsets.yml', aliases: true).transform_values { |v| OpenStruct.new(v) })
 
+  # The shape of `data`. Each example sets @assets before the code makes the index.
   def data = OpenStruct.new(assets: @assets || [], srcsets: real_srcsets)
 
   # ⚠️ Each expected card size below comes from data/srcsets.yml. Thus a change to the shape or to
@@ -34,9 +34,8 @@ RSpec.describe ImageHelpers do
   def card_large_candidate_widths = card_large_config.fetch('widths').sort
 
   # IMAGES_URL is the host that Cloudflare serves each transformation from, and each environment
-  # needs it. There is no fallback to a Contentful resize, thus no value means a raise. No code
-  # here reads CONTEXT or URL. The default is a value, because that is each environment that the
-  # code supports.
+  # needs it. There is no fallback to a Contentful resize, thus no value means a raise.
+  # `cdn_image_url` reads no other variable: DEPLOY_CONTEXT and URL do not change its result.
   def stub_env(images_url: 'https://example.com')
     allow(ENV).to receive(:[]).and_call_original
     allow(ENV).to receive(:[]).with('IMAGES_URL').and_return(images_url)
@@ -112,8 +111,8 @@ RSpec.describe ImageHelpers do
       expect(cdn_image_url(original, w: 10)).to eq('https://example.com/cdn-cgi/image/width=10/https://cdn.example.com/canonical.jpg')
     end
 
-    # This is why the value is necessary: the code resized with Contentful, which looked the same
-    # in the browser and used the Contentful bandwidth until a person found it.
+    # A fallback to a Contentful resize looks correct, and it uses the Contentful bandwidth with no
+    # message. Thus the value is necessary.
     context 'when IMAGES_URL is unset' do
       before { stub_env(images_url: nil) }
 
@@ -163,8 +162,7 @@ RSpec.describe ImageHelpers do
       expect(url).to include('height=630')
     end
 
-    # The code cuts the image at the center, on purpose. gravity=auto gave saliency crops that were
-    # too unpredictable on these photos.
+    # The URL has no gravity option, on purpose. `open_graph_image_url` gives the reason.
     it 'centre-crops on Cloudflare, asking for no gravity' do
       url = open_graph_image_url('https://images.ctfassets.net/s/a/t/p.jpg')
       expect(url).to eq(
@@ -266,11 +264,11 @@ RSpec.describe ImageHelpers do
   end
 
   describe '#generate_open_graph_image_url' do
-    # root_url is in UrlHelpers, and RSpec includes only ImageHelpers here. The Worker of the site
-    # serves the card route, thus this is the only host.
+    # This replaces the root_url of UrlHelpers, which reads DEPLOY_CONTEXT and URL. The Worker of
+    # the site serves the card route, thus the site origin is the only host of a card.
     def root_url = @root_url || 'https://example.com'
 
-    # ⚠️ Each example below reads OG_TEMPLATE_VERSION and never the literal "v1". That constant
+    # ⚠️ Each example below reads OG_TEMPLATE_VERSION and never a literal version. That constant
     # goes up at each change to og-render.ts, to the logo, or to the font, and a literal here would
     # make a correct bump look like a broken helper.
     let(:template) { ImageHelpers::OG_TEMPLATE_VERSION }
@@ -314,9 +312,8 @@ RSpec.describe ImageHelpers do
         .to eq("https://example.com/post/og.png?v=#{template}-7")
     end
 
-    # ⚠️ src/og.ts checks `v` against /^v\d+(-\d+)?$/ before it makes the cache key. A value
-    # outside that shape still renders, and each card then uses one cache entry, with no message.
-    # Thus the shape is the thing to pin, and not the number.
+    # ⚠️ src/og.ts checks the shape of `v`, and OG_TEMPLATE_VERSION gives the reason. Thus the shape
+    # is the thing to pin, and not the number.
     it 'keeps the v<number> shape that the Worker checks' do
       expect(template).to match(/\Av\d+\z/)
       expect(generate_open_graph_image_url('/blog/', 7)).to match(/\?v=v\d+-7\z/)
@@ -343,10 +340,9 @@ RSpec.describe ImageHelpers do
       before do
         allow(self).to receive(:redis).and_return(fake_redis)
         allow(self).to receive(:encode_blurhash).with('asset-1', 32, 18).and_return('LEHV6nWB2yk8pyo0adR*.7kCMdnj')
-        # ⚠️ This does NOT stub Blurhash.decode, on purpose. It is Ruby only, and a 32x18 decode
-        # takes less than a millisecond. A stub that returns a flat array is what hid the TypeError
-        # from `pixels.pack('C*')` on the true nested [row][col][r,g,b,a] output of decode. Each
-        # cache miss then gave no placeholder for weeks. Use the true shape.
+        # ⚠️ This does NOT stub Blurhash.decode, on purpose. The true decode returns a nested
+        # [row][col][r,g,b,a] array, and `pixels.pack('C*')` raises TypeError on it. A stub that
+        # returns a flat array hides that fault, and each cache miss then gives no placeholder.
         allow(fake_image).to receive(:copy).and_return(fake_image)
         allow(fake_image).to receive(:extract_band).and_return(fake_image)
         allow(Vips::Image).to receive(:new_from_memory).and_return(fake_image)
@@ -392,9 +388,8 @@ RSpec.describe ImageHelpers do
     end
 
     describe '#encode_blurhash' do
-      # Cloudflare resizes the thumbnail, as it resizes each other image on the site. The code went
-      # to the Contentful Images API to save a transformation, but a transformation costs a small
-      # part of a cent and the Contentful asset bandwidth is what has a meter.
+      # Cloudflare resizes the thumbnail, as it resizes each other image on the site. A resize by
+      # Contentful would use the metered asset bandwidth.
       it 'resizes the thumbnail through Cloudflare Images' do
         stub_env(images_url: 'https://example.com')
         allow(URI).to receive(:open).and_raise(StandardError, 'stop here')
@@ -411,8 +406,7 @@ RSpec.describe ImageHelpers do
       end
 
       # The mirror URL is the correct source here: Cloudflare gets it from inside the zone, and the
-      # resize is in the path. Thus no code needs the source to read a query string. R2 ignores a
-      # query string, and that is why this code could not use the mirror before.
+      # resize is in the path. Thus the source does not need to read a query string. R2 ignores one.
       it 'sources the thumbnail from the R2 mirror when the rewrite is on' do
         @assets = [
           OpenStruct.new(
@@ -435,9 +429,8 @@ RSpec.describe ImageHelpers do
         )
       end
 
-      # Nothing renders without IMAGES_URL, but the rescue here would change that into a loss of
-      # the placeholders with no message, and cdn_image_url exists to give a failure with a
-      # message.
+      # The rescue of encode_blurhash also catches ImagesUrlMissing. Thus the warning must name
+      # IMAGES_URL, or the placeholders go away with no message.
       it 'warns and returns nil when IMAGES_URL is unset' do
         stub_env(images_url: nil)
         allow(self).to receive(:warn)
@@ -477,9 +470,9 @@ RSpec.describe ImageHelpers do
       end
 
       # ⚠️ The caller puts this value in `url('...')`, thus a raw `'` closes that CSS string and
-      # the browser paints no placeholder. It is also what makes `minify_html` read the SVG
+      # the browser paints no placeholder. A raw quote also makes `minify_html` read the SVG
       # attributes as HTML attributes and remove some of their quotes. Use the TRUE output of
-      # `blurhash_svg` here: a fixture with no attribute hid this fault for weeks.
+      # `blurhash_svg` here: a fixture with no attribute hides this fault.
       it 'percent-encodes each quote, thus the value cannot close the CSS string' do
         allow(self).to receive(:blurhash_jpeg_data_uri).with('asset-1').and_return('data:image/jpeg;base64,abc123')
 

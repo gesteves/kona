@@ -2,8 +2,8 @@ require 'spec_helper'
 require 'ostruct'
 require 'padrino-helpers'
 
-# RSpec includes the module under test, thus you can call the instance methods of ArticleHelpers
-# directly.
+# spec_helper.rb includes each helper module, thus an example calls the instance methods of
+# ArticleHelpers directly.
 RSpec.describe ArticleHelpers do
   include_context 'default helper stubs'
 
@@ -35,9 +35,8 @@ RSpec.describe ArticleHelpers do
     @corpus = articles
   end
 
-  # The helper needs this method, which another module usually supplies. This file defines it
-  # directly, thus a verifying double does not refuse a stub of a method that this object does not
-  # have.
+  # Middleman supplies `data` at run time. This file defines it as a true method, because a
+  # verifying double refuses a stub of a method that this object does not have.
   def data
     OpenStruct.new(articles: @corpus || [])
   end
@@ -129,8 +128,8 @@ RSpec.describe ArticleHelpers do
   end
 
   describe '#article_schema' do
-    # These methods are in other helper modules at run time. This file stubs them, thus the test
-    # runs the schema builder alone.
+    # These replace the methods of other helper modules, and the `current_page` of Middleman. Thus
+    # the test runs the schema builder alone.
     def content_summary(content) = content.summary
     def schema_entity_id(fragment, path: '/') = "https://example.com#{path == '/' ? '/' : "#{path}/"}##{fragment}"
     def cdn_image_url(url, params = {}) = "#{url}?w=#{params[:w]}&h=#{params[:h]}"
@@ -315,10 +314,8 @@ RSpec.describe ArticleHelpers do
       expect(reading_time_minutes(article(slug: 'a', intro: 'so short'))).to eq(1)
     end
 
-    # ⚠️ A GitHub Actions variable with no value becomes an EMPTY STRING. Thus the env key is
-    # available and blank, the default of ENV.fetch never applies, `''.to_i` is 0, and the division
-    # raised FloatDomainError on each article page. That stopped a production deploy. Only the
-    # build ran that code, because nothing else divides by this value.
+    # A blank value, or a value that is not a positive number, gives the default and no division by
+    # zero. `reading_time_minutes` gives the reason.
     it 'falls back to the default rate when READING_TIME_WPM is present but unusable' do
       a = article(slug: 'a', intro: ([ 'word' ] * 250).join(' '))
       [ '', '   ', 'abc', '0', '-5' ].each do |value|
@@ -395,15 +392,14 @@ RSpec.describe ArticleHelpers do
   # ⚠️ These two groups get the content object in the way that Middleman gives it: through
   # `current_page.metadata[:locals][:content]`, with the real `page_content` of SiteHelpers. Do not
   # replace that with a `def content` stub. Such a stub defines a *method*, which makes
-  # `defined?(content)` true and gives a pass against a binding that Middleman never makes. That is
-  # what hid the code that read `defined?(content)` and sent each draft to production where a
-  # search engine could index it.
+  # `defined?(content)` true and gives a pass against a binding that Middleman never makes. Code
+  # that reads `defined?(content)` then passes here, and a search engine can index each draft.
   def page_content = SiteHelpers.instance_method(:page_content).bind_call(self)
   def current_page = OpenStruct.new(url: '/2024/01/01/post/', metadata: { locals: @page_locals || {} }, data: OpenStruct.new(@page_data || {}))
 
   describe '#canonical_url' do
-    # The group above makes `canonical_url` a plain stub for the schema groups. Put the real module
-    # method back here, thus this group runs the code of ArticleHelpers.
+    # The top of this file makes `canonical_url` a plain stub for the schema groups. This puts the
+    # real module method back, thus this group runs the code of ArticleHelpers.
     def canonical_url = ArticleHelpers.instance_method(:canonical_url).bind_call(self)
 
     it 'is the full URL of the current page when the page has no content object' do
@@ -462,10 +458,9 @@ RSpec.describe ArticleHelpers do
     it 'derives the entry and heading DOM ids from the parameterized Contentful id' do
       entry = article(slug: 'post')
       entry.sys = OpenStruct.new(id: '1QxUv2jHbvRd9OqMxOneqZ')
-      # parameterize makes the text lowercase, thus a Contentful id with two cases becomes
-      # lowercase. This is an accepted cost, and the helper says so: two ids that are different only
-      # in case would become one, but a change now would change the DOM id on each published
-      # page.
+      # parameterize makes a Contentful id lowercase. This is an accepted cost: two ids that are
+      # different only in case would become one, but a change now would change the DOM id on each
+      # published page.
       expect(entry_dom_id(entry)).to eq('entry-1qxuv2jhbvrd9oqmxoneqz')
       expect(entry_heading_id(entry)).to eq('hed-1qxuv2jhbvrd9oqmxoneqz')
     end
@@ -678,8 +673,8 @@ RSpec.describe ArticleHelpers do
         a
       end
 
-      # ⚠️ This is the reason for the change: the two sections excluded each other, thus this
-      # article showed one card where five were possible.
+      # ⚠️ The two sections must not exclude each other. This article then shows its five cards, and
+      # not one card.
       it 'renders the race reports and the related entries together' do
         a = entry('cda-2026', 'id-a', concepts: [ race_reports, cda ], published_at: '2026-06-01T00:00:00Z')
         sibling = entry('cda-2025', 'id-sib', concepts: [ race_reports, cda ], published_at: '2025-06-01T00:00:00Z')

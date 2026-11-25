@@ -2,9 +2,6 @@ require_relative "lib/helpers"
 
 each_kona_helper { |helper| helpers helper }
 
-# Start and configure the extensions.
-# https://middlemanapp.com/advanced/configuration/#configuring-extensions
-
 config[:css_dir]             = 'stylesheets'
 config[:js_dir]              = 'javascripts'
 config[:images_dir]          = 'images'
@@ -21,12 +18,10 @@ activate :external_pipeline,
   latency: 1
 
 # `activate :gzip` is off, on purpose: Cloudflare compresses each response itself, thus nothing
-# serves the .gz files and they only add approximately 110 files to the Worker asset upload.
-# ⚠️ Autoprefixer is off, on purpose. Its caniuse data stops at Safari 15.4, thus each browserslist
-# query is incorrect (it targets 2022 and writes the IE 11 `-ms-grid-*` properties into a subgrid
-# layout) or it matches no known version. Only two prefixes are still necessary, and a person writes
-# both of them beside the `@supports` condition that names them. Refer to _nav.scss and
-# base/_extends.scss.
+# serves the .gz files and they only add files to the Worker asset upload.
+# ⚠️ Autoprefixer is off, on purpose. Its caniuse data stops at Safari 15.4, thus a browserslist
+# query writes the IE 11 `-ms-grid-*` properties into a subgrid layout, or it matches no version.
+# A person writes the two necessary prefixes by hand. Refer to _nav.scss and base/_extends.scss.
 activate :dotenv
 activate :asset_hash
 activate :directory_indexes
@@ -42,8 +37,8 @@ ignore "/tag_feed.xml"
 ignore "/about_md.txt"
 ignore "/entry_md.txt"
 
-# Each page that the build makes — an article, a page, the blog index, and a tag page — proxies its
-# template with itself as the `content` local.
+# Each article, each page, the blog index, and each tag page proxies its template, with itself as
+# the `content` local.
 [
   @app.data.articles,
   @app.data.pages,
@@ -69,7 +64,7 @@ end
   proxy "#{tag.tag.path}feed.xml", "/tag_feed.xml", locals: { content: tag }, ignore: true
 end
 
-# The standard.site verification endpoint. It has no layout and no directory index.
+# The standard.site verification endpoint.
 page "/.well-known/site.standard.publication", layout: false, directory_index: false
 
 # `_headers` gives the Content-Type in production. This gives it to `middleman server`.
@@ -85,9 +80,8 @@ if (about_page = AboutHelpers.about_page(@app.data.pages))
     directory_index: false, content_type: "text/markdown; charset=utf-8", ignore: true
 end
 
-# ⚠️ The build renders in forked workers, and a memo in a helper is copied into each one. This reads
-# each blurhash placeholder from Redis one time, here in the parent, and the forks inherit the
-# result. Refer to ImageHelpers#blurhash_jpeg_data_uri.
+# ⚠️ This reads each blurhash placeholder from Redis one time, in the parent, before the build
+# forks. Refer to ImageHelpers#blurhash_jpeg_data_uri for the reason.
 before_build do |_builder|
   require_relative "lib/utils/redis_connection"
   found = ImageHelpers.warm_blurhashes!(app.data.assets, RedisConnection.connection)

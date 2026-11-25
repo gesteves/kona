@@ -194,9 +194,8 @@ describe('handlePlausible', () => {
     expect(res.status).toBe(404);
   });
 
-  // ⚠️ run_worker_first takes /pa/*, thus it never gets the /* block of source/headers. This route
-  // serves JavaScript that runs, from the origin of the site. Thus it is the route that needs
-  // nosniff the most.
+  // ⚠️ /pa/* never gets the `/*` block of source/headers.erb (refer to src/headers.ts), and it
+  // serves JavaScript that runs, from the origin of the site. Thus it needs nosniff the most.
   describe('security headers', () => {
     function expectSecured(res: Response) {
       expect(res.headers.get('x-content-type-options')).toBe('nosniff');

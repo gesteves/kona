@@ -2,7 +2,7 @@ import satori, { init as initYoga } from 'satori/standalone';
 import { Resvg, initWasm } from '@resvg/resvg-wasm';
 // A wasm import gives a WebAssembly.Module that is already compiled, and that is why this works on
 // Workers: the runtime does not permit a compile of wasm from bytes. The default module rules of
-// wrangler cover this, and the shim in src/env.d.ts gives the types.
+// wrangler cover this, and src/assets.d.ts gives the types.
 import yogaWasm from 'satori/yoga.wasm';
 import resvgWasm from '@resvg/resvg-wasm/index_bg.wasm';
 // The Data modules (ArrayBuffer). These need the `rules` entry in wrangler.jsonc.
@@ -12,10 +12,9 @@ import logoPng from './assets/logo.png';
 // The Open Graph card renderer: satori makes the layout of the card as SVG, and resvg changes that
 // SVG into a PNG.
 //
-// src/og.ts does not import this at the top, on purpose. It reaches this module through a dynamic
-// import() behind the RenderCard parameter. Thus the other routes never run the module code of
-// satori, and the test suite can run the route and not load the Data modules. Refer to
-// web/CLAUDE.md.
+// src/og.ts reaches this module only through a dynamic import() behind the RenderCard parameter,
+// on purpose. Thus the other routes never run the module code of satori, and the test suite can
+// run the route and not load the Data modules. Refer to web/CLAUDE.md.
 
 const WIDTH = 1200;
 const HEIGHT = 630;
@@ -53,12 +52,9 @@ const logoDataUri = `data:image/png;base64,${base64(logoPng)}`;
  * raises in Workers.
  */
 function cardElement(title: string): Element {
-  // ⚠️ `text-wrap: balance` goes on a title of MORE THAN ONE WORD only.
-  //
-  // satori halves the width of a title that has no break opportunity: it lays out for two lines,
-  // and one word cannot make two. "Blog" then measures 101px in place of its true 168px, and
-  // `backgroundClip: 'text'` paints the gradient through that box. Thus the word is cut in the
-  // middle of a glyph, and the card looks broken.
+  // ⚠️ `text-wrap: balance` goes on a title of MORE THAN ONE WORD only. satori halves the width of
+  // a title with no break opportunity, and `backgroundClip: 'text'` paints the gradient through
+  // that box. Thus the word is cut in the middle of a glyph, and the card looks broken.
   //
   // ⚠️ It spreads the property and never sets it to `undefined`. The CSS parser of satori reads
   // that value and raises.

@@ -1,6 +1,6 @@
 <%= partial 'partials/article/full', locals: { article: content } %>
 <%= partial 'partials/share', locals: { article: content } %>
-<%# One section: the reports of the same race first, then the related entries fill each empty %>
-<%# place. Refer to recirculation_section. %>
+<%# Two sections: the reports of the same race, then the related entries. Each one renders only %>
+<%# when it has entries. Refer to recirculation_sections. %>
 <%= partial 'partials/recirculation', locals: { article: content } %>
 <%= partial 'partials/read_next', locals: { article: content } %>

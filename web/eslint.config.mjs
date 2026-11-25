@@ -1,29 +1,23 @@
 import js from '@eslint/js';
 import globals from 'globals';
 
-// Covers the plain-JS surface only: the Stimulus app and its jsdom tests. That's the half of the
-// codebase nothing else checked — `npm run check` typechecks src/ and test/ (tsconfig includes
-// only those), so source/javascripts/** had neither a linter nor a typechecker.
+// This covers the plain JavaScript only: the Stimulus app and its jsdom tests. `npm run check`
+// does a type check of the TypeScript in src/ and test/ only, thus nothing else checks
+// source/javascripts/**.
 //
-// ⚠️ src/**/*.ts is deliberately NOT linted here. It would need typescript-eslint, which as of
-// 8.66 declares `peer typescript@">=4.8.4 <6.1.0"` — this project is on TypeScript 7, the native
-// compiler rewrite, and even the alphas haven't caught up. Its type-aware rules call the TS
-// compiler API directly, so forcing the peer would be broken rather than merely unsupported.
-// Revisit when typescript-eslint supports TS 7; `src/` meanwhile has `tsc --noEmit` and the
-// worker test suite.
+// ⚠️ This does NOT lint src/**/*.ts, on purpose. That needs typescript-eslint, which does not
+// support TypeScript 7. Its rules call the compiler API, thus an override of its peer range
+// would not work. `tsc --noEmit` and the Worker test suite check `src/` until it does.
 //
-// ⚠️ No formatting rules, by design. Prettier owns layout; ESLint's stylistic rules were
-// deprecated in v8.53 and are absent from `recommended`, so the two don't overlap and
-// eslint-config-prettier isn't needed.
+// ⚠️ This has no format rules, on purpose. Prettier owns the layout, and `recommended` holds no
+// stylistic rule. Thus the two do not overlap, and eslint-config-prettier is not necessary.
 export default [
   {
-    // ⚠️ `vendor/**` is load-bearing in CI and invisible locally: `bundler-cache: true` installs
-    // gems into web/vendor/bundle/, and several ship .js (execjs runners, autoprefixer, Middleman's
-    // jQuery fixtures) that isn't valid modern module syntax. ESLint lints every file it walks
-    // into, including ones matching no `files:` block below, so without this the step fails on
-    // other people's code. A local rbenv install puts gems outside the repo, so `eslint .` looks
-    // clean here either way — hence the explicit paths in the `lint:js` script as well.
-    // `.prettierignore` excludes `**/vendor/**` for the same reason; keep the two in step.
+    // ⚠️ `vendor/**` is necessary in CI, where `bundler-cache: true` puts the gems in
+    // web/vendor/bundle/. ESLint lints each file that it walks into, with or without a `files:`
+    // match, and some gems hold a .js file that is not a valid module. A local install puts the
+    // gems outside the repo, thus only CI fails. `.prettierignore` and the paths of the `lint:js`
+    // script do the same work.
     ignores: ['build/**', 'tmp/**', 'node_modules/**', 'vendor/**'],
   },
   {
@@ -36,8 +30,8 @@ export default [
     },
   },
   {
-    // jsdom tests. vitest helpers are imported explicitly (no `globals: true`), so only the
-    // browser and node ambients are needed.
+    // The jsdom tests. They import each vitest helper, thus they need only the browser globals and
+    // the node globals.
     files: ['test/browser/**/*.js'],
     ...js.configs.recommended,
     languageOptions: {

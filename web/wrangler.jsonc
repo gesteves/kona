@@ -1,13 +1,13 @@
-// Cloudflare Worker serving the static build plus the dynamic routes (kona-api proxy for
-// widgets + the contact-form POST, Plausible proxy). This one Worker is the whole hosting
-// story for the site — see root CLAUDE.md.
+// The Cloudflare Worker that serves the static build and the dynamic routes: the kona-api proxy
+// for the widgets and the contact POST, the Plausible proxy, and the Open Graph cards. Refer to
+// the root CLAUDE.md.
 //
-// ⚠️ No hostnames live in this file (or anywhere in the repo). The custom domain is
-// attached in the dashboard (Workers & Pages → this Worker → Settings → Domains & Routes),
-// and all environment-specific values are dashboard vars/secrets:
+// ⚠️ This file holds no host name, and no other file in the repo holds one. The custom domain is
+// in the dashboard (Workers & Pages → this Worker → Settings → Domains & Routes). Each value of
+// an environment is a var or a secret in the dashboard:
 //
-//   Secrets: API_TOKEN (must match the api/ app's API_TOKEN or every widget 401s)
-//   Vars:    KONA_API_URL (the fly.io api origin), PLAUSIBLE_SCRIPT_URL
+//   Secrets: API_TOKEN (the same as the API_TOKEN of api/, or each widget gets a 401)
+//   Vars:    KONA_API_URL (the fly.io origin of the api), PLAUSIBLE_SCRIPT_URL
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "kona-web",
@@ -17,38 +17,32 @@
   "assets": {
     "directory": "./build",
     "binding": "ASSETS",
-    // Middleman's directory_indexes builds pretty URLs (/about/ → /about/index.html).
+    // The directory_indexes of Middleman makes each page as /about/index.html, for the URL /about/.
     "html_handling": "auto-trailing-slash",
     "not_found_handling": "404-page",
-    // ⚠️ POSITIVE ALLOWLIST — ONLY these paths invoke the Worker. Everything else (every HTML
-    // page, every fingerprinted asset, the sitemap, /.well-known/*, and any 404) is served
-    // straight from the static asset layer and never runs Worker code. Requires wrangler ≥ 4.20;
-    // globs cross `/`.
+    // ⚠️ ONLY the paths in this list start the Worker. The static asset layer serves each other
+    // path: each HTML page, each asset, the feeds, /.well-known/*, and each 404.
     //
-    // ⚠️ Do not go back to `/*` with one negation for each kind of asset. A wide negation such as
+    // ⚠️ Do not use `/*` with one negation for each kind of asset. A wide negation such as
     // `!/*.js` also stops the Worker for /pa/script.js, and nothing reports it.
     //
-    // The route families that MUST run the Worker (refer to src/index.ts). None has a static
-    // asset, thus the asset layer would answer each one with a 404:
-    //   /widgets/*, /api/contact  → kona-api proxy (no asset; must reach the origin)
-    //   /pa/*                     → Plausible first-party proxy (no asset; proxied upstream)
-    //   /og.png, /*/og.png        → the on-demand Open Graph card renderer (src/og.ts)
+    // No route in this list has a static asset, thus the asset layer would answer each one with a
+    // 404. Refer to src/index.ts:
+    //   /widgets/*, /api/contact  → the kona-api proxy
+    //   /pa/*                     → the Plausible proxy
+    //   /og.png, /*/og.png        → the Open Graph card renderer (src/og.ts)
     //
-    // The card for a page lives at that page's own path (/2026/06/26/post/og.png), so it takes
-    // TWO rules: /og.png for the home page's card, and /*/og.png for every other page's. A rule
-    // is compiled to `^` + the glob with each `*` replaced by `.*` + `$`, so `/*/og.png` matches
-    // any depth of path — and, being anchored, `/og.png` alone would NOT match a nested card.
+    // The card of a page is at the path of that page (/2026/06/26/post/og.png). Thus the cards
+    // need two rules: /og.png for the home page, and /*/og.png for each other page. wrangler
+    // changes each `*` into `.*` and puts an anchor at each end. Thus `/*/og.png` matches a path
+    // of each depth, and `/og.png` alone does not match a card below a directory.
     //
-    // ⚠️ The ".png" is load-bearing, not cosmetic. The zone's single Cache Rule is
-    // scoped `not http.request.uri.path contains "."`, so carrying one keeps these routes off
-    // the 1-year "ignore cache-control" HTML TTL automatically — which is what satisfies the
-    // rule documented in the root CLAUDE.md that every new entry here needs a matching exclusion
-    // added by hand in the dashboard. Don't "tidy" this into an extensionless path (/og, /og/*)
-    // without adding that exclusion first, or every card gets pinned at the edge for a year
-    // under a policy that ignores its own Cache-Control.
-    // Everything with a built asset — including the root and per-tag feeds (feed.xml) — is served
-    // straight from the asset layer and never runs Worker code.
-    // No /cdn-cgi/* entry is needed: Cloudflare answers image transformations at its own edge.
+    // ⚠️ Keep the ".png". The Cache Rule of the zone applies only to a path with no ".", thus the
+    // extension keeps the cards off the HTML edge TTL of one year, which ignores Cache-Control. A
+    // path with no extension (/og, /og/*) needs an exclusion in that rule first, in the dashboard.
+    // Refer to the root CLAUDE.md.
+    //
+    // No /cdn-cgi/* entry is necessary: Cloudflare answers the image transformations at its edge.
     "run_worker_first": [
       "/widgets/*",
       "/api/contact",
@@ -58,41 +52,36 @@
     ],
   },
 
-  // Binary modules imported by src/og-render.ts (the card's font and logo), which wrangler
-  // uploads alongside the entry point and hands to the Worker as ArrayBuffers.
+  // The binary modules that src/og-render.ts imports: the font and the logo of the card. wrangler
+  // uploads them with the entry point and gives each one to the Worker as an ArrayBuffer.
   //
-  // ⚠️ The globs are matched against the IMPORT SPECIFIER, not the file path — wrangler turns
-  // each rule into an esbuild `onResolve({ filter: globToRegExp(glob) })`, which sees
-  // `./assets/logo.png`. A path-scoped glob like "src/assets/*.png" therefore matches NOTHING,
-  // silently, and the build fails with "No loader is configured for .png files". Keep them `**/*`.
+  // ⚠️ Keep the globs at `**/*`. wrangler matches a glob against the IMPORT SPECIFIER
+  // (`./assets/logo.png`), and not against the file path. Thus "src/assets/*.png" matches
+  // nothing, and the build fails with "No loader is configured for .png files".
   //
-  // ⚠️ fallthrough is required so this doesn't shadow wrangler's own default Data rule
-  // (`**/*.bin`). Without it, a second rule of the same type is marked removed and any future
-  // .bin import becomes a hard build error.
+  // ⚠️ Keep `fallthrough`. Without it, wrangler removes its own default Data rule (`**/*.bin`),
+  // and a later .bin import makes the build fail.
   //
-  // No .wasm rule is needed: `{ type: "CompiledWasm", globs: ["**/*.wasm"] }` is already a
-  // wrangler default, which is what makes the satori/resvg wasm imports work.
+  // A .wasm rule is not necessary: `{ type: "CompiledWasm", globs: ["**/*.wasm"] }` is a default
+  // of wrangler, and the wasm imports of satori and resvg use it.
   "rules": [
     { "type": "Data", "globs": ["**/*.ttf", "**/*.png"], "fallthrough": true },
   ],
 
-  // Workers Logs. Declared here rather than left to the dashboard for the same reason as
-  // keep_vars below: the config file is what a deploy reconciles against, so anything only
-  // toggled in the dashboard is one `wrangler deploy` away from silently changing.
+  // Workers Logs. The setting is in this file for the same reason as keep_vars below: a deploy
+  // applies this file, thus a setting that is only in the dashboard can change at a deploy with
+  // no message.
   //
-  // invocation_logs gives one `cf-worker-event` record per request — method/URL, response
-  // status, outcome, cpuTimeMs/wallTimeMs, and the full request headers + `cf` object (IP, UA,
-  // referer, geo, colo, ray). That covers the whole success path on its own, which is why the
-  // routes below log almost nothing themselves: a `console.*` line becomes a SECOND, separate
-  // `cf-worker` record for the same requestId, so anything it repeats from the invocation log is
-  // pure duplication. Custom logs are reserved for what the platform can't see — see the
-  // console.error calls in api-proxy.ts / plausible.ts, whose failures are deliberately silent
-  // (an empty 502 that collapses the widget; a fail-open 200/202 for analytics) and would
-  // otherwise leave no trace of *why*.
+  // invocation_logs gives one `cf-worker-event` record for each request: the method, the URL, the
+  // status, the outcome, the CPU time, the wall time, the request headers, and the `cf` object.
+  // Thus the routes write almost no log of their own: a `console.*` line is a SECOND record for
+  // the same requestId. A route writes a log only for what the platform cannot see, which is the
+  // cause of a failure that the response hides. Refer to the console.error calls in api-proxy.ts
+  // (the empty 502) and in plausible.ts (the fallback 200 or 202).
   //
-  // head_sampling_rate is left at its default of 1 (100%): this Worker only runs on the
-  // run_worker_first routes, so the volume is nowhere near the plan's included logs, and
-  // sampling would mostly hide the rare events worth having.
+  // head_sampling_rate stays at its default of 1 (100%). The Worker runs only on the
+  // run_worker_first routes, thus the volume is much below the logs that the plan includes, and a
+  // sample would hide the rare events that are important.
   "observability": {
     "logs": {
       "enabled": true,
@@ -100,14 +89,14 @@
     },
   },
 
-  // No workers.dev route: it would be an origin that bypasses the zone's WAF. Preview URLs
-  // follow this setting (they default to matching workers_dev), so they're off too — testing
-  // happens on a dashboard-attached hostname, not on workers.dev.
+  // No workers.dev route: it would be an origin that the WAF of the zone does not protect. The
+  // Preview URLs use the same value by default, thus they are also off. A test of a deploy uses a
+  // host name from the dashboard.
   "workers_dev": false,
 
-  // ⚠️ Load-bearing. The vars this Worker reads carry a hostname, so they can't live in this
-  // file — they're set in the dashboard. A deploy normally DELETES all vars absent from the
-  // config (secrets are never touched), which would silently strip KONA_API_URL and
-  // PLAUSIBLE_SCRIPT_URL on the next `wrangler deploy`. This keeps them.
+  // ⚠️ Keep this. The vars of this Worker hold a host name, thus they are in the dashboard and
+  // not in this file. Without keep_vars, a deploy DELETES each var that is absent from this file,
+  // thus the next `wrangler deploy` removes KONA_API_URL and PLAUSIBLE_SCRIPT_URL with no message.
+  // A deploy never changes a secret.
   "keep_vars": true,
 }

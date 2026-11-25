@@ -129,11 +129,9 @@ end
 
 # The number of attempts after a failed icon group, and the time to wait before each attempt.
 #
-# ⚠️ This exists because the api runs on fly machines that stop by themselves. A Contentful publish
-# starts a build, and if that build comes while the origin starts, the first request can fail. A
-# failed icon import stops the build, on purpose, because each page needs the icons. Thus one cold
-# start would stop the full deploy. A cold start takes some seconds, thus two attempts with a wait
-# are sufficient, and they do not hide an origin that is truly broken.
+# ⚠️ The api runs on fly machines that stop by themselves, thus the first request of a build can
+# fail while the origin starts. A failed icon import stops the build, on purpose. A cold start
+# takes some seconds, thus these waits cover it and do not hide an origin that is truly broken.
 ICON_IMPORT_MAX_RETRIES = 3
 ICON_IMPORT_RETRY_DELAYS = [ 2, 5, 10 ].freeze
 
@@ -181,7 +179,8 @@ end
 
 # Gets the standard.site DID and the publication URI from the api and writes them to
 # data/standard_site.json, for the .well-known endpoint and for the verification link tags.
-# On a failure it writes nothing and gives no message, and the templates then omit the markup.
+# On a failure it writes nothing, and the templates then omit the markup. An exception gives a
+# message. A non-2xx answer gives none.
 def import_standard_site
   safely_perform do
     base = ENV["KONA_API_URL"].to_s.chomp("/")
@@ -198,9 +197,9 @@ end
 # ArticleHelpers#related_articles renders that data as the "You May Also Like" section of each
 # article.
 #
-# On a failure it writes nothing and gives no message, as import_standard_site does, and the section
-# is then absent. ⚠️ This does NOT stop the build, on purpose. The list is an improvement, and an api
-# that is unavailable for a short time must not stop a content deploy. An icon that is absent is
+# On a failure it writes nothing, as import_standard_site does, and the section is then absent.
+# ⚠️ This does NOT stop the build, on purpose. The list is an improvement, and an api that is
+# unavailable for a short time must not stop a content deploy. An icon that is absent is
 # different.
 def import_related
   safely_perform do
@@ -251,12 +250,10 @@ end
 # The two apps read Contentful separately, thus a small skew between them is normal.
 RELATED_COVERAGE_FLOOR = 0.8
 
-# Reports a related-articles file that is absent or thin.
+# Reports a related-articles file that is absent or thin. It does NOT stop the build.
 #
-# ⚠️ import_related writes nothing on a failure and gives no message, and that rule is correct: an
-# api that is unavailable must not stop a content deploy. But the result is that each article
-# quietly loses four internal links across the full site. This gives that failure a voice. It does
-# NOT stop the build.
+# ⚠️ A non-2xx answer to import_related gives no message, and each article then loses four
+# internal links. This report shows that failure.
 def report_related_coverage
   articles = JSON.parse(File.read("data/articles.json")) rescue nil
   return if articles.nil?

@@ -16,9 +16,8 @@ afterAll(() => {
 });
 
 afterEach(async () => {
-  // Wait for each ctx.waitUntil() background task to end, for example the cache write of the
-  // Plausible script, before the pool removes the storage of the test. Thus the log gets no abort
-  // message that means nothing.
+  // Wait for each ctx.waitUntil() task before the pool removes the storage of the test. Refer to
+  // pendingWaits in helpers.ts.
   await Promise.allSettled(pendingWaits.splice(0));
   resetFetchMock();
 });

@@ -2,12 +2,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { handleOg, readOgTitle } from '../src/og';
 import { makeCtx, assetsReturning, assetsRecording } from './helpers';
 
-// ⚠️ This suite never imports ../src/og-render, on purpose, and nothing that it loads imports that
-// module. That module imports the card font and the logo as Data modules, and the fallback module
-// loader of the vitest pool sets the type only for `.wasm`. It reads each other file as UTF-8 and
-// parses it as JS. Thus a `.ttf` import there gives a syntax error that does not show its cause.
-// The `render` parameter on handleOg is what keeps that module out. Refer to web/CLAUDE.md.
-// `wrangler dev` covers the render itself.
+// ⚠️ This suite never imports ../src/og-render, and nothing that it loads imports that module.
+// That module imports the font and the logo as Data modules, and the module loader of the vitest
+// pool parses each file that is not `.wasm` as JS. Thus a `.ttf` import gives a syntax error that
+// does not show its cause. The `render` parameter of handleOg keeps that module out, and
+// `wrangler dev` covers the render itself. Refer to web/CLAUDE.md.
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47]) as Uint8Array<ArrayBuffer>;
 const renderStub = () => vi.fn(async () => PNG);
@@ -36,9 +35,8 @@ const request = (path: string, init?: RequestInit) =>
 
 describe('handleOg', () => {
   // The handler reads caches.default and writes to it. Replace both, thus a test never uses the
-  // true Cache storage, which the pool keeps separate for each test. Without this, the write
-  // causes the same miniflare storage teardown problem that the plausible suite and the index
-  // suite also prevent. `match` gives a miss, which makes the code render. `put` does nothing.
+  // true Cache storage. test/plausible.test.ts gives the reason. `match` gives a miss, which makes
+  // the code render. `put` does nothing.
   beforeEach(() => {
     vi.spyOn(caches.default, 'match').mockResolvedValue(undefined);
     vi.spyOn(caches.default, 'put').mockResolvedValue(undefined);
@@ -433,8 +431,7 @@ describe('readOgTitle', () => {
     ).resolves.toBe('Early');
   });
 
-  // ⚠️ The getAttribute of HTMLRewriter returns the attribute as the source writes it, with the
-  // entities. Thus decodeEntities still runs on the result.
+  // ⚠️ HTMLRewriter does not decode an entity. Refer to decodeEntities in src/og.ts.
   it.each([
     ['&amp;', '&'],
     ['&lt;tag&gt;', '<tag>'],
@@ -451,9 +448,9 @@ describe('readOgTitle', () => {
   });
 
   // ⚠️ String.fromCodePoint raises RangeError above 0x10FFFF, and this code runs on a path that
-  // handleOg does not catch. Thus one bad entity in a published og:title made the card give a 500.
-  // The code keeps the entity as the source writes it and does not remove it. Thus the result is
-  // an entity that you can see, and not a gap with no message.
+  // handleOg does not catch. Thus one bad entity in an og:title would make the card give a 500.
+  // The code keeps the entity as the source writes it. Thus the result is an entity that you can
+  // see, and not a gap with no message.
   it.each([
     ['&#1114112;', '&#1114112;'],
     ['&#x110000;', '&#x110000;'],

@@ -68,10 +68,7 @@ export default class extends Controller {
     }
   }
 
-  /**
-   * Submits the form with fetch, and not with a native navigation.
-   * @param {SubmitEvent} event The submit event of the form.
-   */
+  /** Submits the form with fetch, and not with a native navigation. */
   async submit(event) {
     event.preventDefault();
     const form = this.element;
@@ -95,11 +92,9 @@ export default class extends Controller {
         body,
         signal: this.abortController.signal,
       });
-      // A 422 means that the API refuses the input. It is not a failure. A message that says
-      // "something went wrong, please try again" would be incorrect, and the visitor could do
-      // nothing with it: the same input fails in the same way, and resetTurnstile() already used
-      // their challenge. The form keeps its content, thus the visitor can correct the field and
-      // does not type the message again.
+      // A 422 means that the API refuses the input, and it is not a failure. The general message
+      // would be incorrect, because the same input fails in the same way. The form keeps its
+      // content, thus the visitor can correct the field.
       if (response.status === 422) {
         this.resetTurnstile();
         sendNotification(await this.errorMessage(response), 'error');
@@ -188,7 +183,6 @@ export default class extends Controller {
    * the body and it does not come back, and the user loses their place in the form.
    * ⚠️ aria-disabled does not stop a second submit, and it must not: `submit()` aborts the request
    * in progress and sends the new one, on purpose. Thus two presses still give one message.
-   * @param {boolean} isSubmitting True if a submission is in progress.
    */
   setSubmitting(isSubmitting) {
     if (!this.hasSubmitTarget) return;

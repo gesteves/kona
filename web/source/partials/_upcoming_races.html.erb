@@ -2,10 +2,8 @@
     at run time: the live-update controller puts a fragment here that adds the race-day weather of
     the featured race, its live-tracking link, and a separate "Today's Race" section.
 
-    ⚠️ It has live_update_attrs with `placeholder: false`, thus a fetch that fails keeps this
-    content and does not delete it. Do not add the placeholder flag: that flag means "I am an empty
-    skeleton". An EMPTY response still removes the section, and that is correct: it is the api
-    saying that there is no upcoming race.
+    ⚠️ Keep `placeholder: false`. This element holds real content, and with the placeholder flag
+    a fetch that fails deletes it. Refer to live_update_attrs.
 
     ⚠️ This element and api/app/views/widgets/events/upcoming.html.erb are a pair, and
     api/spec/contracts/widget_markup_contract_spec.rb tests the outer element of both. `url` is a

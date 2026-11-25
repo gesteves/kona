@@ -2,8 +2,8 @@ require 'spec_helper'
 require_relative '../../../lib/utils/dev_api_proxy'
 
 RSpec.describe DevApiProxy do
-  # It records each value that it gets, thus a test can check that the request went through with no
-  # change.
+  # The inner app answers with the path that it gets, thus a test can check that the request went
+  # through with no change.
   let(:inner) { ->(env) { [ 200, { 'content-type' => 'text/html' }, [ "page:#{env['PATH_INFO']}" ] ] } }
   let(:proxy) { described_class.new(inner) }
 

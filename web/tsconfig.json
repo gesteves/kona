@@ -1,13 +1,12 @@
 {
-  // Typecheck-only config for the Cloudflare Worker in src/. wrangler bundles with esbuild
-  // and never typechecks, so `npm run check` (tsc --noEmit) is the gate that validates the
-  // Worker before it ships.
+  // This file only checks the types of the Cloudflare Worker in src/. wrangler makes the bundle
+  // with esbuild and checks no type, thus `npm run check` (tsc --noEmit) is the type gate.
   //
-  // Deliberately NOT pulling in @cloudflare/workers-types: src/env.d.ts hand-writes the few
-  // Worker globals it needs (Env, Fetcher, ExecutionContext, caches.default) so the code
-  // typechecks against the standard lib.dom types. Adding workers-types here would collide
-  // with those shims (e.g. its ExecutionContext#waitUntil signature differs). `types: []`
-  // keeps ambient @types out so the shims stay authoritative.
+  // @cloudflare/workers-types is NOT here, on purpose. src/env.d.ts declares the Worker globals
+  // that the code needs (Env, Fetcher, ExecutionContext, caches.default, HTMLRewriter), and the
+  // code uses the standard lib.dom types. workers-types conflicts with those declarations: for
+  // example, its ExecutionContext#waitUntil is different. `types: []` keeps each ambient @types
+  // package out.
   "compilerOptions": {
     "target": "es2022",
     "module": "esnext",

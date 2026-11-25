@@ -76,11 +76,9 @@ describe('worker routing (src/index)', () => {
   });
 
   // ⚠️ This test uses a 405, which the code answers before the handler does its dynamic import of
-  // ../src/og-render. The vitest pool cannot load that module (refer to test/og.test.ts). The true
-  // behavior of the og route is in that file, with the render as a parameter.
-  // Each card path ends with /og.png. The card of the home page is /og.png itself, and the card of
-  // each other page comes from the path of that page. Both shapes must reach the renderer, and
-  // run_worker_first takes both: "/og.png" and "/*/og.png".
+  // ../src/og-render. The vitest pool cannot load that module (refer to test/og.test.ts), and that
+  // file tests the og route with the render as a parameter.
+  // Both card shapes must reach the route: /og.png for the home page, and /<page path>og.png.
   it.each(['/og.png', '/2026/06/26/some-post/og.png'])(
     'routes %s to the OG card renderer',
     async (path) => {
@@ -91,8 +89,6 @@ describe('worker routing (src/index)', () => {
   );
 
   it('serves everything else — including the feeds — straight from the asset layer', async () => {
-    // The Worker answered the feeds and changed the utm parameters for each reader. They are now
-    // plain assets.
     for (const path of [
       '/',
       '/about/',

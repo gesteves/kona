@@ -24,7 +24,7 @@ export default class extends Controller {
   }
 
   /**
-   * @param {string} locale - A BCP 47 language tag.
+   * @param {string} locale A BCP 47 language tag.
    * @returns {string|null} The region subtag, in upper case, or null.
    */
   regionOf(locale) {

@@ -17,8 +17,6 @@ module ShareHelpers
 
   # Makes the share URL of an article for one network.
   # @param network [String] A key of SHARE_NETWORKS.
-  # @param article [Article] The article to share.
-  # @return [String] The share URL.
   def share_url(network, article)
     config = SHARE_NETWORKS.fetch(network)
     parts = { title: sanitize(article.title), url: full_url(article.path) }
@@ -45,7 +43,6 @@ module ShareHelpers
     ]
   end
 
-  # @param article [Article] The article to share.
   # @return [String] The heading of the share section, with the type of the entry in it.
   def share_heading(article)
     # The match uses the concept id and not the name on the screen, as each other taxonomy check in

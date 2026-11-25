@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
-  <%# max and min are nil for an empty feed, and .rfc3339 and .strftime below would then raise. %>
+  <%# max is nil for an empty feed, and .rfc3339 below would then raise. %>
   <% updated = articles.map { |e| DateTime.parse(e.updated_at) }.max || DateTime.now %>
   <%# ⚠️ An Atom id is permanent. The date is the first publish of the Site entry, which never
       changes. The oldest entry would move when a person retags or unpublishes a post, and a reader
@@ -25,11 +25,10 @@
       <author>
         <name><%=h entry.author&.name.presence || data.site.author.name %></name>
       </author>
-      <%# ⚠️ This uses content_summary, and not entry.summary: a Short has no summary field, and Atom
-          needs content in this element. The `sanitize` at the end is also what escapes each entity
-          one time only: it decodes to Unicode, thus the smartypants below finds no straight
-          quotation mark to change into `&rsquo;`, and `h` then does not escape that a second time.
-          The title above uses sanitize first for the same reason. %>
+      <%# ⚠️ This uses content_summary, and not entry.summary: a Short has no summary field, and
+          Atom needs content in this element. The `sanitize` in content_summary also decodes each
+          entity to Unicode. Thus the smartypants below makes no new entity, and `h` does not escape
+          one a second time. The title above uses sanitize first for the same reason. %>
       <summary><%=h smartypants(content_summary(entry)) %></summary>
       <content type="html">
         <%=h render_feed_body(entry.intro) %>

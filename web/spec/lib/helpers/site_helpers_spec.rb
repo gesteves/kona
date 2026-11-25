@@ -3,8 +3,8 @@ require 'ostruct'
 require 'padrino-helpers'
 require 'hashie'
 
-# RSpec includes the module under test, thus you can call the instance methods of SiteHelpers
-# directly.
+# spec_helper.rb includes each helper module, thus an example calls the instance methods of
+# SiteHelpers directly.
 RSpec.describe SiteHelpers do
   include_context 'default helper stubs'
 
@@ -18,8 +18,8 @@ RSpec.describe SiteHelpers do
     )
   end
 
-  # Other helper modules usually supply these methods. This file defines them, thus the test runs
-  # the schema builders alone.
+  # No example in this file calls these three methods, or the `site` double above. Each group that
+  # reads `data` defines its own.
   def data = OpenStruct.new(site: @site || site)
   def site_icon_url(w:) = "https://example.com/icon-#{w}.png"
   def cdn_image_url(url, params = {}) = "#{url}?w=#{params[:w]}"
@@ -81,8 +81,6 @@ RSpec.describe SiteHelpers do
     end
   end
 
-  # page_title tests `content.is_a?(Hash)`, and each true proxied content object is a Middleman
-  # Mash, which is a Hash subclass with dot access. Hashie::Mash replaces one here.
   describe '#atom_tag' do
     # ⚠️ An Atom id is permanent: a reader keeps each entry by it. A change here would show every
     # entry as new.
@@ -150,6 +148,8 @@ RSpec.describe SiteHelpers do
     end
   end
 
+  # page_title tests `content.is_a?(Hash)`, and each true proxied content object is a Middleman
+  # Mash, which is a Hash subclass with dot access. Hashie::Mash replaces one in these two groups.
   describe '#title_tag' do
     include Padrino::Helpers
 
@@ -265,11 +265,9 @@ RSpec.describe SiteHelpers do
       expect(attrs).to be_html_safe
     end
 
-    # The placeholder flag tells the controller that this element holds a skeleton, and not real
-    # content. Thus the controller fetches on connect, and it removes the element if that fetch
-    # fails, and the element does not stay. The api fragment that replaces it must NOT have the
-    # flag, because a temporary failure would then delete content on the page. For that reason only
-    # the placeholder side writes it.
+    # The placeholder flag tells the controller that this element is a skeleton. The api fragment
+    # that replaces it must NOT have the flag, because a temporary failure would then delete content
+    # on the page. Thus only the placeholder side writes it.
     it 'marks the element a placeholder, since only the placeholder side of the contract does' do
       expect(live_update_attrs('/widgets/whoop')).to include('data-live-update-placeholder-value="true"')
     end
@@ -399,8 +397,8 @@ RSpec.describe SiteHelpers do
     end
   end
 
-  # No test covered these two, and split(':') with no limit removed the middle of a title with more
-  # than one colon, and gave no message.
+  # split(':') with no limit removes the middle of a title with more than one colon, and it gives
+  # no message.
   describe '#feed_title and #feed_subtitle' do
     def data = OpenStruct.new(site: OpenStruct.new(meta_title: @meta_title))
 

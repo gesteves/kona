@@ -97,9 +97,9 @@ describe('search controller', () => {
     document.removeEventListener('search:close', onClose);
   });
 
-  // ⚠️ The regression guard for the focus bug. Pagefind opens with showModal(), thus the browser
-  // gives the focus back to the trigger on a close — but on a mobile screen closeNav has just made
-  // that trigger `visibility: hidden`, and the focus then falls to the body.
+  // ⚠️ Pagefind opens with showModal(), thus the browser gives the focus back to the trigger on a
+  // close. On a mobile screen closeNav makes that trigger `visibility: hidden`, and the focus then
+  // goes to the body.
   describe('focus on close', () => {
     const openWithDialog = async (controller) => {
       const dialog = document.createElement('dialog');

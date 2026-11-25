@@ -4,17 +4,15 @@ require "httparty"
 # `middleman server` renders a complete page and does not remove each widget. The
 # `configure :development` block of config.rb registers it. `middleman build` never uses it.
 #
-# ⚠️ This is NOT a copy of web/src/api-proxy.ts and it must not become one. Each rule in that file —
-# the Age header that goes through, the ETag revalidation, an upstream request with the same bytes
-# for each shared cache entry, and the removal of the query string — exists to make one Cloudflare
-# edge cache entry safe for many viewers. Here there is no edge and there is one viewer. Thus this
-# code sends the status, the content type, and the body, and nothing more.
+# ⚠️ This is NOT a copy of src/api-proxy.ts and it must not become one. The rules in that file,
+# for example the Age header and the ETag revalidation, make one edge cache entry safe for many
+# viewers. Here there is no edge and there is one viewer, thus this code needs none of them.
 class DevApiProxy
   WIDGET_PREFIX = "/widgets/"
   CONTACT_PATH = "/api/contact"
 
-  # This is long, as it is in the Worker: the api can be a fly machine that starts from zero, or a
-  # local Rails that did not complete its start.
+  # This is long, because the api can be a fly machine that starts from zero, or a local Rails that
+  # did not complete its start. The Worker has its own, shorter limits for the same reason.
   TIMEOUT = 30
 
   # @param app [#call] The Rack app below this one, which is Middleman.

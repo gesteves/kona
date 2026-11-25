@@ -1,18 +1,16 @@
 # The selection and the markup of the upcoming-races section, at build time.
 #
-# ⚠️ These are a copy of `EventsHelper` and `UpcomingRacesPresenter` in the api, which render the
-# same section at request time and put it in place of this one. The two must agree on the races in
-# the list and on their order. If they do not, the change is visible in the section. This copy is
-# smaller, on purpose: the api also makes the next race a featured race with a race-day weather
-# block, and it gives the race of today its own section. The build cannot know either of those.
-# Refer to the root CLAUDE.md.
+# ⚠️ This is a copy of `EventsHelper` and `UpcomingRacesPresenter` in the api, which render the
+# same section at request time and put it in place of this one. The two must agree on the races
+# and on their order, or the section changes when the fragment arrives. This copy is smaller, on
+# purpose: the build cannot know the race-day weather or the race of today. Refer to the root
+# CLAUDE.md.
 module EventHelpers
   # The number of races in the section when there is no featured race. It is the same number that
   # the api uses in that condition.
   UPCOMING_RACES_COUNT = 3
 
   # The races for the list: the confirmed events of today or later, the soonest first.
-  # @param count [Integer] The number to return.
   # @return [Array] The events, the soonest first. An empty array removes the section.
   def upcoming_races(count: UPCOMING_RACES_COUNT)
     events = Array(data.events)
@@ -40,7 +38,6 @@ module EventHelpers
     end
   end
 
-  # @param event [Object] The event.
   # @return [String] The icon and the <time> span for an upcoming race, the same as the
   #   `event_timestamp_tag` of the api. Only a confirmed event comes here, thus the icon is always
   #   a calendar check.
@@ -55,10 +52,9 @@ module EventHelpers
   # The JSON-LD `SportsEvent` list for the races in the section. Thus a machine can read the same
   # events that the page shows.
   #
-  # ⚠️ The build writes this only for the events that it counts as upcoming. There is no build on a
-  # schedule, thus between two publishes this can name a race that already occurred. A `startDate`
-  # in the past makes the entry incorrect for an event rich result, but the entry is not wrong.
-  # That failure is acceptable here.
+  # ⚠️ There is no build on a schedule, thus between two publishes this can name a race that
+  # already occurred. That is acceptable: a `startDate` in the past only loses the event rich
+  # result, and the entry is not wrong.
   # @param events [Array] The events, from #upcoming_races.
   # @return [String, nil] The JSON-LD, or nil if there is nothing to list.
   def events_schema(events)
@@ -76,7 +72,6 @@ module EventHelpers
     zone.present? ? Time.now.in_time_zone(zone).to_date : Date.today
   end
 
-  # @param event [Object] The event.
   # @return [Hash, nil] One `SportsEvent` node, or nil if the code cannot parse the date.
   def event_schema(event)
     date = parse_event_date(event)
@@ -109,7 +104,6 @@ module EventHelpers
   # ⚠️ Contentful can hold an event with no date, and this code runs on the render path of the home
   # page. A plain parse would stop the full page because of one bad entry, and not remove one
   # card.
-  # @param event [Object] The event.
   # @return [Date, nil]
   def parse_event_date(event)
     date = event&.date

@@ -1,10 +1,8 @@
-// The on-demand Open Graph card route: <page path>og.png?v=<template ver>-<published ver>, or
-// -<CRC32 of the og:title> for a listing page.
-// The path of the card identifies the page, and not a query parameter. Thus /2026/06/26/post/
-// gets /2026/06/26/post/og.png, and the home page gets /og.png. The page names its own `v` in
-// its og:image, and this code renders that version only: a request with another `v` gets a
-// redirect to it. Thus each page has one card in the cache, and a card never needs a purge.
-// This renders the og:image for a page with no cover image. Refer to web/CLAUDE.md.
+// The on-demand Open Graph card route, for a page with no cover image: <page path>og.png?v=<v>.
+// The path of the card identifies the page: /2026/06/26/post/ gets /2026/06/26/post/og.png, and
+// the home page gets /og.png. The page names its own `v` in its og:image, and this code renders
+// that version only. Thus each page has one card in the cache, and a card never needs a purge.
+// Refer to web/CLAUDE.md.
 
 import { withSecurityHeaders } from './headers';
 
@@ -15,7 +13,7 @@ export type RenderCard = (title: string) => Promise<Uint8Array<ArrayBuffer>>;
 const lazyRender: RenderCard = async (title) =>
   (await import('./og-render')).renderCard(title);
 
-// The ".png" is important. Keep it the same as the run_worker_first globs in wrangler.jsonc.
+// Keep the ".png": the run_worker_first globs use it, and wrangler.jsonc gives the reason.
 const OG_FILENAME = 'og.png';
 export const OG_SUFFIX = `/${OG_FILENAME}`;
 
@@ -51,15 +49,12 @@ export function decodeEntities(text: string): string {
 }
 
 /**
- * Decodes one numeric character reference. If it cannot, it gives the entity as the source
- * writes it.
+ * Decodes one numeric character reference. If it cannot, it returns `match`, the full entity
+ * text, with no change.
  *
  * ⚠️ A code point outside the range makes `String.fromCodePoint` raise, and this runs on the path
  * of the OG route that catches nothing. One bad entity in an `og:title` would 500 the card.
- *
- * @param raw The digits from the entity.
- * @param radix 10 for a decimal reference, 16 for a hex reference.
- * @param match The full entity text. It returns this with no change if it cannot decode it.
+ * @param raw The digits of the entity.
  */
 function fromCodePoint(raw: string, radix: number, match: string): string {
   const n = parseInt(raw, radix);
@@ -73,11 +68,10 @@ export type OgMeta = { title: string | null; image: string | null };
 /**
  * Reads the og:title and the og:image of a page from its markup.
  *
- * This uses HTMLRewriter on a stream. It does not buffer the page and match a regex, because an
- * article page is a few hundred KB, this route is already near the Worker CPU limit, and the tags
- * are in `<head>`. Thus the read stops when it has both tags, or at the end of `<head>`, usually
- * in the first chunk.
- * @returns The decoded title and the image URL as the source writes it.
+ * This uses HTMLRewriter on a stream, and it does not buffer the page. An article page is large,
+ * this route is near the Worker CPU limit, and the tags are in `<head>`. Thus the read stops when
+ * it has both tags, or at the end of `<head>`.
+ * @returns The title and the image URL, each one decoded.
  */
 export async function readOgMeta(response: Response): Promise<OgMeta> {
   let title: string | null = null;
@@ -133,10 +127,10 @@ export async function readOgTitle(response: Response): Promise<string | null> {
 /**
  * The `v` that a page declares for this card, from its og:image.
  *
- * ⚠️ This is what limits the route. A well-formed `v` that the page does not declare would
- * otherwise be a cache miss that costs a full render, and there is no end to those values. A page
- * with a cover image names another image, and it has no card at all.
- * @param image The og:image of the page, as the source writes it.
+ * ⚠️ This is what limits the route. The caller supplies `v`, and each different value is a cache
+ * miss. Without this check, each miss costs a full satori and resvg render and a PNG in the edge
+ * cache. A page with a cover image names another image, and it has no card at all.
+ * @param image The og:image of the page.
  * @param cardPathname The path of this card.
  * @returns The value for the cache key, or null when the page does not name this card.
  */
@@ -157,19 +151,16 @@ function declaredVersion(
 
 /**
  * The only shape that `v` has. `image_helpers.rb` writes `<template>-<published_version>` for an
- * article, and `<template>-<CRC32 of the og:title>` for a listing page.
+ * article, `<template>-<CRC32 of the og:title>` for a listing page, and `<template>` with neither.
  */
 const VERSION_FORMAT = /^v\d+(-\d+)?$/;
 
 /**
  * Corrects `v` before it becomes part of the cache key.
  *
- * ⚠️ This is what limits the route. To remove the *unknown* params is not sufficient: the caller
- * supplies `v`, and each different value is a cache miss that costs a full satori and resvg
- * render, which is the slowest path in this Worker, and a 1200×630 PNG in the edge cache. This
- * code puts each value that it does not know on one key. Thus a bad URL, or a URL that a person
- * edited, still renders, but it renders one time.
- *
+ * ⚠️ Each value with an unknown shape goes on one key, thus such values cannot make many cache
+ * entries. A page that declares such a value still gets its card, on that key. `declaredVersion`
+ * limits the values with the known shape.
  * @param raw The `v` search param, or null if it is absent.
  * @returns The value for the cache key.
  */
@@ -208,7 +199,7 @@ function statusResponse(
 /**
  * Renders the OG card for the page of this path, or gives it from the cache.
  * @param render The card renderer. The default is the real one, which loads when it is necessary.
- * @returns A PNG, or a status-line response if the page is absent or the render fails.
+ * @returns A PNG, a 301 to the `v` that the page declares, or a status-line response.
  */
 export async function handleOg(
   request: Request,
@@ -231,10 +222,9 @@ export async function handleOg(
   // shape.
   const path = incoming.pathname.slice(0, -OG_FILENAME.length);
 
-  // Make the cache key again from the path and `v` only. `v` is what makes the content address a
-  // card. The removal of the unknown params stops `?x=<random>` from an unlimited number of
-  // entries, and each entry is a miss that costs a full render. It must be a GET, because
-  // caches.default serves only GET and put() raises for another method.
+  // Make the cache key from the path and `v` only. With an unknown param in the key,
+  // `?x=<random>` makes an unlimited number of entries, and each one costs a full render. The key
+  // must be a GET, because caches.default serves only GET and put() raises for another method.
   const cacheUrl = new URL(incoming);
   cacheUrl.search = '';
   cacheUrl.hash = '';
@@ -249,9 +239,9 @@ export async function handleOg(
       : new Response(cached.body, cached);
   }
 
-  // The page comes from the static assets of this deployment, thus there is no network request
-  // and nothing outside this deployment is available. The code sets `pathname` and does not make
-  // a new URL, thus even a "//evil.example" path stays on this host.
+  // The page comes from the static assets of this deployment, thus there is no network request.
+  // ⚠️ The code sets `pathname` and does not make a relative URL, for the same reason as
+  // api-proxy.ts. Thus a "//evil.example" path stays on this host.
   const target = new URL(incoming);
   target.pathname = path;
   target.search = '';

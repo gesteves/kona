@@ -53,7 +53,7 @@ export default class extends Controller {
   /**
    * Tells if the content of this widget is old enough for a new fetch. A URL with no fetch counts
    * as old.
-   * @returns {Boolean} True when the last fetch was MIN_REFETCH_MS ago or more.
+   * @returns {boolean} True when the last fetch was MIN_REFETCH_MS ago or more.
    */
   get isStale() {
     const lastFetchAt = lastFetchAtByUrl.get(this.urlValue);

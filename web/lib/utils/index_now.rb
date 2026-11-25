@@ -77,7 +77,6 @@ module IndexNow
     private
 
     # Reads the loc and the lastmod of each entry of the sitemap.
-    # @param path [String] The path of the sitemap.
     # @return [Hash{String => String}] Each URL, and its lastmod or an empty string.
     def parse_sitemap(path)
       document = Nokogiri::XML(File.read(path))
@@ -93,7 +92,6 @@ module IndexNow
     # Removes each URL that is not on the host of the site. IndexNow answers 422 for such a URL, and
     # a build that is not a production build writes localhost URLs into the sitemap.
     # @param current [Hash{String => String}] The sitemap of this build.
-    # @param site_url [String] The public origin of the site.
     # @return [Hash{String => String}] The URLs on that host.
     def same_host_only(current, site_url, logger)
       host = URI.parse(site_url.to_s.chomp("/")).host
@@ -124,7 +122,6 @@ module IndexNow
     end
 
     # @param current [Hash{String => String}] The sitemap of this build.
-    # @return [void]
     def write_current(current)
       RedisConnection.connection.set(REDIS_KEY, JSON.dump(current))
     end

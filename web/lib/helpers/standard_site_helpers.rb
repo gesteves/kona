@@ -7,8 +7,8 @@ module StandardSiteHelpers
 
   # Makes the document record key of a Contentful entry: the low 63 bits of the SHA-256 digest of
   # the sys.id, as a TID, because the site.standard.document lexicon needs one.
-  # This must stay the same as StandardSite#document_rkey of the api. If it does not, the AT URI here
-  # does not agree with the record that the api publishes to the PDS.
+  # This must stay the same as StandardSite#document_rkey of the api. If it does not, the AT URI
+  # here does not agree with the record that the api publishes to the PDS.
   # @param entry_id [String] The Contentful sys.id.
   # @return [String] A TID of 13 characters.
   def document_rkey(entry_id)

@@ -7,10 +7,10 @@ RSpec.describe UrlHelpers do
 
   def stub_env(deploy_context: nil, url: nil)
     allow(ENV).to receive(:[]).and_call_original
-    # Each test must stub DEPLOY_CONTEXT, and this includes a test that does not use it. A true build
-    # environment sets it, for example DEPLOY_CONTEXT=production, which rake loads from .env before
-    # the suite runs. Without a stub, that value goes through and_call_original and makes production?
-    # true here.
+    # Each test must stub DEPLOY_CONTEXT, and this includes a test that does not use it. A true
+    # build environment sets it, for example DEPLOY_CONTEXT=production, which rake loads from .env
+    # before the suite runs. Without a stub, that value goes through and_call_original and makes
+    # production? true here.
     allow(ENV).to receive(:[]).with('DEPLOY_CONTEXT').and_return(deploy_context)
     allow(ENV).to receive(:[]).with('URL').and_return(url)
   end

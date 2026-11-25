@@ -72,7 +72,7 @@ RSpec.describe MemoizationHelpers do
   end
 
   # ⚠️ A nil collection is a helper with no data, for example in a spec. The first call must still
-  # yield: `nil.equal?(nil)` is true, and a store with no entry gave nil back with no call.
+  # yield: `nil.equal?(nil)` is true, and a store with no entry would give nil back with no call.
   it 'yields on the first call for a nil collection, then keeps the value' do
     calls = 0
     first = memoize_by_collection(:nil_collection, nil) { calls += 1; { a: 1 } }

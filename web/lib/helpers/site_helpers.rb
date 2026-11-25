@@ -18,9 +18,7 @@ module SiteHelpers
   end
 
   # Makes an Atom tag URI from a URL and a date.
-  # @param url [String] The URL to change.
   # @param date [Date, Time] The date for the tag.
-  # @return [String] The Atom tag URI.
   def atom_tag(url, date)
     tag = url.gsub(/^http(s)?:\/\//, "").gsub("#", "/").split("/")
     tag[0] = "tag:#{tag[0]},#{date.strftime('%Y-%m-%d')}:"
@@ -30,7 +28,6 @@ module SiteHelpers
   # Makes the page title.
   # @param content [Hash, String] A content object (this uses its :title) or a title string.
   # @param include_site_name [Boolean] True to add the title of the site at the end.
-  # @param separator [String] The separator between the title parts.
   # @return [String] The title, after the app removes unsafe markup.
   def page_title(content, include_site_name: false, separator: " · ")
     title = []
@@ -59,12 +56,10 @@ module SiteHelpers
 
   # Renders the placeholder partial of a runtime widget. The partial points at the endpoint that
   # the live-update controller gets on connect.
-  # Do not use <link rel="preload" as="fetch"> with these. The app serves widget fragments with
-  # `max-age=0` and no validator. Thus a preloaded copy is already old when it arrives, and the
-  # controller makes a second full request instead of a re-use of that copy.
+  # Do not use <link rel="preload" as="fetch"> with these. A widget fragment has `max-age=0`, thus
+  # a preloaded copy is already old when it arrives, and the controller makes a second request.
   # @param name [String] The base name of the partial in partials/placeholders/.
   # @param url [String] The same-origin widget endpoint. It goes to the partial as `url`.
-  # @return [String] The rendered placeholder.
   def render_widget(name, url)
     partial "partials/placeholders/#{name}", locals: { url: url }
   end
@@ -96,7 +91,6 @@ module SiteHelpers
   # the web↔api contract in the root CLAUDE.md.
   # @param url [String] The same-origin widget endpoint.
   # @param placeholder [Boolean] True if this element is an empty skeleton with no real content.
-  # @return [String] The HTML attributes.
   def live_update_attrs(url, placeholder: true)
     # The app always makes url as a same-origin path. It is never user input, thus it needs no
     # escape. aria-busy shows that the skeleton still loads. The api fragment that replaces it
@@ -104,32 +98,27 @@ module SiteHelpers
     # reads the change as "finished", and not as one nameless area in place of another.
     #
     # ⚠️ Use `placeholder: false` for an element that the build renders with REAL content. The
-    # flag means "I am an empty skeleton". It makes the controller remove the element when a
-    # fetch fails, and on real content that deletes the content. Such an element still fetches on
-    # connect, because a URL with no fetch counts as old. Thus the removal of the flag costs no
-    # freshness. An empty response still removes the element, which is the "no data" answer from
-    # the api.
+    # flag makes the controller remove the element when a fetch fails, and that deletes the content.
+    # Such an element still gets the fragment on connect, because a URL with no fetch counts as
+    # old. An empty response still removes it, which is the "no data" answer from the api.
     attrs = %(data-controller="live-update" data-live-update-url-value="#{url}")
     attrs += %( data-live-update-placeholder-value="true" aria-busy="true") if placeholder
     attrs += %( data-action="visibilitychange@document->live-update#handleVisibilityChange")
     attrs.html_safe
   end
 
-  # The longest description that this method returns. A search engine shows approximately 160
-  # characters and each unfurl cuts at its own length, thus a longer string only removes the control
-  # of what a reader sees.
+  # The longest description that content_summary returns. A search engine shows approximately 160
+  # characters and each unfurl cuts at its own length, thus a longer string only removes the
+  # control of what a reader sees.
   SUMMARY_LENGTH = 200
 
-  # @param content [Object] A content object.
-  # @return [String] The summary, the intro, or the meta description of the site — the first one
+  # @return [String] The summary, the intro, or the meta description of the site: the first one
   #   that exists, cut to SUMMARY_LENGTH.
   #
-  # ⚠️ The cut is at the END, and it covers each branch. A Short has no summary field and its intro
-  # is the full post, thus that branch gave a description of some thousands of characters. An
-  # authored `summary` has no limit either. One cut here is one rule.
-  # ⚠️ Four places read this: the meta description, og:description, BlogPosting.description, and the
-  # Atom <summary>. The Atom <content> still holds the full post, thus a shorter summary there is
-  # correct.
+  # ⚠️ The cut is at the END, and it covers each branch. The intro of a Short is the full post,
+  # and an authored `summary` has no limit.
+  # ⚠️ The meta description, og:description, the JSON-LD descriptions, and the Atom <summary> read
+  # this. The Atom <content> holds the full post, thus a short summary there is correct.
   def content_summary(content)
     summary = if content.summary.present?
       content.summary
@@ -233,8 +222,6 @@ module SiteHelpers
   # Makes a social media link. A "Feed" link copies its URL instead of navigation.
   # @param title [String] The name of the platform.
   # @param destination [String] The profile URL.
-  # @param css_class [String] A CSS class for the link.
-  # @param open_in_new_tab [Boolean] True to open the link in a new tab.
   # @return [String] An anchor element that contains an SVG icon.
   def social_media_link(title:, destination:, css_class: nil, open_in_new_tab: true)
     icon = if title.downcase == "feed"
@@ -288,8 +275,6 @@ module SiteHelpers
   # ⚠️ A destination comes from Contentful, thus it can have a slash at the end or no slash. The
   # comparison adds the slash to both, because `activate :directory_indexes` puts each page at
   # /<slug>/. An absolute URL and a protocol-relative URL are never the current page.
-  # @param destination [String] The destination of the menu item.
-  # @return [Boolean]
   def current_shortcut?(destination)
     return false if destination.blank?
     return false if destination.match?(%r{\A([a-z][a-z0-9+.\-]*:|//)}i)

@@ -1,8 +1,8 @@
 // The on-demand loader for the Pagefind Component UI. It is not in the <head>, thus it never
-// delays the first paint. Three parts of the app call the one loadPagefind(), which keeps its
-// result. Thus nobody waits in practice, and the three parts cannot add the elements two times: a
-// load at the first idle moment after `load`, a load when the pointer or the focus goes to a Search
-// button, and a call in `search#open` that waits for the result.
+// delays the first paint. Three callers use the one loadPagefind(), which keeps its result: the
+// first idle moment after `load`, a pointer or a focus on a Search button, and `search#open`,
+// which waits for the result. Thus nobody waits in practice, and nothing adds the elements two
+// times.
 
 const CSS_HREF = '/pagefind/pagefind-component-ui.css';
 const JS_SRC = '/pagefind/pagefind-component-ui.js';
@@ -15,7 +15,6 @@ let idleScheduled = false;
 /**
  * Resolves after an element loads or fails to load. A failure is not unusual: `/pagefind/` does not
  * exist in development, where the search does nothing, on purpose.
- * @param {HTMLElement} element - The element to watch.
  * @returns {Promise<boolean>} True if the element loaded.
  */
 function settleOnLoad(element) {
@@ -50,8 +49,7 @@ export function loadPagefind() {
   js.type = 'module';
   js.src = JS_SRC;
   const jsSettled = settleOnLoad(js);
-  // The two elements have no `data-turbo-track`. An element with no such mark stays through a
-  // navigation, which is correct here, because no rendered page contains them.
+  // Neither element has `data-turbo-track`, for the same reason as in lib/wa_theme.js.
   document.head.appendChild(js);
 
   // A load that fails forgets its result and removes its elements. Thus the next call, from a
@@ -85,8 +83,7 @@ export function preloadPagefindWhenIdle() {
   idleScheduled = true;
 
   const schedule = () => {
-    // Safari has requestIdleCallback only from version 17. Use a plain timeout for the older
-    // versions.
+    // Some Safari versions have no requestIdleCallback. Use a plain timeout there.
     if (typeof window.requestIdleCallback === 'function') {
       window.requestIdleCallback(() => loadPagefind(), { timeout: 3000 });
     } else {

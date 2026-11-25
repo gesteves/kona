@@ -28,7 +28,6 @@ export default class extends Controller {
   /**
    * Copies the permalink to the clipboard with the native Clipboard API, and stops the navigation
    * of the link. It runs in the click, thus the browser permits writeText.
-   * @param  {Event} event The click event from the button.
    */
   copy(event) {
     event.preventDefault();
@@ -40,16 +39,13 @@ export default class extends Controller {
       .catch(() => this.unsuccessfulCopy());
   }
 
-  /**
-   * @return {String} The href of the button, as an absolute permalink.
-   */
+  /** @returns {string} The href of the button, as an absolute permalink. */
   getPermalink() {
     return absoluteUrl(this.element.getAttribute('href'));
   }
 
   /**
    * Puts a check in place of the link icon for two seconds, shows a toast, and records the copy.
-   * @param {String} permalink The URL that the code copied.
    */
   successfulCopy(permalink) {
     if (this.hasLinkTarget && this.hasCheckTarget) {

@@ -53,8 +53,6 @@ describe('loadPagefind', () => {
 
     pagefind.loadPagefind();
 
-    // The source order is the only reason that the dark-mode rules win. With the stylesheet at the
-    // end, the modal is light in the dark mode, and only this order in the DOM shows the cause.
     expect(stylesheets()).toEqual([CSS_HREF, '/stylesheets/site.css']);
   });
 
@@ -166,7 +164,7 @@ describe('preloadPagefindWhenIdle', () => {
   });
 
   it('falls back to a timeout where requestIdleCallback is missing', () => {
-    // Safari has requestIdleCallback only from version 17.
+    // Some Safari versions have no requestIdleCallback.
     vi.useFakeTimers();
     delete window.requestIdleCallback;
 

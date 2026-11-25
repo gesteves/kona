@@ -31,8 +31,7 @@ module CspHelpers
   # iframe. Thus each script host is also a frame host.
   # @return [Hash{Symbol => Array<String>}] `:frame` and `:script`, each sorted.
   def embed_origins
-    # ⚠️ Both collections are in the key. With the articles alone, an edit to a page on the
-    # development server kept the old frame-src.
+    # ⚠️ Both collections are in the key. Refer to MemoizationHelpers#memoize_by_collection.
     memoize_by_collection(:embed_origins, data.articles, data.pages) do
       frames = Set.new
       scripts = Set.new
@@ -51,9 +50,9 @@ module CspHelpers
     (CSP_BASE_HOSTS + embed_origins[:frame]).uniq
   end
 
-  # @return [Array<String>] The sources of `script-src`.
   # ⚠️ 'wasm-unsafe-eval' is for Pagefind, which compiles WebAssembly at each search. It permits
   # WebAssembly only, and not eval. Without it, an enforced policy stops the search.
+  # @return [Array<String>] The sources of `script-src`.
   def csp_script_src
     ([ "'self'", plausible_init_script_hash, "'wasm-unsafe-eval'" ] + CSP_BASE_HOSTS + embed_origins[:script]).uniq
   end

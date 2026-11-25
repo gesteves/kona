@@ -4,9 +4,11 @@ require "nokogiri"
 
 # Renders Markdown bodies and does the HTML transformations that the Contentful editor cannot
 # do: responsive images and tables, figures, permalinks, and more.
+#
+# Each transform takes `html` as a String or as a parsed Nokogiri node, and it returns the same
+# type. Refer to #with_nokogiri_doc.
 module MarkupHelpers
-  # Includes the common emoji blocks, the variation selectors, and the skin tone modifiers. It is
-  # a constant, thus wrap_figcaption_emoji does not make it again for each text node.
+  # Includes the common emoji blocks, the variation selectors, and the skin tone modifiers.
   EMOJI_REGEX = /([\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E6}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F900}-\u{1F9FF}]|[\u{1F018}-\u{1F270}])[\u{FE00}-\u{FE0F}\u{1F3FB}-\u{1F3FF}]?/
   # A group of adjacent emoji, and the spaces between them.
   EMOJI_RUN_REGEX = /((?:#{EMOJI_REGEX.source}(?:\s*#{EMOJI_REGEX.source})*))/
@@ -27,12 +29,12 @@ module MarkupHelpers
 
   # Renders the body of an entry through the full transform pipeline.
   #
-  # ⚠️ With no `first_image`, the result is a function of the text and the variant alone, and the
-  # code keeps it: each card of a listing page renders the intro of its entry, and the blog index
-  # and the tag archives render the same intro many times. With a `first_image` the result names
-  # the LCP image of THIS page, thus the code renders it each time.
+  # ⚠️ With no `first_image`, the code keeps the result by text, variant, and link section: the
+  # blog index and the tag archives render the same intro many times. With a `first_image`, the
+  # result names the LCP image of THIS page, thus the code renders it each time.
   # @param text [String] The Markdown text to render.
-  # @param image_variant [Symbol] The responsive-images configuration to use.
+  # @param image_variant [Symbol] The name of a variant in data/srcsets.yml.
+  # @param first_image [Symbol, nil] Refer to #responsivize_images.
   # @param link_section [String, nil] The analytics section of each link to an article. With nil,
   #   the links get no analytics classes.
   # @return [String] The HTML after the transforms.
@@ -86,10 +88,9 @@ module MarkupHelpers
   # Renders the body of an entry for the Atom feed. It does not do the transforms that a feed
   # reader cannot use.
   #
-  # ⚠️ The result is a function of the text alone, and the code keeps it. Each tag has a feed, and
-  # each feed renders the same 25 entries: without the memo, one build rendered each body
-  # approximately forty times.
-  # @param text [String] The Markdown text to render.
+  # ⚠️ The code keeps the result by text. The main feed renders the 25 newest entries, and the
+  # feed of each tag renders the first 25 of that tag. Thus one entry is in many feeds, and
+  # without the memo the build renders its body again for each one.
   # @return [String] The HTML after the transforms.
   def render_feed_body(text)
     memoize_entry(:rendered_feed_bodies, text, data.articles, data.assets) { render_feed_body_now(text) }
@@ -110,17 +111,15 @@ module MarkupHelpers
   end
 
   # Renders a body for the home page, with square images and no change to the degree notation.
-  # @param text [String] The Markdown text to render.
   # @return [String] The HTML after the transforms.
   def render_home_body(text)
     render_markup(text, degrees: false) do |doc|
       add_image_data_attributes(doc)
       add_figure_elements_to_images(doc, base_class: "home")
       set_caption_credit(doc)
-      # ⚠️ `first_image: :eager` is correct HERE and almost nowhere else. A measurement of the
-      # home page gave this image as the LCP element: it is above the fold, and each other
-      # candidate is text. The `home` variant has no `auto` in its `sizes` for the same reason:
-      # `auto` is valid on a lazy image only. Refer to data/srcsets.yml.
+      # ⚠️ `first_image: :eager` is correct HERE and almost nowhere else. This image is the LCP
+      # element of the home page: it is above the fold, and each other candidate is text. Thus
+      # the `home` variant has no `auto` in its `sizes`. Refer to data/srcsets.yml.
       responsivize_images(doc, widths: data.srcsets.home.widths, sizes: data.srcsets.home.sizes.join(", "),
                           square: true, first_image: :eager)
       add_image_placeholders(doc)
@@ -129,9 +128,7 @@ module MarkupHelpers
   end
 
   # Renders the description of a taxonomy concept: inline treatments only, no images and no
-  # tables. The affiliate step runs last, thus its rel and target replace those from the
-  # external-link step.
-  # @param text [String] The Markdown description.
+  # tables.
   # @return [String] The HTML after the transforms.
   def render_tag_description(text)
     render_markup(text) do |doc|
@@ -142,7 +139,6 @@ module MarkupHelpers
   end
 
   # Adds the title of an entry to the start of its body, as a bold run-in.
-  # @param title [String] The title of the entry.
   # @param html [String] The rendered body HTML.
   # @param hidden_from_at [Boolean] Marks the run-in aria-hidden, for a page where a
   #   visually-hidden <h1> already speaks the title.
@@ -174,8 +170,6 @@ module MarkupHelpers
 
   # Changes the `data-imperial` shorthand from Contentful into the attributes of the units
   # Stimulus controller.
-  # @param html [String, Nokogiri::XML::Node] The HTML to change.
-  # @return [String, Nokogiri::XML::Node] The HTML after the change.
   # @example
   #   add_unit_data_attributes('<span data-imperial="6.21 mi">10 km</span>')
   #   # => '<span data-units-imperial-value="6.21 mi" data-units-metric-value="10 km" data-controller="units">10 km</span>'
@@ -192,8 +186,6 @@ module MarkupHelpers
 
   # Adds the Contentful asset id and the original URL to each <img>. The subsequent image
   # transforms read them.
-  # @param html [String, Nokogiri::XML::Node] The HTML to change.
-  # @return [String, Nokogiri::XML::Node] The HTML after the change.
   def add_image_data_attributes(html)
     with_nokogiri_doc(html) do |doc|
       doc.css("img").each do |img|
@@ -207,18 +199,15 @@ module MarkupHelpers
 
   # Puts each image in a <figure>. The other content of the same paragraph goes into a
   # <figcaption>.
-  # @param html [String, Nokogiri::XML::Node] The HTML to change.
   # @param base_class [String] The base class for the figure. The content type of the asset goes
   #   at the end of it.
-  # @return [String, Nokogiri::XML::Node] The HTML after the change.
   def add_figure_elements_to_images(html, base_class: nil)
     with_nokogiri_doc(html) do |doc|
       doc.css("img").each do |img|
         parent = img.parent
-        # ⚠️ This uses "all the other content of the parent" as the caption, then replaces the
-        # parent. Thus two images in one paragraph would put the markup of the second image in
-        # the <figcaption> of the first, and remove it while this loop still reads it. A
-        # paragraph with more than one image gets no figure, and not a bad one.
+        # ⚠️ A paragraph with more than one image gets no figure. The caption is all the other
+        # content of the parent, thus the second image would go in the <figcaption> of the first,
+        # and the replace of the parent would remove it while this loop still reads it.
         next if parent.css("img").size > 1
 
         # Remove the image, thus the caption is the remainder of the parent. Then put it back.
@@ -245,9 +234,6 @@ module MarkupHelpers
   end
 
   # Puts each iframe in a <figure>.
-  # @param html [String, Nokogiri::XML::Node] The HTML to change.
-  # @param base_class [String] The base class for the figure.
-  # @return [String, Nokogiri::XML::Node] The HTML after the change.
   def add_figure_elements_to_iframes(html, base_class: nil)
     with_nokogiri_doc(html) do |doc|
       doc.css("iframe").each do |iframe|
@@ -258,9 +244,6 @@ module MarkupHelpers
 
   # Puts each social media embed in a <figure>. A Bluesky, Instagram, or Threads embed is a
   # blockquote and then a script.
-  # @param html [String, Nokogiri::XML::Node] The HTML to change.
-  # @param base_class [String] The base class for the figure.
-  # @return [String, Nokogiri::XML::Node] The HTML after the change.
   def add_figure_elements_to_embeds(html, base_class: nil)
     with_nokogiri_doc(html) do |doc|
       doc.css("blockquote + script").each do |script|
@@ -274,8 +257,6 @@ module MarkupHelpers
 
 
   # Splits each figcaption at " | " and puts the credit at the end in a <cite>.
-  # @param html [String, Nokogiri::XML::Node] The HTML to change.
-  # @return [String, Nokogiri::XML::Node] The HTML after the change.
   def set_caption_credit(html)
     with_nokogiri_doc(html) do |doc|
       doc.css("figcaption").each do |figcaption|
@@ -316,8 +297,6 @@ module MarkupHelpers
   end
 
   # Puts each group of emoji in a figcaption in a <span class="emoji">, thus CSS can style them.
-  # @param html [String, Nokogiri::XML::Node] The HTML to change.
-  # @return [String, Nokogiri::XML::Node] The HTML after the change.
   def wrap_figcaption_emoji(html)
     with_nokogiri_doc(html) do |doc|
       doc.css("figcaption").each do |figcaption|
@@ -326,8 +305,7 @@ module MarkupHelpers
           next unless text_content.match?(EMOJI_REGEX)
 
           # ⚠️ This makes nodes, and it does not parse a string as HTML. The content of a text node
-          # is plain text, thus a "<" in a caption would become an element in a parse. Adjacent
-          # emoji, and the spaces between them, go in one span.
+          # is plain text, thus a "<" in a caption would become an element in a parse.
           document = text_node.document
           add_text = lambda do |part|
             text_node.add_previous_sibling(Nokogiri::XML::Text.new(part, document)) unless part.empty?
@@ -352,11 +330,12 @@ module MarkupHelpers
     end
   end
 
-  # Marks the first asset image of the page as the probable LCP element.
+  # Gives the LCP mark to the first image of the page that asks for it. Thus a caller can ask for
+  # each image, and one image only takes the mark.
   #
-  # ⚠️ The flag is an instance variable, thus it covers the full page: `_body.html.erb` calls
-  # render_body two times, for the intro and for the body, and only the first image of the two gets
-  # the mark. Middleman gives each page its own template context. Refer to MemoizationHelpers.
+  # ⚠️ The flag is an instance variable, and Middleman gives each page its own template context
+  # (refer to MemoizationHelpers). Thus it covers the full page: `_body.html.erb` calls render_body
+  # for the intro and for the body, and only the first image of the two gets the mark.
   # @return [Boolean] True one time for each page, and false after that.
   def claim_lcp_image
     return false if @lcp_image_claimed
@@ -372,16 +351,12 @@ module MarkupHelpers
   #   :eager     the same, and `loading="eager"`.
   #
   # ⚠️ Use `:eager` only where a measurement gives that image as the LCP element, and only with a
-  # `sizes` list that has no `auto`. `auto` is valid on a lazy image only, and a browser ignores it
-  # on an eager image. Today the home page hero is the one such image. Most body images are below
-  # the fold, thus `:priority` is correct there and `:eager` would get an image that nobody sees.
-  # @param html [String, Nokogiri::XML::Node] The HTML to change.
+  # `sizes` list that has no `auto`. Refer to the `home` variant of data/srcsets.yml. Most body
+  # images are below the fold, thus `:priority` is correct there and `:eager` would get an image
+  # that nobody sees.
   # @param widths [Array<Integer>] The candidate widths. The width of the asset is the maximum.
-  # @param sizes [String] The value of the sizes attribute.
-  # @param lazy [Boolean] True to load the image only when it is necessary.
   # @param square [Boolean] True to cut the image to a square.
   # @param first_image [Symbol, nil] :priority, :eager, or nil for no role.
-  # @return [String, Nokogiri::XML::Node] The HTML after the change.
   def responsivize_images(html, widths: [ 100, 200, 300 ], sizes: "100vw", lazy: true, square: false,
                           first_image: nil)
     with_nokogiri_doc(html) do |doc|
@@ -409,8 +384,7 @@ module MarkupHelpers
         img["srcset"] = srcset(url: original_url, widths: img_widths, ratio: (1 if square), options: { fm: "auto" })
 
         # ⚠️ The src must be one of the candidates above, word for word: the same parameters, in the
-        # same order. Cloudflare renders and bills one transformation for each different URL, thus a
-        # src that only looks the same is a second render of each image that no browser uses.
+        # same order. Refer to ImageHelpers#cover_image_tag for the reason.
         src_width = img_widths.max
         src_query = { fm: "auto", w: src_width }
         src_query.merge!({ h: src_width, fit: "cover" }) if square
@@ -420,9 +394,6 @@ module MarkupHelpers
   end
 
   # Sets the src of each asset image to a transformation with the given maximum width.
-  # @param html [String, Nokogiri::XML::Node] The HTML to change.
-  # @param width [Integer] The maximum width.
-  # @return [String, Nokogiri::XML::Node] The HTML after the change.
   def resize_images(html, width: 1000)
     with_nokogiri_doc(html) do |doc|
       each_asset_image(doc) do |img, asset_id, original_url|
@@ -439,8 +410,6 @@ module MarkupHelpers
 
   # Adds the blurhash placeholder of each asset image as a CSS custom property. It also adds the
   # Stimulus attributes that remove the placeholder after the image loads.
-  # @param html [String, Nokogiri::XML::Node] The HTML to change.
-  # @return [String, Nokogiri::XML::Node] The HTML after the change.
   def add_image_placeholders(html)
     with_nokogiri_doc(html) do |doc|
       each_asset_image(doc) do |img, asset_id, _original_url|
@@ -454,8 +423,6 @@ module MarkupHelpers
   end
 
   # Sets the alt text of each asset image from its Contentful description.
-  # @param html [String, Nokogiri::XML::Node] The HTML to change.
-  # @return [String, Nokogiri::XML::Node] The HTML after the change.
   def set_alt_text(html)
     with_nokogiri_doc(html) do |doc|
       each_asset_image(doc) do |img, asset_id, _original_url|
@@ -466,8 +433,6 @@ module MarkupHelpers
   end
 
   # Puts each table in a <wa-scroller>, thus it scrolls horizontally at a small breakpoint.
-  # @param html [String, Nokogiri::XML::Node] The HTML to change.
-  # @return [String, Nokogiri::XML::Node] The HTML after the change.
   def responsivize_tables(html, css_class: "entry__table")
     with_nokogiri_doc(html) do |doc|
       doc.css("table").each { |table| table.wrap("<wa-scroller class=\"#{css_class}\" orientation=\"horizontal\"></wa-scroller>") }
@@ -476,12 +441,10 @@ module MarkupHelpers
 
   # Gives each list in the body an explicit list role.
   #
-  # ⚠️ This is necessary, and it is not a duplicate of the implicit role. Safari removes the list
-  # semantics from VoiceOver for a list with `list-style: none`, and base/_extends.scss sets that on
-  # each body list. An <ol> is the worst case: it also draws its number from a CSS counter, thus a
-  # numbered list reads as prose with no order and no count.
-  # @param html [String, Nokogiri::XML::Node] The HTML to change.
-  # @return [String, Nokogiri::XML::Node] The HTML after the change.
+  # ⚠️ This is not a duplicate of the implicit role. Safari removes the list semantics from
+  # VoiceOver for a list with `list-style: none`, and base/_extends.scss sets that on each body
+  # list. An <ol> also draws its number from a CSS counter, thus a numbered list reads as prose
+  # with no order and no count.
   def restore_list_semantics(html)
     with_nokogiri_doc(html) do |doc|
       doc.css("ul, ol").each { |list| list["role"] = "list" }
@@ -489,8 +452,6 @@ module MarkupHelpers
   end
 
   # Marks table header cells as column headers.
-  # @param html [String, Nokogiri::XML::Node] The HTML to change.
-  # @return [String, Nokogiri::XML::Node] The HTML after the change.
   def scope_table_headers(html)
     with_nokogiri_doc(html) do |doc|
       doc.css("thead th").each { |th| th["scope"] = "col" }
@@ -499,9 +460,6 @@ module MarkupHelpers
 
   # Puts the text after the first <br> of a table cell in an element. Thus the annotation at the
   # end can be less prominent than the measurement that it describes.
-  # @param html [String, Nokogiri::XML::Node] The HTML to change.
-  # @param css_class [String] The class for the annotation.
-  # @return [String, Nokogiri::XML::Node] The HTML after the change.
   def split_table_cell_annotations(html, css_class: "entry__table-annotation")
     with_nokogiri_doc(html) do |doc|
       doc.css("table th, table td").each do |cell|
@@ -522,19 +480,15 @@ module MarkupHelpers
   end
 
   # Adds a copy-to-clipboard permalink anchor at the start of each h2 and h3 that has an id.
-  # @param html [String, Nokogiri::XML::Node] The HTML to change.
-  # @return [String, Nokogiri::XML::Node] The HTML after the change.
   def add_heading_permalinks(html)
     with_nokogiri_doc(html) do |doc|
       doc.css("h2, h3").each do |heading|
         heading_id = heading["id"]
         next if heading_id.blank?
         heading_text = heading.text
-        # ⚠️ Give the heading a name before you put the permalink in it. The accessible name from
-        # content goes into the anchor and reads *its* aria-label. Without this name, each
-        # heading speaks as "Permalink to Foo Foo". A name on the heading has more importance
-        # than its content. Thus the link stays fully accessible, and it is not hidden from
-        # assistive technology.
+        # ⚠️ Give the heading a name before you put the permalink in it. Without this name, the
+        # name of the heading includes the aria-label of the anchor, and each heading speaks as
+        # "Permalink to Foo Foo". The link stays accessible, because nothing hides it.
         heading["aria-label"] = heading_text
         label = CGI.escapeHTML("Permalink to #{heading_text}")
         permalink = <<~HTML
@@ -554,8 +508,6 @@ module MarkupHelpers
 
   # Marks each Amazon Associates link as sponsored and opens it in a new tab. It adds to the rel
   # that the author wrote, as open_external_links_in_new_tabs does.
-  # @param html [String, Nokogiri::XML::Node] The HTML to change.
-  # @return [String, Nokogiri::XML::Node] The HTML after the change.
   def mark_affiliate_links(html)
     with_nokogiri_doc(html) do |doc|
       doc.css("a").each do |a|
@@ -568,8 +520,6 @@ module MarkupHelpers
   end
 
   # Adds target=_blank and rel=noopener to each link to a different site.
-  # @param html [String, Nokogiri::XML::Node] The HTML to change.
-  # @return [String, Nokogiri::XML::Node] The HTML after the change.
   def open_external_links_in_new_tabs(html)
     with_nokogiri_doc(html) do |doc|
       current_host = URI.parse(root_url).host
@@ -589,9 +539,6 @@ module MarkupHelpers
   end
 
   # Adds the Article Click analytics classes to each link to an article on this site.
-  # @param html [String, Nokogiri::XML::Node] The HTML to change.
-  # @param section [String] The analytics section of the links.
-  # @return [String, Nokogiri::XML::Node] The HTML after the change.
   def track_article_links(html, section)
     with_nokogiri_doc(html) do |doc|
       current_host = URI.parse(root_url).host
@@ -609,12 +556,8 @@ module MarkupHelpers
   end
 
   # Renders a tag that is connected to the units Stimulus controller.
-  # @param metric [String] The metric text.
-  # @param imperial [String] The imperial text.
-  # @param tag [Symbol] The element to render.
   # @param attrs [Hash] More attributes for the element, for example a class. A `title` replaces
   #   the default "metric | imperial", for a number whose unit is in another element.
-  # @return [String] An HTML tag.
   def units_tag(metric, imperial, tag = :span, **attrs)
     title = attrs.delete(:title) || "#{metric} | #{imperial}"
     content_tag tag.to_sym, 'data-controller': "units", 'data-units-imperial-value': imperial, 'data-units-metric-value': metric, title: title, **attrs do
@@ -623,8 +566,6 @@ module MarkupHelpers
   end
 
   # Makes each link to a feed copy its URL to the clipboard. The link does not navigate.
-  # @param html [String, Nokogiri::XML::Node] The HTML to change.
-  # @return [String, Nokogiri::XML::Node] The HTML after the change.
   def copy_feed_links(html)
     with_nokogiri_doc(html) do |doc|
       doc.css("a").each do |link|
@@ -636,14 +577,11 @@ module MarkupHelpers
     end
   end
 
-  # Gives each iframe an accessible name.
+  # Gives each iframe with no title an accessible name. It keeps a title that the author wrote.
   #
-  # ⚠️ A frame with no name is a serious WCAG failure: a screen reader announces only "frame". An
-  # embed comes from raw HTML in the Contentful body, thus a person writes it by hand and a `title`
-  # is easy to forget. This step is the one thing between that and a page with no name for its
-  # player. It never replaces a title that the author wrote.
-  # @param html [String, Nokogiri::XML::Node] The HTML to change.
-  # @return [String, Nokogiri::XML::Node] The HTML after the change.
+  # ⚠️ A person writes each embed by hand, as raw HTML in the Contentful body, and can omit the
+  # `title`. A screen reader announces a frame with no name as "frame" only, and that is a serious
+  # WCAG failure.
   def set_iframe_titles(html)
     with_nokogiri_doc(html) do |doc|
       doc.css("iframe").each do |iframe|
@@ -653,16 +591,14 @@ module MarkupHelpers
     end
   end
 
-  # Removes the width rules from the inline style of each iframe. Thus the body stylesheet gives each
-  # embed the full width of the text column. A video embed also loses its width and height
+  # Removes the width rules from the inline style of each iframe. Thus the body stylesheet gives
+  # each embed the full width of the text column. A video embed also loses its width and height
   # attributes, thus the stylesheet gives it a 16:9 ratio at each width.
   #
   # ⚠️ An embed code can have its own maximum width, for example `max-width:640px` from Apple
   # Podcasts. An inline style has more importance than the stylesheet.
   # ⚠️ Keep the height of each other embed. An audio player has a fixed height, and a ratio would
   # make it too short on a phone.
-  # @param html [String, Nokogiri::XML::Node] The HTML to change.
-  # @return [String, Nokogiri::XML::Node] The HTML after the change.
   def responsivize_iframes(html)
     with_nokogiri_doc(html) do |doc|
       doc.css("iframe").each do |iframe|
@@ -685,8 +621,6 @@ module MarkupHelpers
   end
 
   # Marks each iframe to load only when it is necessary.
-  # @param html [String, Nokogiri::XML::Node] The HTML to change.
-  # @return [String, Nokogiri::XML::Node] The HTML after the change.
   def lazy_load_iframes(html)
     with_nokogiri_doc(html) do |doc|
       doc.css("iframe").each do |iframe|
@@ -698,8 +632,6 @@ module MarkupHelpers
   private
 
   # The name for an iframe with no title: the caption of its figure, or the host that it embeds.
-  # @param iframe [Nokogiri::XML::Node] The iframe.
-  # @return [String] The title.
   def iframe_title(iframe)
     caption = iframe.parent&.at_css("figcaption")&.text.to_s.strip
     return caption if caption.present?
@@ -715,17 +647,12 @@ module MarkupHelpers
   # Puts a node in a <figure>, but not if its parent is already a <figure>. Then it adds the
   # figure classes.
   #
-  # ⚠️ A node in a paragraph replaces that paragraph, as an image does, and the other content of
-  # the paragraph goes into a <figcaption>. A <figure> inside a <p> is not valid HTML: the browser
+  # ⚠️ A node that is alone in a paragraph replaces that paragraph, and the other content of the
+  # paragraph goes into a <figcaption>. A <figure> inside a <p> is not valid HTML: the browser
   # closes the paragraph at the figure, and the text after it becomes a sibling. A paragraph with
-  # more than one such node keeps the figure in place, as the image path gives such a paragraph
-  # no figure.
-  # @param doc [Nokogiri::XML::Document] The document that contains the node.
-  # @param node [Nokogiri::XML::Node] The node to put in the figure.
-  # @param base_class [String, nil] The base class for the figure.
+  # more than one such node keeps its figures in place.
   # @param modifier [String] The modifier at the end of the figure class.
   # @param trailing [Nokogiri::XML::Node, nil] A sibling to move into the figure after the node.
-  # @return [void]
   def wrap_in_figure(doc, node, base_class:, modifier:, trailing: nil)
     parent = node.parent
 
@@ -773,7 +700,6 @@ module MarkupHelpers
 
   # The shared shape of the render_*_body pipelines: render the Markdown, parse it one time, give
   # the fragment to the transform steps of the variant, then serialize it.
-  # @param text [String] The Markdown text to render.
   # @param degrees [Boolean] True to correct the degree notation first.
   # @yield [Nokogiri::HTML::DocumentFragment] The parsed body, for transforms in place.
   # @return [String] The HTML after the transforms.
@@ -809,11 +735,12 @@ module MarkupHelpers
     end
   end
 
-  # Lets a transform take an HTML string or a parsed node. It gives a document for both, and
-  # returns a result of the same type as the input.
+  # Lets a transform take an HTML string or a parsed node. It gives a document for both, and it
+  # changes a node in place.
   # @param html [String, Nokogiri::XML::Node] The HTML to change.
   # @yield [Nokogiri::HTML::DocumentFragment] The document to change.
-  # @return [String, Nokogiri::XML::Node, nil] The result, of the same type as the input.
+  # @return [String, Nokogiri::XML::Node, nil] The same type as the input, or nil for a blank
+  #   String.
   def with_nokogiri_doc(html)
     if html.is_a?(Nokogiri::XML::Node)
       yield html

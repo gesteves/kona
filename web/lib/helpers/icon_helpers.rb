@@ -12,10 +12,9 @@ module IconHelpers
   #
   # ⚠️ The paths of the icon are not here. They go in the sprite at the end of the body, one time
   # for each icon that the page uses, through #icon_symbols. A listing page renders one icon
-  # sixty times, and each copy of the paths was a large part of that page.
+  # many times, and a copy of the paths in each one would be a large part of that page.
   # @param family [String] The Font Awesome family, for example "classic".
   # @param style [String] The style in that family, for example "solid".
-  # @param icon_id [String] The id of the icon.
   # @return [String, nil] The SVG, or nil if data/icons.json does not have the icon.
   def icon_svg(family, style, icon_id)
     key = [ family, style, icon_id ]
@@ -44,8 +43,6 @@ module IconHelpers
   #
   # ⚠️ The render memo of MarkupHelpers calls this for a body that another page rendered. Without
   # it, the sprite of this page would omit the icons of that body.
-  # @param html [String, nil]
-  # @return [void]
   def record_icons_in(html)
     html.to_s.scan(ICON_REFERENCE) { |family, style, icon_id| record_icon([ family, style, icon_id ]) }
   end
@@ -53,12 +50,9 @@ module IconHelpers
   # The SVG of each icon, with [family, style, id] as the key. The app makes this one time for each
   # build.
   #
-  # This is an index and not a `find` over data.icons, as ImageHelpers#asset_index also is. Each item
-  # is a Hashie::Mash object, thus each `.id` in a scan is a method_missing call, and a listing page
-  # renders a few hundred icons against approximately 90 candidates for each one. A measurement
-  # showed no change to the build time, because the build is not slow here. Thus this is clean code
-  # and not a speed improvement, and do not say that it is one.
-  # @return [Hash] The [family, style, id] tuples and their SVG markup.
+  # This is an index and not a `find` over data.icons, as ImageHelpers#asset_index also is. It is
+  # for clean code and not for speed: the build is not slow here.
+  # @return [Hash{Array<String> => String}]
   def icon_index
     memoize_by_collection(:icon_index, data.icons) do
       data.icons.each_with_object({}) do |(family, styles), index|
@@ -71,9 +65,7 @@ module IconHelpers
 
   # Finds the clock icon that is nearest to the given time, at the nearest half hour.
   # @param datetime [DateTime] The time to show.
-  # @param family [String] The Font Awesome family.
-  # @param style [String] The style in that family.
-  # @return [String, nil] The SVG.
+  # @return [String, nil] The SVG. Refer to #icon_svg.
   def clock_icon_svg(datetime, family = "classic", style = "light")
     hours = datetime.hour % 12
     hours = 12 if hours == 0
@@ -106,8 +98,6 @@ module IconHelpers
 
   # Keeps the key of an icon for the sprite of this page. The keys stay in the order of the first
   # render.
-  # @param key [Array<String>]
-  # @return [void]
   def record_icon(key)
     (@icon_sprite_keys ||= {})[key] = true
   end

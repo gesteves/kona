@@ -22,8 +22,8 @@ export const assetsReturning = (response: () => Response): Env['ASSETS'] =>
   ({ fetch: async () => response() }) as unknown as Env['ASSETS'];
 
 // The same as assetsReturning(), but it keeps each request that it gets. The og route makes its
-// asset lookup from the origin of the request that comes in and from the `path` parameter, and a
-// test must check that. assetsReturning() removes it.
+// asset lookup from the origin and the path of the request that comes in, and a test must check
+// that.
 export const assetsRecording = (
   response: () => Response
 ): { requests: Request[]; binding: Env['ASSETS'] } => {
@@ -40,19 +40,15 @@ export const assetsRecording = (
 };
 
 // ── Outbound fetch mocking ────────────────────────────────────────────────────────────────────
-// This replaces the old `fetchMock` of the pool, which was an undici MockAgent through
-// `cloudflare:test`. @cloudflare/vitest-plugin has no `fetchMock`. The two supported
-// replacements are MSW and a stub of `globalThis.fetch`. This is the stub, with the same rules that
-// the tests need:
+// A stub of `globalThis.fetch`, because @cloudflare/vitest-plugin has no `fetchMock`. Its rules:
 //
 //   - a test registers each upstream call that it expects: the method and the absolute URL, with
 //     the query. A query parameter that a test does not expect makes a *different* route, and that
 //     is what lets the cache-key tests of the proxy check that the query never reaches the origin.
-//   - each other call raises and does not reach the network, as the old `disableNetConnect()` did.
-//   - an intercept that a test registers but never calls makes the test fail, as the old
-//     `assertNoPendingInterceptors()` did.
-//   - the handle from each intercept gives the request that the Worker sent. Thus a test reads a
-//     true `Headers` object, and not the raw options object of undici.
+//   - each other call raises and does not reach the network.
+//   - an intercept that a test registers but never calls makes the test fail.
+//   - the handle from each intercept gives the request that the Worker sent, with a true
+//     `Headers` object.
 //
 // A handler runs in the isolate of the Worker. Thus a raise in a handler shows an origin that is
 // down.

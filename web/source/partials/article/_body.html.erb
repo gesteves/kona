@@ -7,14 +7,13 @@
 <% link_section = (MarkupHelpers::ARTICLE_BODY_SECTION if defined?(track_body_links) && track_body_links) %>
 <div class="entry__body"<%= ' data-pagefind-body'.html_safe if defined?(pagefind) && pagefind %>>
   <%# first_image marks the FIRST image of the two calls only. Refer to claim_lcp_image.
-      ⚠️ :priority, and NOT :eager. A measurement gave the LCP element of an article as text: the
-      first body image of a race report is at 2531px, and the fold is at 664px. Thus the image
-      stays lazy, and the mark only raises the priority of the fetch that the browser starts. %>
+      ⚠️ :priority, and NOT :eager. The LCP element of an article is text, and its first body
+      image is usually below the fold. Thus the image stays lazy, and the mark only raises the
+      priority of its fetch. %>
   <%= render_body(article.intro, image_variant: :full, first_image: :priority, link_section: link_section) %>
   <%= render_body(article.body, image_variant: :full, first_image: :priority, link_section: link_section) %>
-  <%# The contact form is a partial, and it is not raw HTML in the Contentful body. SmartyPants, in
-      render_body, makes the quotation marks in a raw HTML attribute curly, and that breaks the
-      form. Refer to partials/_contact_form. %>
+  <%# The contact form is a partial, and it is not raw HTML in the Contentful body. Refer to
+      partials/_contact_form for the reason. %>
   <%= partial 'partials/contact_form' if article.slug == 'contact' %>
   <%= partial 'partials/disclosure', locals: { entry: article } %>
 </div>

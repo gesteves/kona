@@ -3,10 +3,8 @@
 <% if content.items.present? %>
   <ol class="blog__list" role="list">
     <%# ⚠️ The index decides the separator, and not `item == content.items.last`. Each item is a
-        Hashie::Mash, thus `==` compares the full article at each level, and this includes the body,
-        one time for each item. That test is also incorrect: two entries with the same field values
-        would both omit their separator. %>
-    <%# The list holds the blog posts only, as partials/_collection does. %>
+        Hashie::Mash, thus `==` compares the full article, body included, one time for each item. %>
+    <%# The blog posts only, as in partials/_collection. %>
     <% items = content.items.select { |item| blog_post?(item) } %>
     <% last_index = items.size - 1 %>
     <% items.each_with_index do |item, index| %>

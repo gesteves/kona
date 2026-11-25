@@ -10,7 +10,6 @@ export default class extends Controller {
     }
   }
 
-  /** Removes the placeholder background. */
   removePlaceholder() {
     this.element.classList.remove('placeholder');
   }

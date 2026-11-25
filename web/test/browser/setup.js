@@ -26,8 +26,8 @@ const defaultMatchMedia = (query) => ({
 // jsdom has neither requestIdleCallback nor Element#scrollTo. It defines the second one, but that
 // one raises "Not implemented". The code calls both only for their results on the page, thus a
 // stub that runs immediately and a stub that does nothing are correct. `preloadPagefindWhenIdle`
-// tests if requestIdleCallback is absent, thus its own suite removes this stub to run the code for
-// Safari 16.
+// tests if requestIdleCallback is absent, thus its own suite removes this stub to run the
+// fallback path.
 const defaultRequestIdleCallback = (callback) => {
   callback({ didTimeout: false, timeRemaining: () => 50 });
   return 0;
@@ -66,7 +66,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.useRealTimers();
 
-  // The suites that navigate — share, units, and analytics — add query strings. Set the location
-  // back, thus the `new URL(window.location.href)` of the next test starts from a known path.
+  // The share, units, and analytics suites add query strings. Set the location back, thus the
+  // `new URL(window.location.href)` of the next test starts from a known path.
   window.history.replaceState({}, '', '/');
 });

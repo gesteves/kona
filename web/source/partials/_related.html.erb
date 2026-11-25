@@ -1,11 +1,9 @@
 <%# The "You May Also Like" section. The build renders it from the order that the api calculates
     from the article text, the links, and the concepts (data/related.json, through
-    `rake import:related`). It renders nothing when the entry has no neighbor, and that is what
-    removed the widget that this section replaced.
+    `rake import:related`). It renders nothing when that list is empty.
 
     related_section removes the two adjacent entries, which read_next renders on this same page.
-    scope_entry_ids stays necessary: the two sections can still name one entry when the api list
-    changes between two builds. `article` is a necessary local. %>
+    scope_entry_ids puts the section in the DOM id of each card. `article` is a necessary local. %>
 <% related = related_section(article) %>
 <% if related.present? %>
   <%= partial 'partials/collection', locals: { title: "You May Also Like", items: related, variant: "halves", scope_entry_ids: true } %>

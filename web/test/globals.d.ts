@@ -1,8 +1,7 @@
-// The ambient types for the tests only. The production src/env.d.ts is NOT part of this compile, on
-// purpose, because tsconfig.test.json includes test/** only. Thus its Worker global declarations
-// cannot conflict with the @cloudflare/workers-types from the pool. This file declares the shape of
-// the bindings of the app (Env) only. ExecutionContext, Fetcher, and caches.default come from the
-// types of the pool.
+// The ambient types for the tests only. tsconfig.test.json does NOT include src/env.d.ts, on
+// purpose. Thus its Worker global declarations cannot conflict with @cloudflare/workers-types.
+// This file declares the shape of the bindings of the app (Env) only. ExecutionContext, Fetcher,
+// and caches.default come from those types.
 interface Env {
   ASSETS: Fetcher;
   KONA_API_URL?: string;

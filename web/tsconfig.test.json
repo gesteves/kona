@@ -1,27 +1,25 @@
 {
-  // Editor/type support for the Worker test suite (test/**). Kept SEPARATE from the production
-  // tsconfig.json (which stays on `types: []` + the src/env.d.ts shims, per its own note) because
-  // the vitest pool needs @cloudflare/workers-types, whose Worker globals would collide with those
-  // shims. This config pulls those types in and includes only test/** — NOT src/env.d.ts — so the
-  // two never share a compile. `npm run check` still runs on tsconfig.json (src only); vitest itself
-  // transpiles tests with esbuild and never consults this file, so it only affects the editor.
+  // The types of the Worker test suite (test/**). `npm run check` also runs tsc on this file,
+  // thus it is a gate. vitest transpiles the tests with esbuild and never reads this file.
   //
-  // ⚠️ `types` names @cloudflare/workers-types directly. It used to name the pool package, whose
-  // root type entry re-exported the Worker globals for free; pool 0.18 repointed that entry at the
-  // Node-side plugin API (`cloudflareTest` et al), which declares none of them — leaving the whole
-  // suite red in the editor with "Cannot find name 'ExecutionContext'". The `cloudflare:test`
-  // module's own types now live behind the `/types` subpath; nothing here imports it (outbound
-  // fetch mocking is hand-rolled in test/helpers.ts), so it isn't listed.
+  // This file is separate from tsconfig.json, because the tests need @cloudflare/workers-types,
+  // and its Worker globals conflict with the declarations in src/env.d.ts. Thus this file loads
+  // those types and does not include src/env.d.ts, and the two never share a compile.
+  //
+  // ⚠️ `types` names @cloudflare/workers-types directly, and not the pool package. The root type
+  // entry of the pool declares no Worker global, thus that name gives "Cannot find name
+  // 'ExecutionContext'" in the full suite. No test imports `cloudflare:test`, thus its `/types`
+  // subpath is not here.
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "types": ["@cloudflare/workers-types/experimental"],
-    // Drops the inherited `dom` lib for this compile only. workers-types and lib.dom both declare
-    // `CacheStorage`, and the DOM one — which has no `caches.default` — wins, so every
-    // `caches.default` in the suite reads as an error while the tests themselves run fine.
+    // This removes the `dom` lib that the file inherits. workers-types and lib.dom both declare
+    // `CacheStorage`, and the DOM declaration, which has no `caches.default`, wins. With `dom`,
+    // each `caches.default` in the suite is a type error.
     "lib": ["es2022"]
   },
-  // src/assets.d.ts, but NOT src/env.d.ts: tsc follows test/og.test.ts's import of src/og.ts into
-  // og-render.ts's binary-module imports, which need those declarations. The Worker global shims
-  // in env.d.ts stay out — those are what would collide with @cloudflare/workers-types.
+  // src/assets.d.ts is here, and src/env.d.ts is NOT. tsc follows the import of src/og.ts in
+  // test/og.test.ts to the binary-module imports of og-render.ts, which need those declarations.
+  // The Worker globals of env.d.ts are what conflict with @cloudflare/workers-types.
   "include": ["test/**/*.ts", "vitest.config.mts", "src/assets.d.ts"]
 }

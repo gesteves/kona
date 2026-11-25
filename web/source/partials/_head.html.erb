@@ -31,11 +31,11 @@
     <link rel="apple-touch-icon" href="<%= site_icon_url(w: 180) %>">
     <link rel="manifest" href="/manifest.json">
   <% end %>
-  <%# The font faces above the fold. A browser finds them only after it parses site.css,
-      so preloading them removes a round trip from the critical path. `crossorigin` is
-      mandatory even same-origin — fonts always fetch in CORS mode, and omitting it
-      silently doubles the download. Keep this list to the two or three faces that
-      actually render above the fold; more, and they start competing with the LCP image. %>
+  <%# The font faces above the fold. A browser finds them only after it parses site.css, thus a
+      preload removes one round trip from the critical path. `crossorigin` is necessary, also for
+      the same origin: a browser always gets a font in CORS mode, and without the attribute it
+      downloads each font two times, with no message. Keep this list to the two or three faces
+      that render above the fold. With more, they compete with the LCP image. %>
   <% %w[
     ibm-plex-sans-condensed-v14-latin-700.woff2
     lato-v24-latin-300.woff2
@@ -43,20 +43,19 @@
   ].each do |font| %>
     <link rel="preload" as="font" type="font/woff2" href="<%= asset_path(:fonts, font) %>" crossorigin>
   <% end %>
-  <%# This page does NOT load the stylesheet and the component module of Pagefind. The code adds
-      demand by javascripts/stimulus/lib/pagefind.js, which also documents the cascade
-      constraint on where the stylesheet lands in this head. %>
+  <%# This page does NOT load the stylesheet and the component module of Pagefind.
+      javascripts/stimulus/lib/pagefind.js adds them on demand, and it gives the rule for the
+      position of the stylesheet in this head. %>
   <%= javascript_include_tag 'site', defer: 'defer', 'data-turbo-track': 'reload' %>
   <%# The Web Awesome theme. esbuild takes it from the one CSS import in stimulus/index.js.
       It does NOT stop the first render: this element only preloads the file, and
       javascripts/stimulus/lib/wa_theme.js adds the <link rel="stylesheet"> when the bundle runs.
-      The file holds custom-property definitions only, and each consumer is a Web Awesome custom
-      element that cannot render styled until that same bundle upgrades it.
+      The first paint does not need the file, and lib/wa_theme.js gives the reason.
       ⚠️ This element carries the URL, because asset_hash puts a hash in the name and the
       JavaScript cannot write it. Do not give it `data-turbo-track`, and never change one of its
       attributes at run time. Turbo puts the outerHTML of a tracked element in its signature, thus
       a change makes each navigation a full page load and stops the view transitions, with no
-      message. Refer to lib/wa_theme.js. %>
+      message. %>
   <link rel="preload" as="style" data-wa-theme href="<%= asset_path(:css, '/javascripts/site') %>">
   <%= stylesheet_link_tag 'site', 'data-turbo-track': 'reload' %>
   <%= stylesheet_link_tag 'print', media: 'print', 'data-turbo-track': 'reload' %>

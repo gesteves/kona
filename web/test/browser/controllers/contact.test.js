@@ -214,10 +214,9 @@ describe('submitting', () => {
     expect(button.getAttribute('aria-disabled')).toBe('false');
   });
 
-  // ⚠️ This is the guard against the focus bug coming back, and jsdom cannot test the focus itself:
-  // <wa-button> never upgrades here, thus it cannot take the focus at all. The `disabled` PROPERTY
-  // is the thing that moved the focus to the body in a true browser, thus this example pins that
-  // the code never sets it.
+  // ⚠️ jsdom cannot test the focus itself: <wa-button> never upgrades here, thus it cannot take the
+  // focus at all. The `disabled` PROPERTY is what moves the focus to the body in a true browser,
+  // thus this example checks that the code never sets it.
   it('never sets the disabled property, which would drop the focus to the body', async () => {
     await mountForm();
     const button = document.querySelector('[data-contact-target="submit"]');

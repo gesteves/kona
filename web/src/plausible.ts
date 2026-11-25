@@ -43,10 +43,9 @@ export async function handlePlausible(
 }
 
 /**
- * ⚠️ Each response from this module goes through withSecurityHeaders. `run_worker_first` takes
- * /pa/*, thus it never reaches the static asset layer and never gets the `/*` block of
- * `source/headers`. This route also serves JavaScript that runs, from the origin of the site, and
- * that is the place where `nosniff` is the most important.
+ * ⚠️ Each response from this module goes through withSecurityHeaders. src/headers.ts gives the
+ * reason. This route also serves JavaScript that runs, from the origin of the site, and that is
+ * the place where `nosniff` is the most important.
  */
 function securedResponse(
   body: BodyInit | null,
@@ -92,8 +91,8 @@ async function getScript(
 
   // Use the script path alone as the key, and not the request that comes in. The Cache API uses
   // the full URL as its key, thus `?x=<random>` would make an unlimited number of entries, and
-  // each one would get the file from the CDN of Plausible again. No code reads a query parameter,
-  // thus this change loses nothing. A GET key also lets a HEAD request use the same entry.
+  // each one would get the file from the CDN of Plausible again. No code reads a query parameter.
+  // A GET key also lets a HEAD request use the same entry.
   const cacheKey = new Request(new URL(SCRIPT_PATH, request.url).toString());
 
   let response = await caches.default.match(cacheKey);
@@ -102,17 +101,15 @@ async function getScript(
       signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
     });
     if (!upstream.ok) return emptyScript();
-    // ⚠️ The code makes the headers again from a list of the permitted names. It does not use
-    // `new Response(upstream.body, upstream)` with two names removed. Each other header that the
-    // CDN of Plausible sets — its own CORS and cache headers, and any Set-Cookie — would go to
-    // the browser under this origin AND stay in caches.default for its full TTL. The list also
-    // removes set-cookie and vary, and caches.default.put() refuses those two.
+    // ⚠️ The code makes the headers again from a list of the permitted names, and it does not copy
+    // the upstream headers. Each other header of the CDN of Plausible, for example a Set-Cookie,
+    // would go to the browser under this origin AND stay in caches.default for its full TTL. The
+    // list also removes set-cookie and vary, and caches.default.put() refuses those two.
     const headers = withSecurityHeaders(new Headers());
     headers.set(
       'content-type',
       upstream.headers.get('content-type') ?? 'application/javascript'
     );
-    // The code obeys the Cache-Control of the upstream response.
     for (const name of ['cache-control', 'etag', 'last-modified']) {
       const value = upstream.headers.get(name);
       if (value) headers.set(name, value);
@@ -148,7 +145,8 @@ async function postEvent(request: Request): Promise<Response> {
     return securedResponse(null, { status: 413 });
   }
   // ⚠️ The headers go upstream from a list, as the script response comes back from one. The
-  // request of a client can carry anything, and only these three have a use at Plausible.
+  // request of a client can carry anything. Only these two names, and the X-Forwarded-For that
+  // the code adds below, have a use at Plausible.
   const headers = new Headers();
   for (const name of ['content-type', 'user-agent']) {
     const value = request.headers.get(name);

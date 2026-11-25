@@ -77,9 +77,8 @@ describe('handleApi — widgets (GET)', () => {
     expect(upstream.request!.url).toBe(`${ORIGIN}/widgets/whoop`);
   });
 
-  // ⚠️ This request has the API_TOKEN that the code adds. Thus the path must never decide the
-  // upstream ORIGIN. `new URL(path, base)` would change a path with no protocol into a different
-  // host and would send the bearer token there. An assignment of `pathname` on the base cannot.
+  // ⚠️ The path must never decide the upstream ORIGIN, because this request has the API_TOKEN that
+  // the code adds. Refer to the `pathname` comment in handleApi.
   it('keeps a protocol-relative path on the configured origin', async () => {
     const upstream = interceptFetch(
       'GET',
@@ -128,10 +127,9 @@ describe('handleApi — widgets (GET)', () => {
     expect(upstream.request!.headers.get('if-none-match')).toBeNull();
   });
 
-  // Without Age, the browser measures the stale-while-revalidate window of the origin from the
-  // time that it gets the response, and not from the true age of that response. Thus the age at the
-  // edge and the age in the browser add together, and they do not use one clock. That is what makes
-  // a live counter look like it goes down.
+  // Without Age, the browser measures the stale-while-revalidate window from the time that it gets
+  // the response. Thus the age at the edge and the age in the browser add together, and a live
+  // counter looks like it goes down.
   it('forwards Age and cf-cache-status so edge staleness is visible to the browser', async () => {
     interceptFetch(
       'GET',
@@ -375,9 +373,6 @@ describe('handleApi — contact (POST)', () => {
     expect(upstream.request!.headers.get('x-kona-client-port')).toBeNull();
   });
 
-  // The timeout was in the branch for the routes that are not the contact route, with
-  // cacheEverything. Thus the one route that a visitor waits for was the one route with no
-  // limit.
   it('413s a body past the limit, without touching the origin', async () => {
     // There is no intercept. A request to the origin would raise an unmocked-fetch error.
     const res = await handleApi(

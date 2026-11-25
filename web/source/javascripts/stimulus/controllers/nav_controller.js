@@ -15,16 +15,12 @@ export default class extends Controller {
     closeAriaLabel: { type: String, default: 'Close menu' },
   };
 
-  /**
-   * Opens the navigation menu, or closes it.
-   * @param {Event} event The event that started this action.
-   */
+  /** Opens the navigation menu, or closes it. */
   toggleNav(event) {
     event.preventDefault();
     this.isNavOpen() ? this.closeNav() : this.openNav();
   }
 
-  /** Opens the navigation menu. */
   openNav() {
     // The open menu makes <body> fixed, which makes the scroll height of the document zero. Keep
     // the position of the reader, thus a close puts them back and not at the top.
@@ -61,8 +57,8 @@ export default class extends Controller {
     if (!wasOpen) return;
     this.releaseBody();
 
-    // Do this only while the focus is in the nav. This code also runs on turbo:before-cache and
-    // on search:close, where a move of the focus back to the menu button would be incorrect.
+    // Do this only while the focus is in the nav. For the two other callers, a move of the focus to
+    // the menu button would be incorrect.
     if (this.hasButtonTarget && this.element.contains(document.activeElement)) {
       this.buttonTarget.focus();
     }
@@ -86,7 +82,6 @@ export default class extends Controller {
    * Removes the page behind the menu from the tab order and from the accessibility tree. The menu
    * covers the full viewport, thus without this the reader can use Tab to go through it into
    * content that they cannot see.
-   * @param {Boolean} inert True to make the background inert.
    */
   setBackgroundInert(inert) {
     BACKGROUND_SELECTORS.forEach((selector) => {
@@ -105,9 +100,7 @@ export default class extends Controller {
     );
   }
 
-  /**
-   * @returns {Boolean} True if the navigation menu is open.
-   */
+  /** @returns {boolean} True if the navigation menu is open. */
   isNavOpen() {
     return document.body.classList.contains(this.openClass);
   }

@@ -49,10 +49,8 @@ class Contentful
 
   # Writes one collection to data/<type>.json.
   #
-  # ⚠️ There is no rescue here, on purpose. `rake clobber` deletes data/*.json. Thus a write
-  # failure that a rescue hides leaves the file absent while the import reports success, and the
-  # build then renders pages with data that does not exist. Fail with a message, as import:icons
-  # does.
+  # ⚠️ There is no rescue here, on purpose. `rake clobber` deletes data/*.json, thus a write
+  # failure that a rescue hides leaves the file absent while the import reports success.
   # @param type [Symbol] The name of the collection.
   # @param data [Array<Hash>, Hash] The data to write.
   def save_to_file(type, data)
@@ -71,8 +69,7 @@ class Contentful
     generate_tags
   end
 
-  # Gets each collection from the Contentful GraphQL API, one page at a time.
-  # @return [Hash{Symbol => Object}] The collections to get, by data key.
+  # @return [Hash{Symbol => Object}] The GraphQL query of each collection, by data key.
   def collection_queries
     {
       articles: ContentfulClient::QUERIES::Articles,
@@ -93,9 +90,8 @@ class Contentful
       .each { |thread| key, items = thread.value; @content[key] += items }
   end
 
-  # Reads one collection, one page at a time.
+  # Gets one collection from the Contentful GraphQL API, one page at a time.
   # @param key [Symbol] The data key of the collection.
-  # @param query [Object] The GraphQL query.
   # @return [Array<Hash>] All the items in it.
   def fetch_collection(key, query)
     limit = 100
@@ -187,8 +183,6 @@ class Contentful
   # a difference makes each image on the site 404 with no message. A value in IMAGE_HOST also
   # says that the mirror is complete. Run the `rake assets:backfill` of the api first. Refer to
   # the root CLAUDE.md.
-  # @param item [Hash] The asset to change.
-  # @return [Hash] The asset.
   # @raise [ImageHostMissing] If IMAGE_HOST has no value.
   def rewrite_image_urls(item)
     raise ImageHostMissing if ENV["IMAGE_HOST"].blank?
@@ -214,14 +208,12 @@ class Contentful
 
   # Sets the entry type of an item: the given type, or Article if the item has a body and Short
   # if it does not. A draft with a body and no intro is an Article.
+  #
+  # ⚠️ A published entry with a body and no intro would render an empty card in the blog list,
+  # the feed, and the sitemap. Thus the build stops and names it. A draft is not in those lists,
+  # and an author often writes the intro last. Thus a draft gets a preview.
   # @param item [Hash] The item to change. set_draft_status must run on it first.
   # @param type [String, nil] A fixed type.
-  # @return [Hash] The item.
-  #
-  # ⚠️ A published entry with a body and no intro is not an Article and not a Short. It would render
-  # an empty card in the blog list, the feed, and the sitemap. Thus the build stops and names it.
-  # A draft is not in those lists, and an intro is often the last part of a draft that an author
-  # writes. Thus a draft gets a preview and does not stop the build.
   # @raise [ArgumentError] For a published entry with no fixed type, a body, and no intro.
   def set_entry_type(item, type = nil)
     item[:entry_type] = if type.present?
@@ -240,8 +232,6 @@ class Contentful
 
   # Marks an item as a draft if it has no published version. A draft also gets a mark that stops
   # a search engine from an index of it.
-  # @param item [Hash] The item to change.
-  # @return [Hash] The item.
   def set_draft_status(item)
     draft = item.dig(:sys, :published_version).blank?
     item[:draft] = draft
@@ -250,23 +240,18 @@ class Contentful
   end
 
   # Sets the published and updated timestamps of an item.
-  # @param item [Hash] The item to change.
-  # @return [Hash] The item.
   def set_timestamps(item)
     item[:published_at] = item.dig(:published) || item.dig(:sys, :first_published_at) || Time.now.to_s
     item[:updated_at] = item.dig(:sys, :published_at) || Time.now.to_s
     item
   end
 
-  # @param item [Hash] A draft item.
   # @return [String] The stable preview path of a draft, which comes from its id.
   def draft_path(item)
     "/id/#{item.dig(:sys, :id)}/index.html"
   end
 
   # Sets the path of an article: its draft preview path, or its permalink with the date.
-  # @param item [Hash] The article to change.
-  # @return [Hash] The article.
   def set_article_path(item)
     item[:path] = if item[:draft]
       draft_path(item)
@@ -280,8 +265,6 @@ class Contentful
   end
 
   # Sets the path of a page: its draft preview path, the site root, or its slug.
-  # @param item [Hash] The page to change.
-  # @return [Hash] The page.
   def set_page_path(item)
     item[:path] = if item[:draft]
       draft_path(item)
@@ -294,8 +277,6 @@ class Contentful
   end
 
   # Sets the Middleman template that renders an item.
-  # @param item [Hash] The item to change.
-  # @return [Hash] The item.
   def set_template(item)
     item[:template] = if item[:entry_type] == "Article"
       "/article.html"
@@ -338,7 +319,8 @@ class Contentful
       pages = listing_page(tagged, base_path: concept[:path].chomp("/"), template: "/tag.html",
                            title: concept[:name], summary: summary, description: description,
                            published_at: published_at, tag_id: concept[:id])
-      # Use entry_count, not count: `count` is Hash#count on the Hashie::Mash.
+      # ⚠️ The name is entry_count, not count: on the Mash that a helper reads, `count` is
+      # Hash#count, the number of keys.
       { tag: concept.slice(:id, :name, :path, :scheme, :parent_id, :description, :synonyms).merge(entry_count: tagged.size), pages: pages }
     end
   end
@@ -364,8 +346,7 @@ class Contentful
 
   # The meta description of the blog index. Without it, `content_summary` goes to the sitewide
   # meta description, and /blog and the home page then have the same one. This sets only
-  # `summary:`, not `description:`, because articles.html.erb renders no description block. Thus
-  # this is a meta tag and nothing more.
+  # `summary:`, not `description:`, because articles.html.erb renders no description block.
   def default_blog_summary(size)
     "Browse the complete archive of #{size.humanize} #{'entry'.pluralize(size)}, newest first."
   end
@@ -403,7 +384,7 @@ class Contentful
   end
 
   # The taxonomy concepts by id. The app keeps the value for the build. GraphQL gives only the
-  # concept ids on an entry, thus the delivery taxonomy REST endpoint supplies the other fields.
+  # concept ids on an entry, thus the taxonomy endpoint of the Preview API gives the other fields.
   # @return [Hash{String=>Hash}]
   def taxonomy
     @taxonomy ||= build_taxonomy
@@ -444,15 +425,15 @@ class Contentful
     ([ name ].compact + Array(synonyms)).reject(&:blank?).min_by(&:length) || name
   end
 
-  # Gets each concept from the delivery taxonomy endpoint, one page at a time with a cursor. The
-  # concepts are the only source of the categories of an article, thus a non-2xx stops the build.
+  # Gets each concept from the taxonomy endpoint of the Preview API, one page at a time with a
+  # cursor. The concepts are the only source of the categories of an article, thus a non-2xx stops
+  # the build.
   # @return [Array<Hash>] The raw concept hashes. Each localized field is a locale map.
   def fetch_taxonomy_concepts
     space = ENV["CONTENTFUL_SPACE"]
     token = ENV["CONTENTFUL_TOKEN"]
-    # ⚠️ Raise here, do not return []. The concepts are the only source of the categories. Thus
-    # an empty taxonomy gives a *successful* build with no tag pages, no breadcrumbs, and no
-    # article:tag metadata. This is the same failure with no message that ImageHostMissing stops.
+    # ⚠️ Raise here, do not return []. An empty taxonomy gives a *successful* build with no tag
+    # pages, no breadcrumbs, and no article:tag metadata.
     raise "CONTENTFUL_SPACE and CONTENTFUL_TOKEN are required to fetch the taxonomy." if space.blank? || token.blank?
 
     url = "https://preview.contentful.com/spaces/#{space}/environments/master/taxonomy/concepts?limit=1000"
@@ -466,7 +447,7 @@ class Contentful
       items.concat(Array(body["items"]))
       nxt = body.dig("pages", "next")
       break if nxt.blank?
-      # This is a full URL on the delivery API. The check is for a path, if it becomes one.
+      # This is a full URL on the Preview API. The check is for a path, if it becomes one.
       url = nxt.start_with?("http") ? nxt : "https://preview.contentful.com#{nxt}"
     end
     items
@@ -493,7 +474,8 @@ class Contentful
     "/tagged/#{chain.join('/')}/"
   end
 
-  # Gives each event its entry type. DEBUG_EVENT_DATE can move the date of an event.
+  # Gives each event its entry type. With DEBUG_EVENT_DATE, each event gets the same date: that
+  # number of days from now.
   def process_events
     @content[:events].map! do |event|
       if ENV["DEBUG_EVENT_DATE"].present?

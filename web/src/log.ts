@@ -1,6 +1,7 @@
 /**
  * Makes a log line for a request, with a pipe between the fields: the given first fields, then the
  * referrer, the user agent, the IP, the geo data, and the ray of the requester.
+ * @param request The request that came in. Its headers and its `cf` object give the last fields.
  * @param parts The first fields. The code removes each blank one.
  */
 export function requestLogLine(

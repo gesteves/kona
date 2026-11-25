@@ -1,40 +1,34 @@
 import { cloudflareTest } from '@cloudflare/vitest-plugin';
 import { defineConfig } from 'vitest/config';
 
-// `npm test` runs TWO suites, which need two mutually incompatible runtimes — hence
-// `test.projects` rather than one flat config:
+// `npm test` runs TWO suites, and no one runtime can run both. Thus this file uses
+// `test.projects`, and each project has its own plugins, environment, and setup file:
 //
-//   worker  — src/*.ts, the Cloudflare Worker, inside workerd via @cloudflare/vitest-plugin.
-//   browser — source/javascripts/**, the Stimulus/Turbo bundle, inside jsdom.
+//   worker  — src/*.ts, the Cloudflare Worker, in workerd through @cloudflare/vitest-plugin.
+//   browser — source/javascripts/**, the Stimulus and Turbo bundle, in jsdom.
 //
-// They can't share a config: the pool replaces the whole runtime with workerd, which has no
-// `document`, no `window`, and no custom elements, so the controller tests can't run in it; and
-// jsdom has no `caches.default` or `request.cf`, so the Worker tests can't run in jsdom. Each
-// project therefore carries its own plugins, environment, and setup file. `vitest run` executes
-// both and reports them separately by `name`.
+// workerd has no `document`, no `window`, and no custom elements. jsdom has no `caches.default`
+// and no `request.cf`.
 //
-// ⚠️ The two `include` globs are kept disjoint by FILE EXTENSION, not by directory: the worker
-// suite is `.test.ts`, the browser suite is `.test.js` (matching the `.js` sources it exercises).
-// The directory split is for humans. Don't add a `.ts` test under test/browser/ — the worker
-// project's `test/**/*.test.ts` glob would claim it and run it in workerd, where it would fail on
-// the first `document` reference for reasons that look nothing like the cause.
+// ⚠️ The FILE EXTENSION keeps the two `include` globs apart, and not the directory: the worker
+// suite is `.test.ts`, and the browser suite is `.test.js`. Do not add a `.ts` test below
+// test/browser/. The worker glob would take it and run it in workerd, where it fails at the
+// first `document` with a message that does not show the cause.
 export default defineConfig({
   test: {
     projects: [
       {
         // ── The Cloudflare Worker (src/) ──────────────────────────────────────────────────────
-        // Deliberately NOT wired to wrangler.jsonc: the tests build their own `env` objects and
-        // mock outbound fetch, so the pool needs no real bindings — in particular NOT the `assets`
-        // binding, which points at ./build (absent in the CI `checks` job, which runs before any
-        // build). We only mirror wrangler.jsonc's compatibility_date so the runtime matches what
-        // ships.
+        // The pool does NOT read wrangler.jsonc, on purpose. Each test makes its own `env` and
+        // mocks each outbound fetch, thus the pool needs no real binding. The `assets` binding
+        // points at ./build, which is absent in the `checks` job of CI.
         plugins: [
           cloudflareTest({
             miniflare: {
-              // The date the TEST runtime runs under — capped at what the pool's bundled workerd
-              // supports (it warns and falls back otherwise). Distinct from production's
-              // wrangler.jsonc compatibility_date; the tests exercise basic fetch/Response/routing,
-              // so the exact date doesn't affect them. Bump when the pool's runtime advances.
+              // The compatibility date of the TEST runtime. It is not the compatibility_date of
+              // wrangler.jsonc. It must not be later than the date that the workerd of the pool
+              // supports: with a later date, the pool gives a warning and uses an older one. The
+              // tests use only fetch, Response, and the routing, thus the date changes no test.
               compatibilityDate: '2025-09-06',
             },
           }),
@@ -47,24 +41,21 @@ export default defineConfig({
       },
       {
         // ── The browser bundle (source/javascripts/) ──────────────────────────────────────────
-        // No plugins: these are plain ES modules that Vite transforms as-is. jsdom supplies the
-        // DOM; test/browser/setup.js fills the handful of APIs jsdom omits that this code calls
-        // (matchMedia, requestIdleCallback, scrollTo) and resets global/DOM state between tests.
+        // No plugins: these are plain ES modules. jsdom gives the DOM. test/browser/setup.js adds
+        // the APIs that jsdom does not have and that this code calls, and it resets the global
+        // state and the DOM after each test.
         test: {
           name: 'browser',
           environment: 'jsdom',
           include: ['test/browser/**/*.test.js'],
           setupFiles: ['./test/browser/setup.js'],
-          // Clears call history on every mock before each test. Needed because `vi.mock()`
-          // factories are hoisted and run ONCE per file, so the vi.fn()s they return are shared
-          // by every test in it — and `vi.restoreAllMocks()` only undoes spies, not those. Without
-          // this, an assertion like `expect(trackEvent).not.toHaveBeenCalled()` passes or fails
-          // based on what earlier tests in the file did. `clearMocks` (not `mockReset`) keeps the
-          // factories' own implementations, e.g. `vi.fn().mockResolvedValue(true)`.
+          // This clears the call history of each mock before each test. A `vi.mock()` factory runs
+          // ONE time for each file, thus each test of the file shares its vi.fn()s, and
+          // `vi.restoreAllMocks()` does not reset them. Without this, `not.toHaveBeenCalled()`
+          // depends on the tests before it. `mockReset` would also remove the implementations.
           clearMocks: true,
-          // Each file gets its own jsdom, so module-level state in the code under test (the
-          // live-update clock, pagefind's memoized loader, the search-tracking flag) can't leak
-          // across files. Within a file it still can — those suites use vi.resetModules().
+          // Each file gets its own jsdom, thus state at the module level cannot go from one file
+          // to the next. In one file it can, and those suites use vi.resetModules().
           isolate: true,
         },
       },

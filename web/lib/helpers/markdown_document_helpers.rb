@@ -4,8 +4,8 @@ require "uri"
 # Renders a Contentful body as portable Markdown, for a reader on another site. The Markdown
 # document of each post and the AboutSpec document of the about page both use it.
 module MarkdownDocumentHelpers
-  # Renders a body as portable Markdown, for a reader on another site. It uses the feed transforms,
-  # then changes each construct with no Markdown form into plain Markdown.
+  # Renders a body as portable Markdown. It uses the feed transforms, then changes each construct
+  # with no Markdown form into plain Markdown.
   #
   # ⚠️ A construct that normalize_for_markdown does not know goes out as its text only. Add a step
   # there for each new kind of markup in a body.
@@ -32,9 +32,6 @@ module MarkdownDocumentHelpers
   private
 
   # Changes the HTML of the feed transforms into HTML that has a Markdown form.
-  # @param doc [Nokogiri::HTML::DocumentFragment] The parsed body.
-  # @param base_url [String] The URL that each relative link resolves against.
-  # @return [void]
   def normalize_for_markdown(doc, base_url:)
     doc.css("script, style").remove
     doc.css("figure").each { |figure| unwrap_figure(doc, figure) }
@@ -49,9 +46,6 @@ module MarkdownDocumentHelpers
 
   # Replaces a <figure> with its content and a paragraph for its caption. An image goes in a
   # paragraph, and an iframe becomes a link.
-  # @param doc [Nokogiri::HTML::DocumentFragment] The parsed body.
-  # @param figure [Nokogiri::XML::Node] The figure.
-  # @return [void]
   def unwrap_figure(doc, figure)
     figcaption = figure.at_css("figcaption")&.remove
     nodes = figure.element_children.map do |child|
@@ -68,8 +62,6 @@ module MarkdownDocumentHelpers
 
   # Changes a figcaption into a paragraph. Its credit becomes plain text after the caption, with the
   # " | " separator that the author wrote.
-  # @param figcaption [Nokogiri::XML::Node] The figcaption.
-  # @return [Nokogiri::XML::Node] The paragraph.
   def caption_paragraph(figcaption)
     credit = figcaption.at_xpath("./cite")
     if credit
@@ -83,9 +75,6 @@ module MarkdownDocumentHelpers
   end
 
   # A link to the content of an iframe. A YouTube embed links to the watch page of its video.
-  # @param doc [Nokogiri::HTML::DocumentFragment] The parsed body.
-  # @param iframe [Nokogiri::XML::Node] The iframe.
-  # @return [Nokogiri::XML::Node] The link.
   def iframe_link(doc, iframe)
     src = iframe["src"].to_s
     youtube_id = src[MarkupHelpers::YOUTUBE_EMBED_REGEX, 1]
@@ -102,10 +91,7 @@ module MarkdownDocumentHelpers
     a
   end
 
-  # @param doc [Nokogiri::HTML::DocumentFragment] The parsed body.
-  # @param name [String] The name of the new element.
-  # @param node [Nokogiri::XML::Node] The node to put in it.
-  # @return [Nokogiri::XML::Node] The new element.
+  # Puts a node in a new element with the given name, and returns that element.
   def wrap_node(doc, name, node)
     wrapper = Nokogiri::XML::Node.new(name, doc)
     wrapper.add_child(node)
@@ -113,9 +99,6 @@ module MarkdownDocumentHelpers
   end
 
   # Resolves a URL against the URL of the page. A URL with an incorrect shape stays as it is.
-  # @param base_url [String] The URL of the page.
-  # @param url [String] The URL to resolve.
-  # @return [String] The absolute URL.
   def absolute_url(base_url, url)
     URI.join(base_url, url).to_s
   rescue URI::Error

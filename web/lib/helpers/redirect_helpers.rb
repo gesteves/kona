@@ -32,14 +32,13 @@ module RedirectHelpers
     from.include?("*") || from.match?(/:[A-Za-z]/)
   end
 
-  # All the redirect rules, in the order that source/redirects.erb must write them.
+  # All the redirect rules, in the order that source/redirects.erb must write them. This code is
+  # outside the template, thus a spec can test it.
   #
-  # ⚠️ THE ORDER OF THE RULES IS IMPORTANT. The Cloudflare parser permits 2,000 "static" rules but
-  # only 100 "dynamic" rules. It also *latches*: at the first dynamic rule, each subsequent rule
-  # counts as dynamic, exact matches included. Write the static rules first, or the deploy fails
-  # with only `code: 100324` when the file becomes longer than approximately 100 lines. The static
-  # rules first is also the correct match order. This code is outside the template, thus you can
-  # test it.
+  # ⚠️ Write the static rules first. The Cloudflare parser permits 2,000 static rules but only 100
+  # dynamic rules, and after the first dynamic rule it counts each subsequent rule as dynamic,
+  # exact matches included. A file that goes past that limit fails the deploy with only
+  # `code: 100324`. The static rules first is also the correct match order.
   # @return [Array(Array<Hash>, Array<Hash>)] The static rules, then the dynamic rules.
   def partitioned_redirects
     rules =
@@ -50,13 +49,12 @@ module RedirectHelpers
       taxonomy_synonym_redirects.map { |r| { from: r[:from], to: r[:to], status: r[:status] } } +
       data.redirects.map { |r| { from: r.from, to: r.to, status: r.status } }
 
-    # ⚠️ The Cloudflare _redirects file accepts only RELATIVE sources. A `from` with an absolute
-    # URL causes a deploy failure (code 100324). The redirects come from Contentful, thus this
-    # check is between an incorrect rule and a broken deploy. Put a cross-domain redirect in a
-    # zone Bulk Redirect.
+    # ⚠️ The _redirects file accepts only RELATIVE sources, and a `from` with an absolute URL fails
+    # the deploy (code 100324). The redirects come from Contentful, thus this check is necessary.
+    # Put a cross-domain redirect in a zone Bulk Redirect.
     rules.reject! { |r| r[:from].match?(%r{\Ahttps?://}) }
-    # ⚠️ The same is true for a 200-status proxy rewrite to an absolute URL. Nothing writes one
-    # today, because the Worker does the /pa/* proxy, but the same path could write one.
+    # ⚠️ The same is true for a 200-status proxy rewrite to an absolute URL. A redirect from
+    # Contentful can hold one.
     rules.reject! { |r| r[:status].to_i == 200 && r[:to].to_s.match?(%r{\Ahttps?://}) }
     # ⚠️ A rule from a path to itself is a loop that Cloudflare accepts, and two rules with one
     # source make the first one the only one. Both come from a person, thus remove them here.

@@ -20,7 +20,6 @@ export default class extends Controller {
   /**
    * Opens the search modal. It waits for the component UI, because an earlier load can be in
    * progress.
-   * @param {Event} event - The event that started the open.
    */
   async open(event) {
     event.preventDefault();
@@ -43,11 +42,9 @@ export default class extends Controller {
    * Moves the focus back when the modal closes.
    *
    * ⚠️ This is necessary, and the <dialog> does not do it. Pagefind opens with showModal(), thus
-   * the browser remembers the element that had the focus and gives it back on a close. On a mobile
-   * screen that element is the Search item INSIDE the menu, and the `close` above then makes the
-   * menu `visibility: hidden`. Such an element cannot take the focus, thus the browser drops the
-   * focus on the body and the user loses their place.
-   * @param {Element} modal - The pagefind-modal element.
+   * the browser gives the focus back to the element that had it. On a mobile screen that is the
+   * Search item INSIDE the menu, which the `close` in `open` makes `visibility: hidden`. Thus the
+   * focus goes to the body, and the user loses their place.
    */
   restoreFocusOnClose(modal) {
     // Pagefind makes the dialog in the light DOM, thus a plain query finds it.

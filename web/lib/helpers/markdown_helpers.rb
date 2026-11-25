@@ -3,15 +3,14 @@ require "reverse_markdown"
 require "sanitize"
 
 module MarkdownHelpers
-  # ⚠️ This must stay the same as MarkdownHelper::EXTENSIONS of the api. Both render the same article
-  # summary onto the same page: the static card, and the trending or related fragment that replaces
-  # it.
+  # ⚠️ This must stay the same as MarkdownHelper::EXTENSIONS of the api. Both render the same
+  # article summary onto the same page: the static card, and the trending or related fragment
+  # that replaces it.
   EXTENSIONS = {
     fenced_code_blocks: true, disable_indented_code_blocks: true, tables: true, autolink: true, superscript: true
   }.freeze
 
   # Renders Markdown as HTML, with the SmartyPants typography.
-  # @param text [String] The Markdown to render.
   # @return [String, nil] The HTML, or nil for a blank input.
   def markdown_to_html(text)
     return if text.blank?
@@ -27,7 +26,6 @@ module MarkdownHelpers
   end
 
   # Applies the SmartyPants typography to plain text.
-  # @param text [String] The text to change.
   # @return [String, nil] The text after the change, or nil for a blank input.
   def smartypants(text)
     return if text.blank?
@@ -37,15 +35,13 @@ module MarkdownHelpers
   # The text of a heading, with the typography and with no markup. ⚠️ SmartyPants is a typography
   # pass and not an escape: a `<` or a `&` in a title goes through as it is. Sanitize removes each
   # element and escapes the text, thus the result is safe in an element. The api has a copy.
-  # @param text [String, nil] The title.
-  # @return [String, nil]
+  # @return [String, nil] The text, or nil for a blank input.
   def heading_text(text)
     return if text.blank?
     Sanitize.fragment(smartypants(text))
   end
 
   # Changes HTML back into Markdown. An element with no Markdown form gives its text only.
-  # @param html [String, nil] The HTML to change.
   # @return [String, nil] The Markdown, or nil for a blank input.
   def html_to_markdown(html)
     return if html.blank?

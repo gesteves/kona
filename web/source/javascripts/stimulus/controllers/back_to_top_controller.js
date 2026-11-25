@@ -2,9 +2,6 @@ import { Controller } from '@hotwired/stimulus';
 
 /** Scrolls the page to the top. It obeys prefers-reduced-motion. */
 export default class extends Controller {
-  /**
-   * @param {Event} event The click event that started the action.
-   */
   go(event) {
     event.preventDefault();
     const rootElement = document.documentElement;
@@ -28,7 +25,6 @@ export default class extends Controller {
    * this code, the page scrolls to the top for a keyboard user and the focus stays in the footer.
    * tabindex=-1 lets an element that is not interactive take the focus, and it does not put that
    * element in the tab order.
-   * @param {HTMLElement} link The link that the user clicked.
    */
   focusTarget(link) {
     const hash = link?.getAttribute('href') ?? '';

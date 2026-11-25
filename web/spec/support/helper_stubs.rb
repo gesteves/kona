@@ -1,7 +1,7 @@
-# The methods that other helper modules usually supply. This file defines them, thus a test can run
-# one helper alone. They are true methods and not stubs, thus `verify_partial_doubles` does not
-# refuse a method that the example group object does not have. A group that needs a different result
-# can define either method again.
+# spec_helper.rb includes each helper module, thus `full_url` and `sanitize` already exist, and
+# this context overrides them with simple results. Only `url_for` is absent: Middleman supplies
+# it. `url_for` is a true method, because `verify_partial_doubles` refuses a stub of a method
+# that the object does not have. A group that needs a different result can define each one again.
 RSpec.shared_context 'default helper stubs' do
   def full_url(path, params = {})
     query = params.present? ? "?#{URI.encode_www_form(params)}" : ''

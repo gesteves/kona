@@ -17,7 +17,6 @@ const stubbedProperties = [];
  * comes through the MutationObserver. Wait for `flushDom()` for such an element.
  *
  * @param {string} identifier The Stimulus identifier, for example 'live-update'.
- * @param {Function} controllerClass The controller class for the test.
  * @param {string} html The markup for document.body. It must contain a data-controller element
  *   that matches.
  * @param {Function} [prepare] This runs on the parsed document after the markup arrives and before
@@ -72,8 +71,6 @@ export async function flushDom() {
  * `navigator.share`, and `navigator.language`), which `vi.stubGlobal` cannot change.
  * `restoreStubbedProperties()` in the global afterEach puts the property back.
  * @param {Object} object The host object, for example `navigator`.
- * @param {string} property The name of the property.
- * @param {*} value The value to give.
  */
 export function stubProperty(object, property, value) {
   const original = Object.getOwnPropertyDescriptor(object, property);
@@ -116,8 +113,6 @@ export function stubPlausible() {
 
 /**
  * A `fetch` stub that returns one HTML fragment, for the live-update controller.
- * @param {string} body The response body.
- * @param {number} status The HTTP status.
  * @returns {Function} A vi.fn() for `vi.stubGlobal('fetch', …)`.
  */
 export function stubFetchReturning(body, status = 200) {

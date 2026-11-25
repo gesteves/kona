@@ -68,6 +68,7 @@ change one:
 | The card `sizes` and its widths | `config/srcsets.yml` | `data/srcsets.yml` |
 | `article_click_classes` + `ARTICLE_CLICK_EVENT` | `helpers/plausible_helper.rb` | `lib/helpers/site_helpers.rb` |
 | `upcoming_races`, `event_collection_variant`, `event_timestamp_tag`, `parse_event_date` | `helpers/events_helper.rb` | `lib/helpers/event_helpers.rb` |
+| `live_update_attrs` | `helpers/live_update_helper.rb` | `lib/helpers/site_helpers.rb` |
 
 ⚠️ **The cover image of a card is in two places, and no check compares them.** The api renders the
 card of the trending widget, and the build renders each other card, and the two go on the same page.

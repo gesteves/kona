@@ -18,8 +18,8 @@ const FORWARD_REQUEST_HEADERS = ['accept'];
 const CONTACT_PATH = '/api/contact';
 
 /**
- * The time to wait for the origin before the code removes a widget. It is long, on purpose,
- * because the origin is one fly machine that can start from zero.
+ * The time to wait for the origin before a widget request gets the empty 502. It is long, on
+ * purpose, because the origin is one fly machine that can start from zero.
  */
 const WIDGET_UPSTREAM_TIMEOUT_MS = 15_000;
 
@@ -51,8 +51,6 @@ type ClientGeo = {
 
 /**
  * Makes the upstream request headers.
- * @param incoming The headers from the client request.
- * @param hasBody True if the request body goes upstream.
  * @param apiToken The shared bearer token that the server adds. It is constant, thus all the
  *   viewers share one cache entry.
  * @param contactGeo Set on the contact path only. It also lets the client headers go upstream.
@@ -114,8 +112,8 @@ function etagMatches(ifNoneMatch: string, etag: string): boolean {
 }
 
 /**
- * A 502 with an empty body and a short cache time. The live-update controller removes the widget
- * on a non-2xx, and the empty body is the same as the "no data" answer from the origin.
+ * A 502 with an empty body and a short cache time. On a non-2xx, the live-update controller
+ * removes a placeholder, and it keeps an element that has real content.
  */
 function badGateway(): Response {
   return new Response('', {
@@ -140,8 +138,8 @@ const ALLOWED_CONTACT_METHODS = ['POST'];
 
 /**
  * Proxies a widget request or a contact-form request to the kona-api origin.
- * @returns The response from the origin, a 304, a 405, or an empty 502 if the code cannot reach
- *   the origin.
+ * @returns The response from the origin, a 304, a 405, a 413, or an empty 502 if the code cannot
+ *   reach the origin.
  */
 export async function handleApi(request: Request, env: Env): Promise<Response> {
   const incoming = new URL(request.url);
@@ -183,15 +181,15 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
   try {
     // The code removes the query string. The widget inputs are path segments, but the Cloudflare
     // cache key includes the query. Thus a query that goes through would let `?x=random` make a
-    // new origin render for each request. This is in the try block, thus a bad KONA_API_URL gives
-    // the empty 502 below and does not raise.
+    // new origin render for each request.
     //
-    // ⚠️ The code sets `pathname` on the base URL. It does not make a relative URL against the
-    // base, for the same reason as og.ts. `new URL('//evil.example/x', base)` gives a different
-    // ORIGIN, and this request has the API_TOKEN that the code adds. Today the prefixes of the
-    // router prevent that, and this code prevents it for each future router.
-    // `?? ''` is only for the optional type: an empty base raises here, as a base that the code
-    // cannot parse does, and the try block is for that condition.
+    // ⚠️ The code sets `pathname` on the base URL, and it does not make a relative URL against the
+    // base. `new URL('//evil.example/x', base)` gives a different ORIGIN, and this request has the
+    // API_TOKEN that the code adds. Today the prefixes of the router prevent that, and this code
+    // prevents it for each future router.
+    //
+    // This is in the try block, thus an empty or bad KONA_API_URL raises here and gives the empty
+    // 502 below. `?? ''` is only for the optional type.
     const upstreamBase = new URL(env.KONA_API_URL ?? '');
     upstreamBase.pathname = incoming.pathname;
     upstreamBase.search = '';
@@ -210,8 +208,7 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
       // cannot send a stream again, thus it never does this subrequest a second time.
       body: hasBody ? request.body : undefined,
       redirect: 'manual',
-      // Both paths have a limit. With the timeout in the widgets-only branch below, the contact
-      // POST had no limit, and that is the one request that a visitor waits for.
+      // Both routes need a limit. The contact POST is the one request that a visitor waits for.
       signal: AbortSignal.timeout(
         isContact ? CONTACT_UPSTREAM_TIMEOUT_MS : WIDGET_UPSTREAM_TIMEOUT_MS
       ),

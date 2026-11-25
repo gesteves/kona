@@ -40,7 +40,6 @@ module ImageHelpers
   BLURHASH_READ_TIMEOUT = 15
 
   # Gets the Contentful asset ID from an asset URL.
-  # @param url [String, nil] An asset URL.
   # @return [String, nil] The asset ID, or nil for a blank URL.
   def get_asset_id(url)
     return if url.blank?
@@ -55,21 +54,18 @@ module ImageHelpers
     end
   end
 
-  # @param asset_id [String] The ID of the asset.
   # @return [Array<Integer, Integer>] The width and the height of the asset, or nils if unknown.
   def get_asset_dimensions(asset_id)
     asset = asset_index[asset_id]
     return asset&.width, asset&.height
   end
 
-  # @param asset_id [String] The ID of the asset.
   # @return [String, nil] The description of the asset (its alt text), or nil if it has none.
   def get_asset_description(asset_id)
     asset = asset_index[asset_id]
     asset&.description&.strip
   end
 
-  # @param asset_id [String] The ID of the asset.
   # @return [String, nil] The content type of the asset, or nil if the app cannot find it.
   def get_asset_content_type(asset_id)
     asset = asset_index[asset_id]
@@ -78,20 +74,16 @@ module ImageHelpers
 
   # ⚠️ A GIF gets no transformation and no srcset, thus it keeps its animation. A width makes
   # Cloudflare give one static frame of it. Each image method reads this rule here.
-  # @param asset_id [String] The ID of the asset.
-  # @return [Boolean] True if the asset is a GIF.
   def gif_asset?(asset_id)
     get_asset_content_type(asset_id) == "image/gif"
   end
 
-  # @param asset_id [String] The ID of the asset.
   # @return [String, nil] The URL of the asset, or nil if the app cannot find it.
   def get_asset_url(asset_id)
     asset = asset_index[asset_id]
     asset&.url
   end
 
-  # @param asset_id [String] The ID of the asset.
   # @return [Integer, nil] The published version of the asset, or nil if the app cannot find it.
   def get_asset_published_version(asset_id)
     asset = asset_index[asset_id]
@@ -139,13 +131,11 @@ module ImageHelpers
     options.join(",")
   end
 
-  # Makes a responsive srcset.
-  # @param url [String] The URL of the image.
+  # Makes the value of a responsive srcset attribute.
   # @param widths [Array<Integer>] The widths to make candidates for.
   # @param ratio [Numeric, nil] The height of a candidate divided by its width. It cuts each
   #   candidate to that shape. Nil keeps the shape of the asset.
   # @param options [Hash] More transformation parameters.
-  # @return [String] The srcset attribute value.
   def srcset(url:, widths:, ratio: nil, options: {})
     srcset = widths.map do |w|
       query = options.merge({ w: w })
@@ -155,7 +145,6 @@ module ImageHelpers
     srcset.join(", ")
   end
 
-  # @param width [Integer] The width of the candidate.
   # @param ratio [Numeric] The height divided by the width.
   # @return [Integer] The height of the candidate.
   def candidate_height(width, ratio)
@@ -163,8 +152,8 @@ module ImageHelpers
   end
 
   # The shape of a cover image on a card: the height divided by the width. It comes from the
-  # `ratio` of a card variant of data/srcsets.yml, thus that file is the ONE place that holds the
-  # shape and the api reads the same value from its copy.
+  # `ratio` of a card variant of data/srcsets.yml, which is the one place in web/ that holds the
+  # shape. api/config/srcsets.yml is a copy, and a person keeps the two the same.
   # @param variant [Symbol] The name of the card variant.
   # @return [Rational]
   def card_ratio(variant = :card)
@@ -176,7 +165,6 @@ module ImageHelpers
   # entry skeleton write it into the markup as `--card-ratio`, and _entry.scss and _skeleton.scss
   # read it. Thus the stylesheets follow srcsets.yml, and a person does not edit the shape in two
   # languages.
-  # @param variant [Symbol] The name of the card variant.
   # @return [String]
   def card_aspect_ratio(variant = :card)
     data.srcsets.public_send(variant).ratio.sub(":", " / ")
@@ -184,11 +172,9 @@ module ImageHelpers
 
   # Makes the <img> of the cover image of an entry, for a card.
   #
-  # ⚠️ It gives the element `alt=""`. The caller must put it in a link with `aria-hidden="true"`
-  # and `tabindex="-1"`. The headline below the image already links to the same page, thus without
-  # that, each card gives two identical tab stops and two identical entries in the link list of a
-  # screen reader.
-  # @param entry [Object] The article or the page.
+  # ⚠️ It gives the element `alt=""`, and the caller must put it in a link with `aria-hidden="true"`
+  # and `tabindex="-1"`. The headline below the image links to the same page, thus without that,
+  # each card gives a screen reader two identical links and two identical tab stops.
   # @param variant [Symbol] The name of the card variant in data/srcsets.yml.
   # @param eager [Boolean] True to ask for the LCP mark. Refer to the note below.
   # @return [String] The <img> element, or an empty string when the entry has no cover image.
@@ -204,8 +190,8 @@ module ImageHelpers
     width = [ config.widths.first, widths.max ].min
     height = candidate_height(width, card_ratio(variant))
 
-    # ⚠️ `eager` is a request and not a command. claim_lcp_image gives the mark to the FIRST image
-    # of the page, thus a caller can pass it for each card in a list and one card only takes it.
+    # ⚠️ `eager` is a request and not a command: only the FIRST image of the page gets the mark.
+    # Thus a caller can pass it for each card of a list. Refer to MarkupHelpers#claim_lcp_image.
     lcp = eager && claim_lcp_image
 
     gif = gif_asset?(asset_id)
@@ -219,9 +205,8 @@ module ImageHelpers
       width: width,
       height: height,
       alt: "",
-      # `loading="lazy"` is necessary: each sizes list starts with `auto`, and a browser ignores
-      # that keyword on an image that it loads at once. The eager image below drops `auto` for the
-      # same reason.
+      # `loading="lazy"` is necessary, because each sizes list starts with `auto`. Refer to the
+      # note at `sizes` below.
       loading: lcp ? "eager" : "lazy",
       decoding: "async",
       class: "entry__cover-image placeholder",
@@ -232,16 +217,17 @@ module ImageHelpers
     attributes[:fetchpriority] = "high" if lcp
 
     # ⚠️ The shape goes in the markup, and not in the stylesheet. _entry.scss reads --card-ratio,
-    # thus data/srcsets.yml is the one place that holds it. Keep the placeholder in the SAME
-    # attribute: a second style attribute would replace this one.
+    # thus data/srcsets.yml is the one place in web/ that holds it (refer to #card_ratio). Keep the
+    # placeholder in the SAME attribute: a second style attribute would replace this one.
     style = [ "--card-ratio:#{card_aspect_ratio(variant)};" ]
     placeholder = blurhash_svg_data_uri(asset_id)
     style << "--placeholder:url('#{placeholder}');" if placeholder.present?
     attributes[:style] = style.join
 
     unless gif
-      # ⚠️ `auto` is valid on a lazy image only, and a browser ignores it on an eager one. Thus the
-      # eager card drops it and uses the media conditions after it, which are complete without it.
+      # ⚠️ An eager image must not have `auto` in its `sizes`: refer to the `home` variant of
+      # data/srcsets.yml. Thus the eager card drops it and uses the media conditions after it,
+      # which are complete without it.
       sizes = lcp ? config.sizes.reject { |s| s == "auto" } : config.sizes
       attributes[:sizes] = sizes.join(", ")
       attributes[:srcset] = srcset(url: cover.url, widths: widths, ratio: card_ratio(variant), options: { fm: "auto" })
@@ -268,8 +254,6 @@ module ImageHelpers
   # Makes the Open Graph card URL for a cover image, at the size that Facebook recommends. It
   # cuts the image at the center, on purpose, because the Cloudflare saliency crop gives
   # unpredictable results on these photos.
-  # @param original_url [String] The source URL of the image.
-  # @return [String] The transformation URL.
   def open_graph_image_url(original_url)
     params = { w: 1200, h: 630, fit: "cover" }
     cdn_image_url(original_url, params)
@@ -279,26 +263,25 @@ module ImageHelpers
   # It goes into the `v` cache buster below, thus an increase makes a new URL for each card. In
   # all other conditions a card is immutable.
   #
-  # ⚠️ Keep the `v<number>` shape. The caller supplies `v` at the edge, thus src/og.ts checks it
-  # against /^v\d+(-\d+)?$/ before it makes the cache key. That check stops `?v=<random>` from
-  # making an unlimited number of full satori and resvg renders. A value outside that shape still
-  # renders, but each card then uses one cache entry, with no message.
+  # ⚠️ Keep the `v<number>` shape. src/og.ts checks `v` against /^v\d+(-\d+)?$/ before it makes the
+  # cache key, thus a `?v=<random>` cannot start an unlimited number of renders. A value outside
+  # that shape still renders, but each card then uses one cache entry, with no message.
   OG_TEMPLATE_VERSION = "v2"
 
   # Makes the URL of the on-demand Open Graph card for a page. The Worker of this site
   # (web/src/og.ts) renders the card from the og:title of the page. The card URL comes from the
   # path of the page, thus there is no path from a caller to check. The ".png" is important: it
   # keeps the route out of the zone Cache Rule (`not path contains "."`).
+  #
+  # ⚠️ A listing page needs the title. The Worker stores each card with the Cache API and writes no
+  # `Cache-Tag`, thus do not trust the deploy purge to reach it. Without the title, the URL never
+  # changes and a cache can keep an old card for a year.
   # @param path [String] The root-relative path of the page (current_page.url).
   # @param version [Integer, String, nil] The sys.published_version of the entry, thus a new
   #   publish makes a new URL. It is nil for a listing page, which is not a Contentful entry.
   # @param title [String, nil] The og:title of the page. With no version, a CRC32 of it addresses
   #   the card, thus a new title makes a new URL.
   # @return [String] The URL of the card.
-  #
-  # ⚠️ A listing page needs the title. The Worker stores each card with the Cache API and writes no
-  # `Cache-Tag`, thus do not trust the deploy purge to reach it. Without the title, the URL never
-  # changes and a cache can keep an old card for a year.
   def generate_open_graph_image_url(path, version = nil, title: nil)
     v = if version.present?
       "#{OG_TEMPLATE_VERSION}-#{version}"
@@ -311,7 +294,6 @@ module ImageHelpers
     "#{root_url.to_s.chomp('/')}#{path.to_s.chomp('/')}/og.png?#{query}"
   end
 
-  # @param w [Integer] The necessary width.
   # @return [String, nil] The transformation URL of the site icon, or nil if the site has no logo.
   # @raise [ImagesUrlMissing] If IMAGES_URL has no value.
   def site_icon_url(w:)
@@ -327,7 +309,6 @@ module ImageHelpers
 
   # Makes a data URI that contains the blurhash SVG of the asset, for a CSS background.
   # @see https://css-tricks.com/the-blur-up-technique-for-loading-background-images/#recreating-the-blur-filter-with-svg
-  # @param asset_id [String] The ID of the asset.
   # @return [String, nil] The data URI, or nil if the app cannot make a blurhash.
   def blurhash_svg_data_uri(asset_id)
     svg = blurhash_svg(asset_id)
@@ -337,22 +318,18 @@ module ImageHelpers
   end
 
   # Escapes the few characters that an SVG in a `url()` cannot hold. `url_encode` escapes `/` and
-  # `+` as well, and those are legal there: a listing page holds one placeholder for each card,
-  # thus each byte here is on the page some tens of times.
+  # `+` as well, and those are legal there. A listing page holds one placeholder for each card,
+  # thus each byte here is on the page many times.
   #
-  # ⚠️ **The two quote characters must stay in this set.** `blurhash_svg` writes each
-  # attribute with `'`, and the caller puts the result in `url('...')`. A raw `'` closes that CSS
-  # string, thus `background` becomes invalid and the browser paints NO placeholder and NO fallback
-  # color. `minify_html` then reads those same quotes as attributes and removes some of them, thus
-  # the SVG is not valid XML either. Both faults give no message.
-  # @param svg [String]
-  # @return [String]
+  # ⚠️ The two quote characters must stay in this set. `blurhash_svg` writes each attribute with
+  # `'`, and the caller puts the result in `url('...')`. A raw `'` closes that CSS string, and the
+  # browser then paints no placeholder and no fallback color. `minify_html` also removes some raw
+  # quotes, thus the SVG is not valid XML. Both faults give no message.
   def escape_svg_for_url(svg)
     svg.gsub(/[#%"'<> ]/) { |char| format("%%%02X", char.ord) }
   end
 
   # Makes an SVG that blurs the blurhash thumbnail of the asset to the aspect ratio of the asset.
-  # @param asset_id [String] The ID of the asset.
   # @return [String, nil] The SVG markup, or nil if the app cannot make a blurhash.
   def blurhash_svg(asset_id)
     jpeg_data_uri = blurhash_jpeg_data_uri(asset_id)
@@ -372,20 +349,14 @@ module ImageHelpers
   end
 
   # Decodes the blurhash of the asset into a small JPEG data URI. Redis caches it by published
-  # version, because it is slow to make one.
+  # version, because it is slow to make one. The app also keeps the value in the process, because
+  # a Redis GET is one network request for each image on each page.
   #
-  # ⚠️ The app also keeps the value in the process, above the Redis cache. This runs in
-  # render_body, which each listing page calls for each article. Thus the Redis GET below was one
-  # network request for each image on each page. The value is immutable, because the key contains
-  # the published_version. Thus one lookup for each asset for each build is sufficient.
-  # @param asset_id [String] The ID of the asset.
+  # ⚠️ `middleman build` renders in forked workers, and each fork has its own copy of that store.
+  # Thus `before_build` in config.rb reads each placeholder from Redis one time, in the parent,
+  # into `ImageHelpers.warm_blurhashes`. Without it, each worker asks Redis for each asset again.
   # @param width [Integer] The width of the JPEG in pixels.
   # @return [String, nil] The data URI, or nil for a GIF or if the encode fails.
-  # ⚠️ `middleman build` renders in forked worker processes, and each one has its own copy of that
-  # store. Thus `before_build` in config.rb reads each placeholder from Redis one time, in the
-  # parent, into `ImageHelpers.warm_blurhashes`, and the forks inherit it. Without that, each
-  # worker asked Redis for each asset again, and a cold cache made each worker get and encode the
-  # same asset.
   def blurhash_jpeg_data_uri(asset_id, width: 32)
     key = [ asset_id, width ]
     memoize_entry(:blurhash_jpegs, key, data.assets) do
@@ -403,8 +374,6 @@ module ImageHelpers
     # Reads the placeholder of each asset from Redis in one call, before the build forks. A miss
     # stays absent, and the worker that renders it makes it.
     # @param assets [Array<Object>] `data.assets`.
-    # @param redis [Redis]
-    # @param width [Integer]
     # @return [Integer] The number of placeholders found.
     def warm_blurhashes!(assets, redis, width: 32)
       entries = Array(assets).filter_map do |asset|
@@ -422,8 +391,7 @@ module ImageHelpers
     end
   end
 
-  # @param asset_id [String] The ID of the asset.
-  # @param width [Integer] The width of the JPEG in pixels.
+  # Gets the placeholder from Redis, or makes it and puts it there.
   # @return [String, nil] The data URI, or nil for a GIF or if the encode fails.
   def build_blurhash_jpeg_data_uri(asset_id, width)
     content_type = get_asset_content_type(asset_id)
@@ -449,11 +417,10 @@ module ImageHelpers
                        .copy(interpretation: :srgb)
                        .extract_band(0, n: 3)
 
-    # `strip` removes the Exif block, which was a fifth of each placeholder.
+    # `strip` removes the Exif block, which is a large part of such a small JPEG.
     jpeg = "data:image/jpeg;base64,#{Base64.strict_encode64(image.jpegsave_buffer(strip: true))}"
-    # The key contains the published_version of the asset. Thus each new publish makes a new key
-    # and nothing can read the old entry again. With no TTL, the Redis of the build, a metered
-    # Upstash instance, becomes larger for all time.
+    # With no TTL, the metered Redis of the build becomes larger for all time. Refer to
+    # BLURHASH_CACHE_TTL.
     redis.set(cache_key, jpeg, ex: BLURHASH_CACHE_TTL)
     jpeg
   rescue StandardError => e
@@ -465,10 +432,7 @@ module ImageHelpers
   # source is the R2 mirror, as it is for each other image.
   # The `fm: 'jpg'` is important: with no format, Cloudflare returns the source format, and a
   # libvips with no loader for that format fails the decode into the rescue. There is then no
-  # placeholder and no message.
-  # @param asset_id [String] The ID of the asset.
-  # @param width [Integer] The width of the thumbnail.
-  # @param height [Integer] The height of the thumbnail.
+  # placeholder, and only a warning in the build log.
   # @return [String, nil] The blurhash, or nil if the encode fails.
   def encode_blurhash(asset_id, width, height)
     url = cdn_image_url(get_asset_url(asset_id), { w: width, h: height, fm: "jpg" })

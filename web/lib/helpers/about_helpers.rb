@@ -14,7 +14,6 @@ module AboutHelpers
 
   # Renders the about page as AboutSpec Markdown: front matter with a `summary`, then the body.
   # There is no title heading, because the reader shows the document in its own "About" tab.
-  # @param page [Object] The about page.
   # @return [String] The Markdown document, with a newline at the end.
   def about_markdown(page)
     summary = sanitize(page.summary)

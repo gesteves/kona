@@ -36,7 +36,7 @@ RSpec.describe Contentful do
       expect(transform(:set_entry_type, { intro: 'i', body: nil })[:entry_type]).to eq('Short')
     end
 
-    # The build is the gate: such an entry rendered an empty card in the list, the feed, and the
+    # The build is the gate: such an entry renders an empty card in the list, the feed, and the
     # sitemap, with no message.
     it 'stops the build for a published entry with a body and no intro, and names the entry' do
       expect { transform(:set_entry_type, { slug: 'no-intro', draft: false, intro: nil, body: 'b' }) }
@@ -341,9 +341,8 @@ RSpec.describe Contentful do
       expect(item[:url]).to eq('https://images.example.com/space/asset-1/token/a.jpg')
     end
 
-    # The rewrite kept the first URL as :contentful_url, because encode_blurhash resized with the
-    # query parameters of the Contentful Images API and the mirror ignores a query string. It now
-    # resizes with Cloudflare Images from this URL, thus no code reads the first URL.
+    # No code reads the Contentful URL after the rewrite, because encode_blurhash resizes with
+    # Cloudflare Images from the mirror URL.
     it 'adds no key beyond the swapped URL' do
       item = transform(:rewrite_image_urls, { url: 'https://images.ctfassets.net/space/asset-1/token/a.jpg' })
       expect(item.keys).to eq([ :url ])
@@ -381,8 +380,7 @@ RSpec.describe Contentful do
 
     # The mirror is the ONLY host that the zone permits as a Cloudflare Images transformation
     # source. Thus a build with no rewrite does not use Contentful: it makes each image on the site
-    # 403. This code did nothing before, and that gave a build where each image was broken while
-    # the build reported a success.
+    # 403. A method that does nothing here gives that build, and the build reports a success.
     context 'when IMAGE_HOST is unset' do
       before { stub_image_host(nil) }
 

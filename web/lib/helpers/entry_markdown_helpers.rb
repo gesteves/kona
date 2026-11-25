@@ -11,7 +11,6 @@ module EntryMarkdownHelpers
     path.sub(/index\.html\z/, "index.md")
   end
 
-  # @param entry [Object] A post.
   # @return [String] The path of the Markdown document of the post.
   def entry_markdown_path(entry)
     EntryMarkdownHelpers.markdown_path(entry.path)

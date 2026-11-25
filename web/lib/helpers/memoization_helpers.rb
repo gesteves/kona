@@ -11,6 +11,9 @@ module MemoizationHelpers
 
   # Keeps a value that comes from one or more Middleman data collections, for the life of those
   # collections. Thus a data reload on the development server calculates the value again.
+  #
+  # ⚠️ Give each collection that the value reads. With one absent, an edit to that collection on
+  # the development server keeps the old value.
   # @param name [Symbol] A name for the value. Each name must be different.
   # @param collections [Array<Object>] The collections that the value comes from. A new object at
   #   any one of them makes the value again.

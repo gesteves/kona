@@ -2,8 +2,7 @@ import { Controller } from '@hotwired/stimulus';
 import { trackEvent, trackEventThen } from '../lib/analytics';
 import { canonicalUrl } from '../lib/utils';
 
-/** Does the social sharing: the native share sheet, the popup share windows, and the share
- * records. */
+/** Does the social sharing: the native share sheet, the popup windows, and the share records. */
 export default class extends Controller {
   static classes = ['hidden'];
   static values = {
@@ -22,16 +21,10 @@ export default class extends Controller {
     }
   }
 
-  /**
-   * @returns {string} `urlValue`, or the canonical URL of the document.
-   */
   getShareUrl() {
     return this.urlValue || canonicalUrl();
   }
 
-  /**
-   * @returns {string} `textValue`, or the og:title of the document, or its title.
-   */
   getShareText() {
     return (
       this.textValue ||
@@ -40,10 +33,7 @@ export default class extends Controller {
     );
   }
 
-  /**
-   * Opens the native share sheet with the title and the URL of the page.
-   * @param {Event} event - The event that started the share action.
-   */
+  /** Opens the native share sheet with the title and the URL of the page. */
   openShareSheet(event) {
     event.preventDefault();
     trackEvent('Share', { url: this.getShareUrl(), via: 'Native' });
@@ -60,10 +50,7 @@ export default class extends Controller {
       });
   }
 
-  /**
-   * Opens a popup window to share the URL of the link.
-   * @param {Event} event - The event that started the popup window, for example a click.
-   */
+  /** Opens a popup window to share the URL of the link. */
   openPopup(event) {
     event.preventDefault();
     const linkURL = this.element.href;
@@ -84,10 +71,9 @@ export default class extends Controller {
 
   /**
    * Records a share link. A mailto: link and an sms: link navigate the current window, thus the
-   * code stops the event and sends the event first. An HTTP or HTTPS link has `target="_blank"`
+   * code stops the click and records the event first. An HTTP or HTTPS link has `target="_blank"`
    * in the markup, thus the browser opens it, and a popup blocker treats that navigation better
    * than a `window.open` from code.
-   * @param {Event} event - The event that started the share action.
    */
   trackShare(event) {
     const linkURL = this.element.href;

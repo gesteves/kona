@@ -3,8 +3,8 @@ require 'ostruct'
 require 'padrino-helpers'
 require 'hashie'
 
-# RSpec includes the module under test, thus you can call the instance methods of RedirectHelpers
-# directly.
+# spec_helper.rb includes each helper module, thus an example calls the instance methods of
+# RedirectHelpers directly.
 RSpec.describe RedirectHelpers do
   include_context 'default helper stubs'
 
@@ -18,8 +18,8 @@ RSpec.describe RedirectHelpers do
     )
   end
 
-  # Other helper modules usually supply these methods. This file defines them, thus the test runs
-  # the schema builders alone.
+  # No example in this file calls these three methods, or the `site` double above. Each group that
+  # reads `data` defines its own.
   def data = OpenStruct.new(site: @site || site)
   def site_icon_url(w:) = "https://example.com/icon-#{w}.png"
   def cdn_image_url(url, params = {}) = "#{url}?w=#{params[:w]}"
@@ -52,10 +52,9 @@ RSpec.describe RedirectHelpers do
     end
   end
 
-  # ⚠️ The division into static rules and dynamic rules is a rule that a change can break, and it is
-  # not a style choice. The Cloudflare parser latches at the first dynamic rule and counts each rule
-  # after it, exact matches included, against the limit of 100 dynamic rules. This code was in
-  # redirects.erb, and you cannot test a template.
+  # ⚠️ The division into static rules and dynamic rules is a rule that a change can break, and it
+  # is not a style choice: the Cloudflare parser counts each rule after the first dynamic rule as
+  # dynamic. `partitioned_redirects` gives the limits.
   describe '#partitioned_redirects' do
     def taxonomy_synonym_redirects
       [ { from: '/tagged/half-ironman', to: '/tagged/triathlon/ironman-703/', status: 301 } ]

@@ -1,5 +1,5 @@
 // The binding types, which a person writes, until the tools use `wrangler types`.
-// These help the editor only: wrangler makes the bundle and checks no type.
+// These are for tsc (`npm run check`) and the editor: wrangler makes the bundle and checks no type.
 
 interface Env {
   // The Static Assets binding, from `assets.binding` in wrangler.jsonc.
@@ -29,10 +29,9 @@ interface CacheStorage {
   readonly default: Cache;
 }
 
-// The HTML parser of Workers, which reads a stream. src/og.ts uses it to get one <meta> from a page
-// and it holds no copy of the page. This file declares only the parts that this app calls.
-// ⚠️ getAttribute returns the attribute as the source writes it. HTMLRewriter does not decode a
-// character reference, and that is why og.ts also calls decodeEntities on the result.
+// The HTML parser of Workers, which reads a stream. src/og.ts uses it to read two <meta> tags and
+// the end of <head>, and it holds no copy of the page. This file declares only the parts that
+// this app calls. getAttribute does not decode an entity: refer to decodeEntities in og.ts.
 interface HTMLRewriterElement {
   getAttribute(name: string): string | null;
   onEndTag(handler: (endTag: unknown) => void | Promise<void>): void;

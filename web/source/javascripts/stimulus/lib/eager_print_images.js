@@ -5,10 +5,7 @@
 
 const EAGER_MARK = 'data-print-eager';
 
-/**
- * Changes each lazy image to eager, thus the print layout can contain it.
- * @returns {void}
- */
+/** Changes each lazy image to eager, thus the print layout can contain it. */
 export function eagerLoadImages() {
   document.querySelectorAll('img[loading="lazy"]').forEach((img) => {
     img.setAttribute('loading', 'eager');
@@ -19,7 +16,6 @@ export function eagerLoadImages() {
 /**
  * Puts each image that the print made eager back to lazy. Without this, one print makes each
  * image on a long list load at once for the life of the page.
- * @returns {void}
  */
 export function restoreLazyImages() {
   document.querySelectorAll(`img[${EAGER_MARK}]`).forEach((img) => {
@@ -31,7 +27,6 @@ export function restoreLazyImages() {
 /**
  * Waits for the two ways into a print. ⚠️ Both are necessary: `beforeprint` does not occur in each
  * Safari path, and the media query alone does not find a print from a tab in the background.
- * @returns {void}
  */
 export function watchForPrint() {
   window.addEventListener('beforeprint', eagerLoadImages);

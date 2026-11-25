@@ -1,15 +1,13 @@
-<%# The contact form. It is here, as a plain ERB partial, and not in the body of the `contact` page
-    in Contentful. markdown_to_html renders that body through the SmartyPants of Redcarpet (refer to
-    lib/helpers/markdown_helpers.rb), which makes each straight quotation mark in a raw HTML
-    *attribute* curly. That breaks the field names of the form and its Stimulus attributes. The
-    intro text above the form stays in Contentful, where a person can edit it.
-    partials/article/_body.html.erb adds this partial to the contact page.
+<%# The contact form. partials/article/_body.html.erb adds it to the contact page. It is a plain
+    ERB partial, and not raw HTML in the body of the `contact` page in Contentful. markdown_to_html
+    runs SmartyPants, which makes each straight quotation mark in a raw HTML *attribute* curly.
+    That breaks the field names of the form and its Stimulus attributes. The intro text above the
+    form stays in Contentful, where a person can edit it.
 
-    Keep the field names — name, email, message, and the honeypot `comment` — the same as in the
-    Api::ContactController of the api. This form
-    also works with no JavaScript: the method and the action do a native POST, then a 303 to
-    /contact/success. With JavaScript, the `contact` Stimulus controller takes the submit, does a
-    fetch, and shows a toast. %>
+    Keep the field names (name, email, message, and the honeypot `comment`) the same as in the
+    Api::ContactController of the api. This form also works with no JavaScript: the method and the
+    action do a native POST, then a 303 to /contact/success. With JavaScript, the `contact`
+    Stimulus controller takes the submit, does a fetch, and shows a toast. %>
 <form method="POST" action="/api/contact" class="form"
       data-controller="contact" data-action="submit->contact#submit" data-turbo="false"
       data-contact-site-key-value="<%= turnstile_site_key %>">
@@ -17,10 +15,10 @@
   <wa-input label="Your email" type="email" name="email" autocomplete="email" with-clear required></wa-input>
   <label class="hp">Comment <textarea name="comment" tabindex="-1" autocomplete="off"></textarea></label>
   <wa-textarea label="What's on your mind?" name="message" rows="6" resize="auto" with-count required></wa-textarea>
-  <%# Cloudflare Turnstile goes here. The `contact` controller renders it, and that render works
-      with Turbo. It is empty or absent when there is no sitekey in the configuration, and the
-      controller then omits it and the Turnstile check of the api permits the message. It protects
-      the JavaScript path only, because the POST with no JavaScript cannot run the widget. %>
+  <%# The `contact` controller renders Cloudflare Turnstile here, and that render works with
+      Turbo. With no sitekey in the configuration, the div stays empty and the Turnstile check of
+      the api permits the message. It protects the JavaScript path only, because the POST with no
+      JavaScript cannot run the widget. %>
   <div class="contact__turnstile" data-contact-target="turnstile"></div>
   <wa-button type="submit" variant="brand" appearance="accent" data-contact-target="submit">
     Send Message

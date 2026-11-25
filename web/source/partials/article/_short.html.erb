@@ -12,9 +12,9 @@
         here is for a screen reader only, and the run-in is aria-hidden, and a screen reader then
         speaks the title one time.
         ⚠️ A Short needs this heading in a LIST as well, and not on its own page only. Without it,
-        the blog index and each tag archive give no heading for approximately half of their entries,
-        and heading navigation, which is how a screen-reader user reads a list page, goes past each
-        one. On its own page the level is h1, and in a list it is h2, beside the h2 of _compact. %>
+        the blog index and each tag archive give no heading for a Short, and heading navigation,
+        which is how a screen-reader user reads a list page, goes past each one. On its own page the
+        level is h1, and in a list it is h2, beside the h2 of _compact. %>
     <% if standalone %>
       <h1 class="sr-only" id="<%= entry_heading_id(article) %>"><%= heading_text(article.title) %></h1>
     <% else %>

@@ -4,11 +4,10 @@ import { describe, expect, it } from 'vitest';
 
 // A check on the entry point of the bundle, and not on the behavior of one controller.
 //
-// index.js is the only place that makes a controller available to the markup. A new controller that
-// nobody adds there fails in the quietest way in this code: the `data-controller` attribute does
-// nothing. There is no error, there is no log line, and the page renders. The feature simply does
-// not occur. An import of index.js for this check is not possible, because it loads the full Web
-// Awesome Pro theme and registers twelve custom elements. Thus this file reads the source text.
+// index.js is the only place that makes a controller available to the markup. For a controller
+// that is absent there, the `data-controller` attribute does nothing, and there is no error. An
+// import of index.js for this check is not possible, because it loads the full Web Awesome Pro
+// theme and registers its custom elements. Thus this file reads the source text.
 
 // The path comes from the Vitest root, which is web/, and not from import.meta.url. In the jsdom
 // environment, import.meta.url is an http:// URL, and node:fs refuses that.

@@ -4,16 +4,13 @@ module ArticleHelpers
   DEFAULT_READING_TIME_WPM = 200
 
   # Tells if an entry is a blog post (a full Article or a Short).
-  # @param entry [Object] The entry to check.
-  # @return [Boolean]
   def blog_post?(entry)
     %w[Article Short].include?(entry&.entry_type)
   end
 
-  # Tells if an entry is a published blog post, that is, not a draft. It controls the markup for
-  # posts only: the article schema, the breadcrumbs, and the Open Graph article tags.
-  # @param entry [Object] The entry to check.
-  # @return [Boolean]
+  # Tells if an entry is a published blog post, that is, not a draft. It controls the markup of a
+  # published post only: the article schema, the breadcrumbs, the standard.site document link, and
+  # the link to the Markdown copy.
   def published_post?(entry)
     blog_post?(entry) && !entry.draft
   end
@@ -41,14 +38,12 @@ module ArticleHelpers
   end
 
   # The publish date of an entry, after the parse.
-  # @param entry [Object] The entry.
   # @return [DateTime]
   def published_datetime(entry)
     DateTime.parse(entry.published_at)
   end
 
   # The DOM id for an entry element, from its Contentful id. parameterize makes it lowercase.
-  # @param entry [Object] The entry.
   # @param scope [String, nil] A section slug at the start of the id. It is necessary when a
   #   section can list an entry that another section on the same page also lists. With no scope,
   #   the two cards have the same id and each aria-labelledby points to the first card.
@@ -58,7 +53,6 @@ module ArticleHelpers
   end
 
   # The DOM id for the heading of an entry. The aria-labelledby of the entry element points to it.
-  # @param entry [Object] The entry.
   # @param scope [String, nil] The same as for #entry_dom_id. Give the two the same scope.
   # @return [String] For example "hed-1qxuv2jhbvrd9oqmxoneqz".
   def entry_heading_id(entry, scope: nil)
@@ -70,7 +64,6 @@ module ArticleHelpers
     [ scope, entry.sys.id ].compact.join("-").parameterize
   end
 
-  # @param entry [Object] The entry.
   # @return [String, nil] The public name of the entry type.
   def entry_type(entry)
     return if entry.entry_type.blank?
@@ -85,7 +78,6 @@ module ArticleHelpers
   # Makes the permalink of an article, with its publish date as the label. For a recent article,
   # the publish-date Stimulus controller puts a live relative time in its place. This is the
   # result when there is no JavaScript.
-  # @param article [Object] The article.
   # @param link_class [String, nil] The class names for the <a>. Use article_click_classes for the
   #   analytics of a card. Leave it out on the page of the article: that link is the page itself.
   # @return [String] A <time> that contains an <a>, thus a machine can still read the ISO instant.
@@ -127,8 +119,6 @@ module ArticleHelpers
   end
 
   # The most recent full articles. This does not include the drafts and the Shorts.
-  # @param count [Integer] The number to return.
-  # @param exclude [Object] An article to omit.
   # @return [Array<Object>]
   def recent_articles(count: 4, exclude: nil)
     published_articles
@@ -145,8 +135,6 @@ module ArticleHelpers
   # ⚠️ An empty result removes the section. This is correct for the three causes of an empty
   # result: the import did not run (no api, or no token), the api could not read Contentful, or
   # each neighbor that it names is now unpublished.
-  # @param article [Object] The entry to find the neighbors of.
-  # @param count [Integer] The number to return.
   # @return [Array<Object>] The related entries, the nearest first.
   def related_articles(article, count: 4)
     return [] unless data.respond_to?(:related)
@@ -168,16 +156,14 @@ module ArticleHelpers
   end
 
   # The most recent published entries, for the Atom feed.
-  # @param count [Integer] The number to return.
-  # @return [Array<Object>]
   # ⚠️ The feeds are the largest part of the build: each entry renders its intro and its body,
   # and each tag has a feed of its own. Twenty-five is what a reader needs from a feed.
+  # @return [Array<Object>]
   def feed_articles(count: 25)
     published_articles.take(count)
   end
 
   # The most recent full articles that a search engine can index, for llms.txt.
-  # @param count [Integer] The number to return.
   # @return [Array<Object>]
   def llms_articles(count: 100)
     indexable_articles
@@ -187,7 +173,6 @@ module ArticleHelpers
 
   # The adjacent entries in time, for the "Read next" navigation. It includes the Shorts, thus
   # the navigation works on both types of page.
-  # @param article [Object] The current entry.
   # @return [Hash] { newer:, older: }. One of them is nil at each end of the archive. Both are
   #   nil if the entry is not in the published sequence, for example a draft preview.
   def adjacent_articles(article)
@@ -204,7 +189,6 @@ module ArticleHelpers
   end
 
   # Makes the JSON-LD BlogPosting schema for an article.
-  # @param content [Object] The article.
   # @see https://developers.google.com/search/docs/appearance/structured-data/article
   # @return [String, nil] The JSON-LD, or nil for a draft.
   def article_schema(content)
@@ -253,7 +237,6 @@ module ArticleHelpers
 
   # Makes the JSON-LD BreadcrumbList for an article: Home › Blog › its chain of topics › the
   # article.
-  # @param content [Object] The article.
   # @see https://developers.google.com/search/docs/appearance/structured-data/breadcrumb
   # @return [String, nil] The JSON-LD, or nil if the entry is not a published post.
   def breadcrumb_schema(content)
@@ -267,7 +250,6 @@ module ArticleHelpers
   # The chain of parents of the most deeply nested concept of an article, in the two schemes. If
   # two concepts are at the same depth, the number of articles in the archive of the concept
   # selects one.
-  # @param content [Object] The article.
   # @return [Array<Hash>] The [{ id:, name:, path: }] items, the root first, or [] if the article
   #   has no tags.
   def taxonomy_trail(content)
@@ -304,7 +286,7 @@ module ArticleHelpers
     memoize_by_collection(:taxonomy_index, data.tags) do
       Array(data.tags).each_with_object({}) do |entry, index|
         tag = entry.tag
-        # Use entry_count, not count: `count` is Hash#count on the Mash, the number of keys.
+        # Refer to Contentful#generate_tags for the reason for the name entry_count.
         index[tag.id] = { name: tag.name, path: tag.path, parent_id: tag.parent_id, scheme: tag.scheme, count: tag.entry_count }
       end
     end
@@ -337,8 +319,6 @@ module ArticleHelpers
 
   # Counts the words in the intro and the body of an article. The app keeps the value for each
   # entry, because the removal of the markup is slow and each page calls this more than one time.
-  # @param article [Object] The article.
-  # @return [Integer] The number of words.
   def article_word_count(article)
     memoize_entry(:article_word_counts, article.sys&.id, (data.articles if respond_to?(:data))) do
       compute_article_word_count(article)
@@ -351,18 +331,15 @@ module ArticleHelpers
   end
 
   # The estimated reading time for an article, in full minutes. It rounds up.
-  # @param article [Object] The article.
-  # @return [Integer] The reading time in minutes.
   def reading_time_minutes(article)
-    # ⚠️ Do not use ENV.fetch with a default. It gives the default only when the key is ABSENT.
-    # A CI variable with no value becomes an empty string, which is available but blank.
-    # `''.to_i` is 0, and a division by 0 raises FloatDomainError on each article page.
+    # ⚠️ Do not use ENV.fetch with a default. A CI variable with no value is an empty string, and
+    # not an absent key. `''.to_i` is 0, and a division by 0 raises FloatDomainError on each
+    # article page.
     wpm = ENV["READING_TIME_WPM"].to_i
     wpm = DEFAULT_READING_TIME_WPM unless wpm.positive?
     (article_word_count(article) / wpm.to_f).ceil
   end
 
-  # @param article [Object] The article.
   # @return [String] The reading time as text, for example "A 4-minute read".
   def reading_time(article)
     minutes = reading_time_minutes(article)
@@ -371,10 +348,7 @@ module ArticleHelpers
     "#{indefinite_article} #{minutes}-minute read"
   end
 
-  # The other race reports with the same race concept as this article, the newest first. The app
-  # keeps the value, because recirculation_section reads it and the title needs it again.
-  # @param article [Object] The current article.
-  # @param count [Integer] The number to return.
+  # The other race reports with the same race concept as this article, the newest first.
   # @return [Array<Object>]
   def related_race_reports(article, count: 4)
     race_id = race_concept_id(article)
@@ -402,12 +376,9 @@ module ArticleHelpers
   # The entries for the two recirculation sections of an article: the reports of the same race, and
   # then the related entries.
   #
-  # ⚠️ The two sections excluded each other before, thus a race with only one or two other reports
-  # gave one or two cards where four were possible. Race reports are the largest group on the site,
-  # thus that applied to most of them. The two now render together, and the dedup below is what
-  # makes that safe: a report of the same race is often also a near entry by meaning, and the same
-  # card two times would give two DOM ids that are the same.
-  # @param article [Object] The article.
+  # ⚠️ Do not make the two sections exclude each other: a race with few other reports then gives
+  # one or two cards where four are possible. Keep the dedup below. A report of the same race is
+  # often also a near entry by meaning, and the same card two times gives two equal DOM ids.
   # @param count [Integer] The number of cards in each section.
   # @return [Hash] { reports:, related: }. An empty list renders no section.
   def recirculation_sections(article, count: 4)
@@ -426,8 +397,6 @@ module ArticleHelpers
   # ⚠️ An entry with a near meaning is frequently also the adjacent entry in time. Without this
   # removal the same card renders two times on the page. The api sends more neighbors than the
   # section shows (RelatedController::COUNT), thus the removal does not make the section short.
-  # @param article [Object] The entry.
-  # @param count [Integer] The number of cards.
   # @param seen [Set<String>] The ids of the entries that another section already shows.
   # @return [Array<Object>]
   def related_section(article, count: 4, seen: Set.new)
@@ -443,7 +412,6 @@ module ArticleHelpers
   # The id of the race concept of an article: its most deeply nested Sports concept at the race
   # level or below it (discipline › distance › race, thus the chain length is 3 or more). It
   # controls the groups of race reports.
-  # @param article [Object] The article.
   # @return [String, nil]
   def race_concept_id(article)
     Array(article.contentful_metadata&.tags)
@@ -456,8 +424,6 @@ module ArticleHelpers
 
   # Tells if an article has the race-report tag. Thus a race preview with the same race concept
   # cannot go into the group of race reports.
-  # @param article [Object] The article.
-  # @return [Boolean]
   def race_report?(article)
     Array(article.contentful_metadata&.tags).any? { |t| t.id == "race-reports" }
   end
@@ -467,7 +433,6 @@ module ArticleHelpers
   # has. Thus it removes a concept in the middle that the article does not have, and the chain
   # stays complete. The most deeply nested chain is first, and Sports goes before Topics at the
   # same depth.
-  # @param article [Object] The article.
   # @return [Array<Array>] One array of tags for each chain, from the root to the leaf.
   def tag_breadcrumb_chains(article)
     tags = Array(article.contentful_metadata&.tags)
@@ -487,7 +452,6 @@ module ArticleHelpers
   # The concepts of the article for the meta line: the breadcrumb chains as one flat list, with
   # each concept one time. Two chains that share a parent give that parent one time, and the
   # children of that parent stay together.
-  # @param article [Object] The article.
   # @return [Array<Object>] The tags, a parent before its children.
   def tag_breadcrumb_concepts(article)
     flatten_concept_chains(tag_breadcrumb_chains(article))

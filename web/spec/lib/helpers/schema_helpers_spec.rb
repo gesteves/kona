@@ -3,8 +3,8 @@ require 'ostruct'
 require 'padrino-helpers'
 require 'hashie'
 
-# RSpec includes the module under test, thus you can call the instance methods of SchemaHelpers
-# directly.
+# spec_helper.rb includes each helper module, thus an example calls the instance methods of
+# SchemaHelpers directly.
 RSpec.describe SchemaHelpers do
   include_context 'default helper stubs'
 
@@ -18,8 +18,8 @@ RSpec.describe SchemaHelpers do
     )
   end
 
-  # Other helper modules usually supply these methods. This file defines them, thus the test runs
-  # the schema builders alone.
+  # These replace `data` of Middleman and two methods of ImageHelpers. Thus the test runs the
+  # schema builders alone.
   def data = OpenStruct.new(site: @site || site)
   def site_icon_url(w:) = "https://example.com/icon-#{w}.png"
   def cdn_image_url(url, params = {}) = "#{url}?w=#{params[:w]}"

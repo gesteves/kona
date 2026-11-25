@@ -201,8 +201,8 @@ RSpec.describe MarkupHelpers do
         expect(transformed_html).to eq('<figcaption>This is <a href="http://example.com" title="example | page">a link</a> <cite>Photo by Pepe</cite></figcaption>')
       end
 
-      # A split on the text content of an element, with plain text nodes in its place, removed the
-      # element. Thus a full caption that is one link lost that link.
+      # A split on the text content of an element puts plain text nodes in its place. Thus a full
+      # caption that is one link would lose that link.
       it 'does not split inside an element, dropping its markup' do
         html = '<figcaption><a href="http://example.com">Ride report | Strava</a></figcaption>'
         transformed_html = set_caption_credit(html)
@@ -419,7 +419,7 @@ RSpec.describe MarkupHelpers do
     end
 
     # The accessible name from the content goes into the anchor and uses its aria-label. Thus
-    # without a name on the heading, each heading spoke as
+    # without a name on the heading, a screen reader says
     # "Permalink to First Heading First Heading".
     it 'names the heading after its own text, not the nested permalink' do
       html = '<h2 id="first">First Heading</h2>'
@@ -553,8 +553,8 @@ RSpec.describe MarkupHelpers do
     end
 
     # The transform puts the other content of the parent into the caption and then replaces the
-    # parent. Thus a second image in the same paragraph went into the <figcaption> of the first
-    # image, and the code removed it from the tree during the loop.
+    # parent. Thus a second image in the same paragraph would go into the <figcaption> of the first
+    # image, and the loop would then remove it from the tree.
     context 'with two images in one paragraph' do
       it 'leaves them alone rather than swallowing the second into the first figcaption' do
         html = %(<p><img src="#{image_url}"><img src="#{image_url}"></p>)
@@ -738,8 +738,8 @@ RSpec.describe MarkupHelpers do
         expect(second).not_to include('fetchpriority')
       end
 
-      # ⚠️ Most body images are below the fold, thus :priority must NOT make an image eager. A
-      # measurement gave the LCP element of an article as text.
+      # ⚠️ Most body images are below the fold, thus :priority must NOT make an image eager. The LCP
+      # element of an article is text.
       it 'leaves the image lazy for :priority' do
         html = responsivize_images(tagged_img, widths: [ 100 ], sizes: '100vw', first_image: :priority)
         expect(html).to include('loading="lazy"')
@@ -757,8 +757,8 @@ RSpec.describe MarkupHelpers do
     end
   end
 
-  # ⚠️ A frame with no accessible name is a serious WCAG failure, and axe found one in a podcast
-  # embed from the Contentful body.
+  # ⚠️ A frame with no accessible name is a serious WCAG failure, and a podcast embed from the
+  # Contentful body has no title of its own.
   describe '#set_iframe_titles' do
     it 'names an iframe from the host that it embeds' do
       html = %(<iframe src="https://embed.podcasts.apple.com/us/podcast/x"></iframe>)

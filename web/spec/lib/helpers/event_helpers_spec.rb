@@ -69,8 +69,8 @@ RSpec.describe EventHelpers do
       expect(upcoming_races.size).to eq(described_class::UPCOMING_RACES_COUNT)
     end
 
-    # ⚠️ Contentful can hold an event with no date, and this code runs on the render path of the home
-    # page. One bad entry must remove its own card, and not the full page.
+    # ⚠️ Contentful can hold an event with no date, and this code runs on the render path of the
+    # home page. One bad entry must remove its own card, and not the full page.
     it 'drops an event with a missing or unparseable date rather than raising' do
       @events = [
         event(id: 'undated', date: nil),

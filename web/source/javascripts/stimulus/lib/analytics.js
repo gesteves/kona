@@ -1,7 +1,7 @@
 /**
  * Calls Plausible if it is available. Thus the tracking does nothing when the page has no such
  * script, for example in development, and it does not raise a ReferenceError.
- * @param {...*} args - The arguments that go to `window.plausible`.
+ * @param {...*} args The arguments that go to `window.plausible`.
  */
 function track(...args) {
   if (typeof window.plausible !== 'function') return;
@@ -10,7 +10,7 @@ function track(...args) {
 
 /**
  * Records a page view, then removes the tracking parameters from the URL.
- * @param {Object} additionalProps - More properties for the page view. They are optional.
+ * @param {Object} additionalProps More properties for the page view.
  */
 export function trackPageView(additionalProps = {}) {
   const currentUrl = new URL(window.location.href);
@@ -26,8 +26,8 @@ export function trackPageView(additionalProps = {}) {
 
 /**
  * Records an event.
- * @param {string} event - The name of the event.
- * @param {Object} props - More properties to send with the event.
+ * @param {string} event The name of the event.
+ * @param {Object} props More properties to send with the event.
  */
 export function trackEvent(event, props = {}) {
   track(event, { props });
@@ -36,9 +36,9 @@ export function trackEvent(event, props = {}) {
 /**
  * Records an event, then calls a function one time only, and it calls that function even if the
  * event does not go out. Use this when the function navigates away, which would stop the request.
- * @param {string} event - The name of the event.
- * @param {Object} props - More properties to send with the event.
- * @param {Function} done - The function to call after the event goes out, or after the timeout.
+ * @param {string} event The name of the event.
+ * @param {Object} props More properties to send with the event.
+ * @param {Function} done The function to call after the event goes out, or after the timeout.
  */
 export function trackEventThen(event, props, done) {
   let ran = false;

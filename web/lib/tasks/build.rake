@@ -13,9 +13,9 @@ namespace :build do
     build_site(verbose: true)
   end
 
-  # This does not run :import, thus it builds the data that `rake import` last wrote to data/. Use it
-  # to make build/ again during a `wrangler dev` session. `rake build:verbose` is still the check
-  # before a commit.
+  # This does not run :import, thus it builds the data that `rake import` last wrote to data/. Use
+  # it to make build/ again during a `wrangler dev` session. `rake build:verbose` is still the
+  # check before a commit.
   desc "Build the site from the existing data/ without re-importing"
   task fast: [ :dotenv ] do
     build_site
@@ -27,8 +27,8 @@ end
 def build_site(verbose: false)
   middleman_command = verbose ? "middleman build --verbose" : "middleman build"
   sh middleman_command
-  # A file in source/ with an underscore at the start of its name is a partial. Thus these files have
-  # no underscore, and this code renames them.
+  # A file in source/ with an underscore at the start of its name is a partial. Thus these files
+  # have no underscore, and this code renames them.
   %w[redirects headers].each do |name|
     source = "#{BUILD_DIRECTORY}/#{name}"
     raise "The build made no #{source}: source/#{name}.erb did not render, and Cloudflare needs _#{name}." unless File.exist?(source)
