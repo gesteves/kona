@@ -1,3 +1,4 @@
+<%# locals: (article:, **) %>
 <article class="entry entry--full entry--page" id="<%= entry_dom_id(article) %>" aria-labelledby="<%= entry_heading_id(article) %>">
   <header class="entry__header">      
     <% if article.draft %>
@@ -7,8 +8,5 @@
       <%= heading_text(article.title) %>
     </h1>
   </header>
-  <%# The site search indexes a page, as it indexes an entry. ⚠️ This tests index_in_search_engines
-      and also draft, and the entry templates are different. /contact/success is a published page
-      that sets that flag to false, and without this test it would appear in the search modal. %>
-  <%= partial 'partials/article/body', locals: { article: article, pagefind: !article.draft && article.index_in_search_engines } %>
+  <%= partial 'partials/article/body', locals: { article: article } %>
 </article>

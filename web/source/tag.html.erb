@@ -8,7 +8,7 @@
           Updated <%= content_tag :time, latest.strftime('%B %-e, %Y'), datetime: latest.iso8601 %>
         </span>
       <% end %>
-      <% ancestors = content.tag_id ? concept_chain(content.tag_id)[0...-1] : [] %>
+      <% ancestors = concept_ancestors(content.tag_id) %>
       <% if ancestors.any? %>
         <span>
           <%= tag_list_icon(ancestors.size) %>

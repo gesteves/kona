@@ -1,19 +1,17 @@
+<%# locals: (article:, show_draft: true, show_tags: true, tracking_section: nil, **) %>
 <%# The meta line with the publish date. The full entry, the compact entry, and the Short share it,
     and they show the draft label and the tags. The summary card also shares it, with `show_draft`
-    and `show_tags` set to false. The code parses the date one time, here. %>
-<% render_draft = !defined?(show_draft) || show_draft %>
-<% render_tags = !defined?(show_tags) || show_tags %>
+    and `show_tags` set to false. The code parses the date one time, here.
+    `tracking_section` tags the permalink for the analytics. ⚠️ The full entry must not pass it:
+    on the page of the article that link is the page itself. %>
 <% published = published_datetime(article) %>
-<%# `tracking_section` is an optional local. It tags the permalink for the analytics. ⚠️ The full
-    entry must not pass it: on the page of the article that link is the page itself. %>
-<% tracking_section = defined?(tracking_section) ? tracking_section : nil %>
 <p class="entry__meta"
   data-controller="publish-date"
   data-publish-date-datetime-value="<%= published.iso8601 %>"
   data-publish-date-time-zone-value="<%= site_time_zone %>"
   data-publish-date-entry-type-value="<%= article.entry_type %>"
   data-publish-date-draft-value="<%= article.draft %>">
-  <% if render_draft && article.draft %>
+  <% if show_draft && article.draft %>
     <%= draft_badge %>
   <% end %>
   <span class="entry__highlight" data-publish-date-target="badge" hidden><%= icon_svg("classic", "regular", "sparkles") %> New</span>
@@ -24,7 +22,7 @@
   </span>
   <%# The concepts, and not `contentful_metadata.tags`: a concept with no tag page renders no link,
       thus an article can have tags and no link. %>
-  <% concepts = render_tags ? tag_breadcrumb_concepts(article) : [] %>
+  <% concepts = show_tags ? tag_breadcrumb_concepts(article) : [] %>
   <% if concepts.any? %>
     <span>
       <%= tag_list_icon(concepts.size) %>

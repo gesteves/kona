@@ -1,3 +1,4 @@
+<%# locals: (article:, **) %>
 <%# The recirculation of an article. It has two sections, and each one renders only when it has
     entries: the reports of the same race, and then the related entries, which the api puts in
     order (data/related.json, through `rake import:related`). recirculation_sections removes from
@@ -5,8 +6,7 @@
 
     ⚠️ scope_entry_ids is necessary: a report of the same race can also be the Previous or the
     Next card of read_next on this page. Without the section in the id, two cards would have the
-    same DOM id and both aria-labelledby values would point at the first card.
-    `article` is a necessary local. %>
+    same DOM id and both aria-labelledby values would point at the first card. %>
 <% sections = recirculation_sections(article) %>
 <% if sections[:reports].present? %>
   <%= partial 'partials/collection', locals: { title: "More Reports From This Race", items: sections[:reports], variant: "halves", scope_entry_ids: true } %>

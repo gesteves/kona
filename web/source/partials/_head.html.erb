@@ -2,18 +2,19 @@
   <%= partial 'partials/meta' %>
   <%= partial 'partials/open_graph_and_social' %>
   <%# page_content is the same object that `content` names, and it needs no defined? test on each %>
-  <%# line. %>
+  <%# line. `post` is that object when the page is a published post. %>
   <% page = page_content %>
-  <%= partial 'partials/schema/article', locals: { article: page } if page && published_post?(page) %>
+  <% post = current_post %>
+  <%= partial 'partials/schema/article', locals: { article: post } if post %>
   <%= partial 'partials/schema/site' %>
-  <%= partial 'partials/schema/breadcrumb' if page && published_post?(page) %>
-  <%= partial 'partials/schema/profile' if page && page.entry_type == 'Page' && page.slug == 'about' %>
-  <%= partial 'partials/schema/collection' if page && page.template == '/tag.html' %>
-  <%= partial 'partials/schema/blog' if page && page.template == '/articles.html' %>
+  <%= partial 'partials/schema/breadcrumb' if post %>
+  <%= partial 'partials/schema/profile' if page && about_page?(page) %>
+  <%= partial 'partials/schema/collection' if tag_archive?(page) %>
+  <%= partial 'partials/schema/blog' if blog_index?(page) %>
   <% if standard_site&.publication_uri.present? %>
     <link rel="site.standard.publication" href="<%= standard_site.publication_uri %>">
-    <% if page && published_post?(page) && standard_site.did.present? %>
-      <link rel="site.standard.document" href="at://<%= standard_site.did %>/site.standard.document/<%= document_rkey(page.sys.id) %>">
+    <% if post && standard_site.did.present? %>
+      <link rel="site.standard.document" href="at://<%= standard_site.did %>/site.standard.document/<%= document_rkey(post.sys.id) %>">
     <% end %>
   <% end %>
   <link rel="canonical" href="<%= canonical_url %>">
@@ -22,8 +23,8 @@
   <% end %>
   <%# The Markdown copy of a post, and the llms.txt that covers each page. These are the link
       relations of the llms.txt proposal. %>
-  <% if page && published_post?(page) %>
-    <link rel="alternate" type="text/markdown" href="<%= full_url(entry_markdown_path(page)) %>">
+  <% if post %>
+    <link rel="alternate" type="text/markdown" href="<%= full_url(entry_markdown_path(post)) %>">
   <% end %>
   <link rel="describedby" href="<%= full_url('/llms.txt') %>">
   <link rel="icon" href="/favicon.ico" sizes="32x32">

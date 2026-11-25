@@ -135,12 +135,41 @@ module ArticleHelpers
     published_articles.take(count)
   end
 
+  # Tells if a page is a page of the blog index. Contentful#generate_blog gives it that template.
+  def blog_index?(page)
+    page&.template == "/articles.html"
+  end
+
+  # The published post that this page renders. It controls the markup of a post in the <head>.
+  # @return [Object, nil] The post, or nil on each other page.
+  def current_post
+    page = page_content
+    page if page && published_post?(page)
+  end
+
+  # Tells if the site search indexes the body of an entry on its own page. It never indexes a
+  # draft.
+  #
+  # ⚠️ A Page also needs `index_in_search_engines`. /contact/success is a published page that sets
+  # that flag to false, and without this test it would appear in the search modal.
+  def search_indexable?(entry)
+    return false if entry.draft
+
+    entry.entry_type != "Page" || entry.index_in_search_engines.present?
+  end
+
   # The most recent full articles that a search engine can index, for llms.txt.
   # @return [Array<Object>]
   def llms_articles(count: 100)
     indexable_articles
       .reject { |a| a.entry_type == "Short" }
       .take(count)
+  end
+
+  # The summary of an article for its line in llms.txt: one line, of 200 characters at the most.
+  # @return [String, nil]
+  def llms_summary(article)
+    sanitize(article.summary)&.truncate(200, omission: "…", separator: " ")&.tr("\n", " ")
   end
 
   # The "Draft" badge on the meta line of an unpublished entry.

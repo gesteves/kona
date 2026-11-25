@@ -1,3 +1,4 @@
+<%# locals: (section_id:, heading:, url:, **) %>
 <%# The placeholder of an article collection that the API puts in order. Today that is the
     trending collection only. The live-update controller replaces it with the API fragment, and it
     removes the element when the API gives an empty response. The locals: `section_id` and
@@ -8,7 +9,7 @@
   <ol class="collection__list" role="list">
     <% 4.times do %>
       <li class="collection__item">
-        <%= partial 'partials/placeholders/entry_skeleton', locals: { image: true } %>
+        <%= partial 'partials/placeholders/entry_skeleton' %>
       </li>
     <% end %>
   </ol>

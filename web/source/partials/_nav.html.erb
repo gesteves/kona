@@ -1,3 +1,4 @@
+<%# locals: (items:, **) %>
 <% if items.present? %>
   <nav class="nav" id="nav" aria-label="Main" data-controller="nav" data-nav-open-class="has-nav-open" data-action="turbo:before-cache@document->nav#closeNav search:close@document->nav#closeNav keydown.esc@document->nav#closeNav">
     <ol class="nav__list" id="nav-menu" role="list" data-nav-target="menu">

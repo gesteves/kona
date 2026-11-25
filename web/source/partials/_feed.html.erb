@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
-  <%# max is nil for an empty feed, and .rfc3339 below would then raise. %>
-  <% updated = articles.map { |e| DateTime.parse(e.updated_at) }.max || DateTime.now %>
+  <%# locals: (articles:, html_path:, feed_path:, title:, subtitle:, **) %>
+  <% updated = feed_updated_at(articles) %>
   <%# ⚠️ An Atom id is permanent. The date is the first publish of the Site entry, which never
       changes. The oldest entry would move when a person retags or unpublishes a post, and a reader
       then shows the full feed as new. %>
@@ -20,10 +20,10 @@
       <link rel="alternate" type="text/html" href="<%=h full_url(entry.path) %>"/>
       <published><%= entry_published.rfc3339 %></published>
       <updated><%= DateTime.parse(entry.updated_at).rfc3339 %></updated>
-      <%# ⚠️ Contentful gives a null item for a link that it cannot resolve, thus the author can be
-          nil. Atom needs a name, and the author of the site is the one for each entry today. %>
+      <%# Refer to feed_author_name for the reason that this does not read entry.author
+          directly. %>
       <author>
-        <name><%=h entry.author&.name.presence || data.site.author.name %></name>
+        <name><%=h feed_author_name(entry) %></name>
       </author>
       <%# ⚠️ This uses content_summary, and not entry.summary: a Short has no summary field, and
           Atom needs content in this element. The `sanitize` in content_summary also decodes each

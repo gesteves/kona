@@ -1,3 +1,4 @@
+<%# locals: (icon:, top:, bottom: nil, **) %>
 <%# The loading skeleton of one stat card. The label at the top, which is an icon and a name, %>
 <%# does not change, thus it is true text. Only the number and the footer, which come from the %>
 <%# data, are skeletons. It uses the true `.stats__stat` classes, thus each line keeps the same %>
@@ -7,7 +8,7 @@
   <span class="stats__meta"><%= icon_svg("classic", "light", icon) %> <%= top %></span>
   <span class="stats__number"><wa-skeleton effect="sheen"></wa-skeleton></span>
   <span class="stats__meta">
-    <% if defined?(bottom) %>
+    <% if bottom %>
       <%= bottom %>
     <% else %>
       <wa-skeleton effect="sheen"></wa-skeleton>

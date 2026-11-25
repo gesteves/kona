@@ -144,6 +144,29 @@ module SiteHelpers
     ].flatten.max
   end
 
+  # The time of the newest entry on a page of the blog index or of a tag archive. Such a page has
+  # no updated_at of its own.
+  # @return [DateTime, nil] The time, or nil for a page with no entry.
+  def listing_updated_at(page)
+    Array(page.items).filter_map { |item| DateTime.parse(item.updated_at) if item.updated_at.present? }.max
+  end
+
+  # The <updated> of a feed: the time of its newest entry. An empty feed gets the time of the
+  # build, because Atom needs a value.
+  # @return [DateTime]
+  def feed_updated_at(articles)
+    articles.map { |entry| DateTime.parse(entry.updated_at) }.max || DateTime.now
+  end
+
+  # The author of an entry in a feed.
+  #
+  # ⚠️ Contentful gives a null item for a link that it cannot resolve, thus the author can be nil.
+  # Atom needs a name, and the author of the site is the one for each entry today.
+  # @return [String]
+  def feed_author_name(entry)
+    entry.author&.name.presence || data.site.author.name
+  end
+
   # The value of <lastmod> in the sitemap.
   # ⚠️ Keep the time. IndexNow compares this string, thus a date alone makes a second edit of the
   # same day invisible, and no URL goes to the engines.
@@ -198,7 +221,7 @@ module SiteHelpers
     pc = page_content
     tags = if pc.nil?
       []
-    elsif pc.template == "/tag.html" && pc.tag_id
+    elsif tag_archive?(pc) && pc.tag_id
       node = taxonomy_index[pc.tag_id] # the tag itself
       node ? [ node ] : []
     else

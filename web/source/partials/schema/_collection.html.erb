@@ -1,3 +1,4 @@
+<%# locals: (content:, **) %>
 <script type="application/ld+json"><%= collection_page_schema(content) %></script>
 <% breadcrumb = tag_breadcrumb_schema(content) %>
 <% if breadcrumb %><script type="application/ld+json"><%= breadcrumb %></script><% end %>

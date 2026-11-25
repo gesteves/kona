@@ -1,5 +1,12 @@
 require_relative "lib/helpers"
 
+# A partial that takes a local declares it on its first line, as a Rails partial does:
+# `<%# locals: (article:, tracking_section: nil, **) %>`. A local with no default is necessary,
+# and the build stops when a caller omits it.
+# ⚠️ The `**` at the end is necessary. Middleman gives each partial the locals of its page also,
+# for example `content`, and without the `**` the build stops on that local.
+Tilt.extract_fixed_locals = true
+
 each_kona_helper { |helper| helpers helper }
 
 config[:css_dir]             = 'stylesheets'

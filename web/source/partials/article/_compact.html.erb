@@ -1,4 +1,4 @@
-<% tracking_section = defined?(tracking_section) ? tracking_section : nil %>
+<%# locals: (article:, tracking_section: nil, **) %>
 <article class="entry entry--compact" id="<%= entry_dom_id(article) %>" aria-labelledby="<%= entry_heading_id(article) %>">
   <header class="entry__header">
     <%= partial 'partials/article/meta', locals: { article: article, tracking_section: tracking_section } %>

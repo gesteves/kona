@@ -1,27 +1,20 @@
-<%# The loading skeleton of an entry card, for placeholders/_article_collection.html.erb. It has %>
-<%# the shape of an entry summary: an eyebrow, a heading, and `lines` lines of body text. %>
-<%# `lines`, which is an optional local, is the number of body lines. The default is 2, and no %>
-<%# caller gives another value today. %>
-<% line_count = defined?(lines) ? lines : 2 %>
-<%# Give `image: true` where the fragment renders a cover image. Without it, the section jumps when
-    the fragment replaces the skeleton. %>
-<% show_image = defined?(image) ? image : false %>
+<%# The loading skeleton of an entry card, for placeholders/_article_collection.html.erb. It has
+    the shape of the summary card that replaces it: a cover image, an eyebrow, a heading, and two
+    lines of body text. Thus the section does not jump at the swap. %>
 <%# The container tags are the same as in the _summary card of the api, which replaces this. Thus a
     selector such as `article.entry` or `header.entry__header` in _entry.scss reaches both.
     ⚠️ The heading stays a span, on purpose: a screen reader announces an empty h3 as a heading
     with no name. %>
 <article class="entry entry--summary">
-  <% if show_image %>
-    <%# --card-ratio holds the box of the skeleton, thus the section does not jump when the api
-        fragment replaces it. It comes from data/srcsets.yml, as the cover image does. %>
-    <span class="entry__cover"><wa-skeleton class="entry-skeleton-cover" effect="sheen" style="--card-ratio:<%= card_aspect_ratio %>;"></wa-skeleton></span>
-  <% end %>
+  <%# --card-ratio holds the box of the skeleton, thus the section does not jump when the api
+      fragment replaces it. It comes from data/srcsets.yml, as the cover image does. %>
+  <span class="entry__cover"><wa-skeleton class="entry-skeleton-cover" effect="sheen" style="--card-ratio:<%= card_aspect_ratio %>;"></wa-skeleton></span>
   <header class="entry__header">
     <p class="entry__meta"><wa-skeleton class="entry-skeleton-eyebrow" effect="sheen"></wa-skeleton></p>
     <span class="entry__hed"><wa-skeleton class="entry-skeleton-heading" effect="sheen"></wa-skeleton></span>
   </header>
   <div class="entry__body">
-    <% line_count.times do %>
+    <% 2.times do %>
       <wa-skeleton class="entry-skeleton-line" effect="sheen"></wa-skeleton>
     <% end %>
   </div>

@@ -226,7 +226,7 @@ RSpec.describe MarkupHelpers do
       text = 'Read [this](/2024/05/01/a-race/).'
       allow(self).to receive(:amazon_associates_link?).and_return(false)
 
-      tagged = render_body(text, link_section: 'Article Body')
+      tagged = render_body(text, tracking_section: 'Article Body')
       plain = render_body(text)
 
       expect(tagged).to include('plausible-event-section=Article+Body')

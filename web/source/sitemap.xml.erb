@@ -21,7 +21,7 @@
   <% (data.blog + data.tags.flat_map(&:pages)).select { |p| p.index_in_search_engines }.each do |page| %>
     <url>
       <loc><%= full_url(page.path) %></loc>
-      <% latest = Array(page.items).filter_map { |i| DateTime.parse(i.updated_at) if i.updated_at.present? }.max %>
+      <% latest = listing_updated_at(page) %>
       <% if latest %>
         <lastmod><%= sitemap_lastmod(latest) %></lastmod>
       <% end %>

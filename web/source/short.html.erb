@@ -1,4 +1,4 @@
-<%= partial 'partials/article/short', locals: { article: content, indexable: true } %>
+<%= partial 'partials/article/short', locals: { article: content, standalone: true } %>
 <%= partial 'partials/share', locals: { article: content } %>
 <%# A Short has no event, thus it always shows the "You May Also Like" section, which uses the %>
 <%# meaning of the articles. %>

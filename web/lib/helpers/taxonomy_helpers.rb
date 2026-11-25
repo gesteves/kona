@@ -13,6 +13,17 @@ module TaxonomyHelpers
     TaxonomyHelpers.tag_feed_path(tag_path)
   end
 
+  # Tells if a page is the archive of a tag. Contentful#generate_tags gives it that template.
+  def tag_archive?(page)
+    page&.template == "/tag.html"
+  end
+
+  # The concepts above a concept, the root first. The concept itself is not in the list.
+  # @return [Array<Hash>] The [{ id:, name:, path: }] items, or [] with no id.
+  def concept_ancestors(id)
+    id ? concept_chain(id)[0...-1] : []
+  end
+
   # The chain of parents of the most deeply nested concept of an article, in the two schemes. If
   # two concepts are at the same depth, the number of articles in the archive of the concept
   # selects one.

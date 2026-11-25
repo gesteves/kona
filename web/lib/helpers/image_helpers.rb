@@ -279,6 +279,33 @@ module ImageHelpers
     "#{root_url.to_s.chomp('/')}#{path.to_s.chomp('/')}/og.png?#{query}"
   end
 
+  # The Open Graph image of the page, and its alt text: the cover image of the content, or the
+  # card that the Worker renders for content with no cover image, or the cover image of the site
+  # for a page with no content. Each one has the card size of 1200×630.
+  #
+  # The alt text can be an empty string, for a cover image with no description. It is nil only
+  # when a content page has no title, and the page then has no og:image:alt tag.
+  # @return [Array(String, String), nil] The URL and the alt text, or nil for no image.
+  def open_graph_image
+    page = page_content
+    if page && page.cover_image.present?
+      [ open_graph_image_url(page.cover_image.url), page.cover_image.description.to_s ]
+    elsif page
+      title = (page_title(meta_title_source) if meta_title_source)
+      [ open_graph_card_url(current_page.url, page.sys&.published_version, title: title), title ]
+    elsif data.site.cover_image.present?
+      [ open_graph_image_url(data.site.cover_image.url), data.site.cover_image.description.to_s ]
+    end
+  end
+
+  # The icons of the web app manifest, from the logo of the site.
+  # @return [Array<Hash>] The { src:, type:, sizes: } items, or [] if the site has no logo.
+  def manifest_icons
+    return [] unless data.site.logo.present?
+
+    [ 192, 512 ].map { |w| { src: site_icon_url(w: w), type: data.site.logo.content_type, sizes: "#{w}x#{w}" } }
+  end
+
   # @return [String, nil] The transformation URL of the site icon, or nil if the site has no logo.
   # @raise [ImagesUrlMissing] If IMAGES_URL has no value.
   def site_icon_url(w:)

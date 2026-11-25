@@ -1,8 +1,8 @@
-<% standalone = defined?(indexable) && indexable %>
-<%# A Short renders its full body here, thus the permalink of the meta line is its one link into
-    the entry. It carries the analytics of the card. %>
-<% tracking_section = defined?(tracking_section) ? tracking_section : nil %>
-<% index_body = standalone && !article.draft %>
+<%# locals: (article:, standalone: false, tracking_section: nil, **) %>
+<%# `standalone` is true on the page of the Short, and false in a list. A Short renders its full
+    body here, thus the permalink of the meta line is its one link into the entry. It carries
+    `tracking_section`, the analytics of the card. %>
+<% index_body = standalone && search_indexable?(article) %>
 <%# The landmark takes its name from the sr-only heading below, which is an <h1> on its own page and
     an <h2> in a list. Both carry entry_heading_id, thus one aria-labelledby covers the two. %>
 <article class="entry entry--compact" id="<%= entry_dom_id(article) %>" aria-labelledby="<%= entry_heading_id(article) %>">
@@ -23,7 +23,7 @@
     <% if index_body %><span hidden data-pagefind-meta="title"><%= heading_text(article.title) %></span><% end %>
   </header>
   <div class="entry__body"<%= ' data-pagefind-body'.html_safe if index_body %>>
-    <%= prepend_title(heading_text(article.title), render_body(article.intro, link_section: (MarkupHelpers::ARTICLE_BODY_SECTION if standalone)), hidden_from_at: true) %>
+    <%= prepend_title(heading_text(article.title), render_body(article.intro, tracking_section: (MarkupHelpers::ARTICLE_BODY_SECTION if standalone)), hidden_from_at: true) %>
     <%= partial 'partials/disclosure', locals: { entry: article } %>
   </div>
 </article>

@@ -12,6 +12,17 @@ module AboutHelpers
     pages.find { |page| page.slug == ABOUT_PAGE_SLUG && !page.draft }
   end
 
+  # Tells if a page is the about page. ⚠️ This does not test `draft`, as .about_page does.
+  def about_page?(page)
+    page.entry_type == "Page" && page.slug == ABOUT_PAGE_SLUG
+  end
+
+  # The path that llms.txt gives for the about page: its Markdown document when the build makes
+  # one, and the HTML page in each other condition.
+  def about_document_path
+    AboutHelpers.about_page(data.pages) ? "/.well-known/about.md" : "/about/"
+  end
+
   # Renders the about page as AboutSpec Markdown: front matter with a `summary`, then the body.
   # There is no title heading, because the reader shows the document in its own "About" tab.
   # @return [String] The Markdown document, with a newline at the end.

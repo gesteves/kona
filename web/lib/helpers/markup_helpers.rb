@@ -24,20 +24,20 @@ module MarkupHelpers
   # @param text [String] The Markdown text to render.
   # @param image_variant [Symbol] The name of a variant in data/srcsets.yml.
   # @param first_image [Symbol, nil] Refer to MarkupImageHelpers#responsivize_images.
-  # @param link_section [String, nil] The analytics section of each link to an article. With nil,
+  # @param tracking_section [String, nil] The analytics section of each link to an article. With nil,
   #   the links get no analytics classes.
   # @return [String] The HTML after the transforms.
-  def render_body(text, image_variant: :entry, first_image: nil, link_section: nil)
+  def render_body(text, image_variant: :entry, first_image: nil, tracking_section: nil)
     if first_image
       return compute_render_body(text, image_variant: image_variant, first_image: first_image,
-                             link_section: link_section)
+                             tracking_section: tracking_section)
     end
 
     rendered = false
-    key = [ text, image_variant, link_section ]
+    key = [ text, image_variant, tracking_section ]
     html = memoize_entry(:rendered_bodies, key, data.articles, data.assets) do
       rendered = true
-      compute_render_body(text, image_variant: image_variant, first_image: nil, link_section: link_section)
+      compute_render_body(text, image_variant: image_variant, first_image: nil, tracking_section: tracking_section)
     end
     # The icons of a body that another page rendered go in the sprite of this page as well.
     record_icons_in(html) unless rendered
@@ -45,11 +45,11 @@ module MarkupHelpers
   end
 
   # @see #render_body
-  def compute_render_body(text, image_variant:, first_image:, link_section: nil)
+  def compute_render_body(text, image_variant:, first_image:, tracking_section: nil)
     srcset = data.srcsets[image_variant]
     render_markup(text) do |doc|
       open_external_links_in_new_tabs(doc)
-      track_article_links(doc, link_section) if link_section
+      track_article_links(doc, tracking_section) if tracking_section
       copy_feed_links(doc)
       add_unit_data_attributes(doc)
       add_image_data_attributes(doc)

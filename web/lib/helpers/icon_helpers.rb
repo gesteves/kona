@@ -8,6 +8,13 @@ module IconHelpers
   # A `<use>` reference to an icon symbol, in a rendered HTML string.
   ICON_REFERENCE = /href="#icon-([a-z]+)-([a-z]+)-([^"]+)"/
 
+  # Makes the SVG of an icon for a slot of a Web Awesome component, for example the `end` slot of
+  # a button.
+  # @return [String, nil] The SVG with a `slot` attribute, or nil if the icon is absent.
+  def slotted_icon_svg(family, style, icon_id, slot:)
+    icon_svg(family, style, icon_id)&.sub("<svg", %(<svg slot="#{slot}"))
+  end
+
   # Makes the SVG of an icon: a `<use>` of its symbol, with the marks that say it is decoration.
   #
   # ⚠️ The paths of the icon are not here. They go in the sprite at the end of the body, one time

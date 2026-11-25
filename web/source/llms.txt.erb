@@ -10,12 +10,12 @@ signals are in <%= full_url('/robots.txt') %>. The full archive lives at <%= ful
 
 ## Key pages
 
-- [About](<%= full_url(AboutHelpers.about_page(data.pages) ? '/.well-known/about.md' : '/about/') %>): About <%= data.site.author.name %> and this site.
+- [About](<%= full_url(about_document_path) %>): About <%= data.site.author.name %> and this site.
 - [Atom feed](<%= full_url('/feed.xml') %>): Machine-readable feed of recent articles.
 
 ## Articles
 <% llms_articles.each do |article| %>
-- [<%= sanitize(article.title) %>](<%= full_url(entry_markdown_path(article)) %>)<% if article.summary.present? %>: <%= sanitize(article.summary)&.truncate(200, omission: "…", separator: " ")&.tr("\n", " ") %><% end %>
+- [<%= sanitize(article.title) %>](<%= full_url(entry_markdown_path(article)) %>)<% if article.summary.present? %>: <%= llms_summary(article) %><% end %>
 <% end %>
 
 ## Optional

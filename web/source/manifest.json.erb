@@ -6,5 +6,5 @@
   display: "minimal-ui",
   theme_color: "#BF0222",
   background_color: "#FFFFFF",
-  icons: data.site.logo.present? ? [192, 512].map { |w| { src: site_icon_url(w: w), type: data.site.logo.content_type, sizes: "#{w}x#{w}" } } : []
+  icons: manifest_icons
 }.to_json %>

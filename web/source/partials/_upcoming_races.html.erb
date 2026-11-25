@@ -1,3 +1,4 @@
+<%# locals: (url:, **) %>
 <%# The upcoming-races section. The build renders it from data/events.json, and the api adds to it
     at run time: the live-update controller puts a fragment here that adds the race-day weather of
     the featured race, its live-tracking link, and a separate "Today's Race" section.
@@ -6,8 +7,8 @@
     a fetch that fails deletes it. Refer to live_update_attrs.
 
     ⚠️ This element and api/app/views/widgets/events/upcoming.html.erb are a pair, and
-    api/spec/contracts/widget_markup_contract_spec.rb tests the outer element of both. `url` is a
-    necessary local. %>
+    api/spec/contracts/widget_markup_contract_spec.rb tests the outer element of both. `url` is
+    the endpoint of the api. %>
 <% races = upcoming_races %>
 <% if races.present? %>
   <div class="collection-group" data-nosnippet <%= live_update_attrs(url, placeholder: false) %>>

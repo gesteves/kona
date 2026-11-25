@@ -1,27 +1,24 @@
+<%# locals: (title:, items:, variant:, scope_entry_ids: false, tracking_section: nil, **) %>
 <%# ⚠️ Use aria-labelledby, thus a section with a title becomes a `region` landmark with a name.
     The trending section from the api already has it (placeholders/_article_collection.html.erb,
     and widgets/articles/_collection of the api). Without it here, "Trending Articles" is a
     landmark of the page and "Recent Articles" is not. %>
 <% section_id = title.present? ? title.parameterize : nil %>
-<section class="collection <%= "collection--#{variant}" if defined?(variant) %>" <% if section_id %>id="<%= section_id %>" aria-labelledby="hed-<%= section_id %>"<% end %>>
+<section class="collection <%= "collection--#{variant}" %>" <% if section_id %>id="<%= section_id %>" aria-labelledby="hed-<%= section_id %>"<% end %>>
   <% if title.present? %>
     <h2 class="collection__heading" <% if section_id %>id="hed-<%= section_id %>"<% end %>><%= smartypants(title) %></h2>
   <% end %>
   <ol class="collection__list" role="list">
     <%# Select the items before the <li>, and not in it. If you do it in the <li>, an item that %>
     <%# is not a post gives an empty <li>. %>
-    <%# `scope_entry_ids`, which is an optional local, puts this section in the DOM id of each card.
-        Set it where the section can list an entry that another section on the same page also
-        lists. %>
-    <% id_scope = (defined?(scope_entry_ids) && scope_entry_ids) ? section_id : nil %>
+    <%# `scope_entry_ids` puts this section in the DOM id of each card. Set it where the section
+        can list an entry that another section on the same page also lists. %>
+    <% id_scope = scope_entry_ids ? section_id : nil %>
     <%# The analytics of a card names its section by the HEADING, word for word. Refer to the root
-        CLAUDE.md. `tracking_section` overrides it, for a heading that is not unique in the site.
-        ⚠️ Read it into ANOTHER name. `x = defined?(x) ? x : y` never gives y: the assignment makes
-        the parser declare x, thus defined? is always true and the value is nil. %>
-    <% section_label = defined?(tracking_section) ? tracking_section : title %>
+        CLAUDE.md. `tracking_section` overrides it, for a heading that is not unique in the site. %>
     <% items.select { |item| blog_post?(item) }.each do |item| %>
       <li class="collection__item">
-        <%= partial 'partials/article/summary', locals: { article: item, id_scope: id_scope, tracking_section: section_label } %>
+        <%= partial 'partials/article/summary', locals: { article: item, id_scope: id_scope, tracking_section: tracking_section || title } %>
       </li>
     <% end %>
   </ol>

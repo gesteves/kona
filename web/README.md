@@ -145,4 +145,6 @@ The partials of each page, below the layout:
 - **Blog index and tag archive** (`articles.html.erb`, `tag.html.erb`): `_blog_list` → `article/_compact` for an Article and `article/_short` for a Short.
 - **Page** (`page.html.erb`): `article/_page` → `article/_body`; then the `trending` placeholder, when the Page has `show_recommendations` on.
 
+A partial that takes a local declares it on its first line, `<%# locals: (article:, tracking_section: nil, **) %>`, in the way of a Rails partial: a local with no default is necessary, and the build stops when a caller omits it. `config.rb` sets that on and gives the reason for the `**`.
+
 Three names need care. `partials/article/` also holds the partials of a Short and of a Page. `_collection.html.erb` is a section of article cards, `placeholders/_article_collection` is the skeleton of the trending widget, and `schema/_collection` is the JSON-LD of a tag archive. `partials/placeholders/` holds the skeletons of the live widgets, and the placeholder of an image is a different thing (`image_helpers`, `_placeholder.scss`).
