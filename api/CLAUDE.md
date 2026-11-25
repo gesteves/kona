@@ -174,7 +174,7 @@ writes. In practice that means **no** `button_to`, which writes a native `<butto
 around a `<wa-button type="submit">`. The button of Web Awesome is part of its form
 (`formAssociated = true`), thus it submits that form as a native button does, and this includes the
 CSRF token and `_method`. A plain `<button` in the server HTML means that one came back into the
-code, and two request specs check that there is none.
+code, and ten admin request specs check that there is none.
 
 Use Sass here for what is truly ours: the layout of one page, the brand colors, and a border that
 the component does not draw. A rule that repeats the appearance of a component — its corner radius,

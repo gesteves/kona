@@ -21,7 +21,7 @@ Copy `.env.example` to `.env` and fill in the credentials below (deploys read th
 - **Redis** — the cache of the build. It holds the blurhash placeholder of each image, thus a build does not decode each one again, and the state of IndexNow (the sitemap of the last submission). Set `REDIS_URL`.
 - **Kona API** — set `KONA_API_URL` to the deployed [`api/`](../api/README.md) app. The home-page weather/stats/Whoop widgets load from it at runtime.
 - **Cloudflare R2** — a bucket mirroring Contentful's image assets, so Cloudflare Images fetches its source from a hostname inside the zone rather than from Contentful. A source outside the zone can't use Tiered Cache or Cache Reserve, so every Cloudflare PoP otherwise pulls the full-size original from Contentful and re-pulls it on eviction — which is what this is for. Attach a custom domain to the bucket and set `IMAGE_HOST` to that hostname, then allowlist **that host and only that host** as a Transformations source. ⚠️ Don't allowlist `*.ctfassets.net`: with the mirror host as the only allowed source, a missing or wrong `IMAGE_HOST` 403s loudly instead of silently falling back to Contentful and billing its metered bandwidth. That's also why `IMAGE_HOST` is required rather than optional. ⚠️ The **api** app populates the bucket, webhook-driven; run its `rake assets:backfill` before setting `IMAGE_HOST`, or every image 404s.
-- **Known Agents** _(optional)_ — the [AI agent catalogue](https://knownagents.com/) that was Dark Visitors. `rake import` posts the "AI Data Scraper" agent type to its API and the build writes the `Disallow` rules it returns into `/robots.txt`, so the blocklist tracks the agent landscape without an edit here. Make an account to get an access token and set `KNOWN_AGENTS_ACCESS_TOKEN`, locally and in the build environment. Unset, the import writes nothing and `/robots.txt` keeps its catch-all rule only.
+- **Known Agents** _(optional)_ — the [AI agent catalogue](https://knownagents.com/) that was Dark Visitors. `rake import` posts the "AI Data Scraper" and "Undocumented AI Agent" agent types (`KnownAgents::AGENT_TYPES`) to its API and the build writes the `Disallow` rules it returns into `/robots.txt`, so the blocklist tracks the agent landscape without an edit here. Make an account to get an access token and set `KNOWN_AGENTS_ACCESS_TOKEN`, locally and in the build environment. Unset, the import writes nothing and `/robots.txt` keeps its catch-all rule only.
 
 ## Running locally
 
@@ -78,8 +78,8 @@ npx wrangler dev              # http://localhost:8787
    | `import:content` | Contentful | `articles`, `assets`, `blog`, `events`, `pages`, `redirects`, `site`, `tags` (`.json`) | The build stops |
    | `import:icons` | `api/` | `icons.json` | The build stops |
    | `import:related` | `api/` | `related.json` | A warning. No article has "You May Also Like" |
-   | `import:standard_site` | `api/` | `standard_site.json` | A warning. No page has the verification tags |
-   | `import:known_agents` | Known Agents | `known_agents.json` | A warning. `robots.txt` keeps its catch-all rule only |
+   | `import:standard_site` | `api/` | `standard_site.json` | A warning for an error that raises, and no message for a non-2xx answer. No page has the verification tags |
+   | `import:known_agents` | Known Agents | `known_agents.json` | A warning for an error that raises, and no message for a non-2xx answer or no token. `robots.txt` keeps its catch-all rule only |
    | `import:schema` | Contentful | The schema file of step 1, for the next run | A warning |
 
 4. **Middleman reads `config.rb`**, which gives each module in `lib/helpers/` to the templates and then makes the pages from the data:
@@ -114,7 +114,7 @@ One row for each feature, and each file that it goes through. A helper is a modu
 | Feeds | `articles.json`, `tags.json` | `article_helpers` (`feed_articles`), `markup_helpers` (`render_feed_body`), `site_helpers` (`feed_title`) | `feed.xml.erb`, `tag_feed.xml.erb` → `_feed` | — | — |
 | Markdown copies | `articles.json`, `pages.json` | `entry_markdown_helpers`, `about_helpers`, `markdown_document_helpers` | `entry_md.txt.erb`, `about_md.txt.erb` | — | — |
 | Share buttons | — | `share_helpers` | `_share` | `share`, `clipboard` | — |
-| Header, nav, footer | `site.json` | `site_helpers` (the links, the copyright) | `_header`, `_nav`, `_footer`, `_logo.svg`, `_logo_symbol.svg` | `nav`, `back_to_top`, `current_year` | — |
+| Header, nav, footer | `site.json` | `site_helpers` (the links, the copyright) | `layouts/layout.erb` (the `nav` controller is on `<body>`), `_header`, `_nav`, `_footer`, `_logo.svg`, `_logo_symbol.svg` | `nav`, `back_to_top`, `current_year` | — |
 | Icons | `font_awesome.yml`, `icons.json` | `icon_helpers` | each template, through `icon_svg` | — | — |
 | Redirects and security headers | `redirects.json` | `redirect_helpers`, `csp_helpers` | `redirects.erb`, `headers.erb` | — | `headers.ts` (the Worker routes) |
 | `robots.txt`, `llms.txt`, sitemap, IndexNow | `known_agents.json` | `site_helpers`, `article_helpers` (`llms_articles`) | `robots.txt.erb`, `llms.txt.erb`, `sitemap.xml.erb`, `indexnow.txt.erb` | — | — |

@@ -8,14 +8,14 @@ Copy `.env.example` to `.env` for local development; in production set these as 
 
 ### Required services
 
-- **Redis** — caches upstream API responses (shared with the web app; `rediss://` for TLS). Set `REDIS_URL`.
+- **Redis** — caches upstream API responses, holds the Sidekiq queues, and is the only copy of some records (refer to `CLAUDE.md`). The web app has its own Redis. Set `REDIS_URL` (`rediss://` for TLS).
 - **Contentful** — looks up events and articles, and receives publish webhooks (to sync standard.site PDS records). Set `CONTENTFUL_SPACE`, `CONTENTFUL_TOKEN`, and `CONTENTFUL_WEBHOOK_SECRET` (HMAC secret verifying the webhook).
 - **Font Awesome** — icons, fetched from the API and cached per version. Set `FONT_AWESOME_API_TOKEN`.
 - **Intervals.icu** — activity stats. Set `ICU_ATHLETE_ID`, `ICU_API_KEY` (from the Intervals.icu settings page).
 - **Google Maps** — geocodes the location and powers pollen/AQI lookups. Set `GOOGLE_API_KEY` for a project with the Geocoding, Time Zone, Maps Elevation, Air Quality, and Pollen APIs enabled.
 - **WeatherKit** — current weather and forecast. Follow Apple's [WeatherKit REST setup](https://developer.apple.com/documentation/weatherkitrestapi/request_authentication_for_weatherkit_rest_api) and set `WEATHERKIT_KEY_ID`, `WEATHERKIT_TEAM_ID`, `WEATHERKIT_SERVICE_ID`, and `WEATHERKIT_PRIVATE_KEY` (the base64-encoded `.p8` key).
 - **Whoop** — sleep/recovery/strain. Create a Whoop OAuth app and set `WHOOP_CLIENT_ID`, `WHOOP_CLIENT_SECRET`, and `WHOOP_REDIRECT_URI` (must match the app, e.g. `https://<your-app-host>/whoop/callback`). The redirect URI must name the admin host. Connect the account with the Whoop card of the Connected apps page; the tokens then go into Redis.
-- **API token** — set `API_TOKEN`, the bearer token required by `POST /api/location`, `POST /api/weight`, and `POST /api/ftp`.
+- **API token** — set `API_TOKEN`, the bearer token that each `/widgets/*` and `/api/*` endpoint requires (`TokenGatedController`). The two exceptions are `GET /api/standard-site` and the signed `/api/social-photos/*` URLs.
 - **Site URL** — set `SITE_URL`, the public site root (used for the `/` redirect and the standard.site publication URL).
 
 ### Optional services
@@ -54,11 +54,11 @@ Copy `.env.example` to `.env` for local development; in production set these as 
 
   A successful POST returns `204 No Content`; an invalid FTP returns `422`.
 - **standard.site / Bluesky** — publishes posts to the AT Protocol PDS, webhook-driven (no-ops until connected). Connect an account on the admin's Connected apps page; `BLUESKY_PDS_URL` optionally overrides the default PDS host.
-- **Other**: `TIME_ZONE` (fallback timezone), `FONT_AWESOME_VERSION` (defaults to `7.2.0`), `WHOOP_REFERRAL_URL` (shown under the Whoop widget).
+- **Other**: `TIME_ZONE` (fallback timezone), `FONT_AWESOME_VERSION` (defaults to `7.3.0`), `WHOOP_REFERRAL_URL` (shown under the Whoop widget).
 
 ## Running locally
 
-Requirements: Ruby.
+Requirements: Ruby, Node (the version in `.nvmrc`; `bin/setup` builds the admin JS and CSS bundle, and its `npm ci` needs `WEBAWESOME_NPM_TOKEN` in your shell), and libvips (`brew install vips`; Rails loads it at boot, thus `rspec` and `bin/dev` both need it).
 
 1. Copy `.env.example` to `.env` and fill in the credentials above.
 2. Install dependencies: `bundle install`.
@@ -80,7 +80,7 @@ Requirements: Ruby.
 One row for each feature: where a request or an event comes in, and each file that it goes through. A name is a class, and its file is the same name in snake case:
 
 - a controller is in `app/controllers/`, a job in `app/jobs/`, and a presenter in `app/presenters/`;
-- a service is below `app/services/`, in the folder of its feature (`activity/`, `articles/`, `contact/`, `contentful/`, `icons/`, `location/`, `maps/`, `photos/`, `shared/`, `social/`, `weather/`). A folder is not a namespace: `app/services/social/bluesky.rb` is `Bluesky`. A spec is at the same path below `spec/services/`;
+- a service is below `app/services/`, in the folder of its feature (`activity/`, `articles/`, `contact/`, `contentful/`, `icons/`, `location/`, `maps/`, `photos/`, `shared/`, `social/`, `weather/`), or in `concerns/` for a module that several services include. A folder is not a namespace: `app/services/social/bluesky.rb` is `Bluesky`. A spec is at the same path below `spec/services/`;
 - a view folder is below `app/views/`;
 - an admin JS name is a Stimulus controller in `app/javascript/controllers/` (`social` is `social_controller.js`), or a module in `app/javascript/lib/`.
 
