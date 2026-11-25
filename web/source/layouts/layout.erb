@@ -1,13 +1,15 @@
 <!doctype html>
 <html lang="en" data-controller="page" data-action="turbo:load->page#load turbo:before-cache->page#clearNotifications">
   <%= partial 'partials/head' %>
-  <body>
+  <%# The nav controller is on <body>: an open menu makes the body fixed and makes each
+      `background` target inert. Refer to nav_controller.js. %>
+  <body data-controller="nav" data-nav-open-class="has-nav-open" data-action="turbo:before-cache@document->nav#closeNav search:close@document->nav#closeNav keydown.esc@document->nav#closeNav">
     <%= partial 'partials/skip' %>
     <div class="content">
       <%= partial 'partials/header' %>
       <%# tabindex="-1", thus the skip link moves the focus here, and not the scroll position %>
       <%# only. %>
-      <main class="content__main" id="main-content" tabindex="-1">
+      <main class="content__main" id="main-content" tabindex="-1" data-page-target="main" data-nav-target="background">
         <%= yield %>
       </main>
     </div>
@@ -18,7 +20,7 @@
         ⚠️ data-turbo-permanent keeps this ONE element across each navigation. Turbo replaces the
         body, thus without it each page would bring a new region that already holds its text, and a
         screen reader does not announce such a region. It needs the id for that flag. %>
-    <div id="route-announcer" class="sr-only" role="status" aria-live="polite" data-turbo-permanent></div>
+    <div id="route-announcer" class="sr-only" role="status" aria-live="polite" data-turbo-permanent data-page-target="announcer"></div>
     <%# The symbols that each <use> on this page names: the wordmark and each icon that the page
         rendered. It is at the END of the body, because icon_symbols knows the icons of the page
         only after the page rendered them. A <use> can name a symbol that comes after it. %>

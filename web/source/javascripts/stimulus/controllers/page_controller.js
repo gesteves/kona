@@ -1,16 +1,17 @@
 import { trackPageView } from '../lib/analytics';
 import { Controller } from '@hotwired/stimulus';
 
-/** The id of the live region and of the main landmark, both in layouts/layout.erb. */
-const ANNOUNCER_ID = 'route-announcer';
-const MAIN_ID = 'main-content';
-
 // The wait between the empty region and the new text. A screen reader must see a change, thus the
 // two writes cannot be in the same task.
 const ANNOUNCE_DELAY_MS = 50;
 
-/** The Turbo lifecycle methods of the page. */
+/**
+ * The Turbo lifecycle methods of the page. Its targets are in layouts/layout.erb: the `announcer`
+ * live region, the `main` landmark, and the `notifications` toast stack.
+ */
 export default class extends Controller {
+  static targets = ['announcer', 'main', 'notifications'];
+
   connect() {
     // `turbo:load` also runs for the first render of the document. The browser announces that page
     // itself, thus the code counts this load and announces nothing.
@@ -43,10 +44,10 @@ export default class extends Controller {
    * tab. A timer runs in both conditions.
    */
   announcePage() {
-    const region = document.getElementById(ANNOUNCER_ID);
-    if (!region) {
+    if (!this.hasAnnouncerTarget) {
       return;
     }
+    const region = this.announcerTarget;
     const title = document.title;
     region.textContent = '';
     setTimeout(() => {
@@ -62,7 +63,7 @@ export default class extends Controller {
    * gives back the position of the reader. A focus without this flag would move the page again.
    */
   focusMain() {
-    document.getElementById(MAIN_ID)?.focus({ preventScroll: true });
+    if (this.hasMainTarget) this.mainTarget.focus({ preventScroll: true });
   }
 
   /**
@@ -72,6 +73,6 @@ export default class extends Controller {
    * stack opens.
    */
   clearNotifications() {
-    document.getElementById('notifications')?.replaceChildren();
+    if (this.hasNotificationsTarget) this.notificationsTarget.replaceChildren();
   }
 }

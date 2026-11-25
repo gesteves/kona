@@ -10,6 +10,7 @@ import { mount } from '../helpers';
 const markup = () =>
   `<img class="placeholder" src="/x.jpg"
         data-controller="image-placeholder"
+        data-image-placeholder-placeholder-class="placeholder"
         data-action="load->image-placeholder#removePlaceholder error->image-placeholder#removePlaceholder">`;
 
 // `complete` is a read-only getter on HTMLImageElement, and it must have its value BEFORE the
@@ -57,11 +58,22 @@ describe('image-placeholder controller', () => {
     const { element } = await mount(
       'image-placeholder',
       ImagePlaceholderController,
-      '<img class="placeholder cover" data-controller="image-placeholder">'
+      '<img class="placeholder cover" data-controller="image-placeholder" data-image-placeholder-placeholder-class="placeholder" data-action="load->image-placeholder#removePlaceholder">'
     );
 
     element.dispatchEvent(new Event('load'));
 
     expect(element.className).toBe('cover');
+  });
+
+  // ⚠️ A fragment of the api can come from the edge cache with the markup of an earlier deploy.
+  it('does not raise for an image that does not name the class', async () => {
+    const { element } = await mount(
+      'image-placeholder',
+      ImagePlaceholderController,
+      '<img class="placeholder" data-controller="image-placeholder" data-action="load->image-placeholder#removePlaceholder">'
+    );
+
+    expect(() => element.dispatchEvent(new Event('load'))).not.toThrow();
   });
 });

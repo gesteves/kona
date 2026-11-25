@@ -196,6 +196,7 @@ module ImageHelpers
       decoding: "async",
       class: "entry__cover-image placeholder",
       "data-controller": "image-placeholder",
+      "data-image-placeholder-placeholder-class": "placeholder",
       "data-action": "load->image-placeholder#removePlaceholder error->image-placeholder#removePlaceholder"
     }
 

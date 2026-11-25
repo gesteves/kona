@@ -347,6 +347,7 @@ RSpec.describe ImageHelpers do
       expect(html).to include('decoding="async"')
       expect(html).to include('class="entry__cover-image placeholder"')
       expect(html).to include('data-controller="image-placeholder"')
+      expect(html).to include('data-image-placeholder-placeholder-class="placeholder"')
     end
 
     it 'cuts each candidate to the card ratio' do

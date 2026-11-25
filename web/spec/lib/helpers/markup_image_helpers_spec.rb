@@ -363,7 +363,7 @@ RSpec.describe MarkupImageHelpers do
     it 'sets the blurhash placeholder as a CSS custom property and wires up the image-placeholder controller' do
       allow(self).to receive(:blurhash_svg_data_uri).with('asset-1').and_return('data:image/svg+xml;charset=utf-8,%3Csvg%2F%3E')
       transformed_html = add_image_placeholders(tagged_img)
-      expect(transformed_html).to eq(%(<img src="#{image_url}" data-asset-id="asset-1" data-original-url="#{image_url}" style="--placeholder:url('data:image/svg+xml;charset=utf-8,%3Csvg%2F%3E');" class="placeholder" data-controller="image-placeholder" data-action="load-&gt;image-placeholder#removePlaceholder error-&gt;image-placeholder#removePlaceholder">))
+      expect(transformed_html).to eq(%(<img src="#{image_url}" data-asset-id="asset-1" data-original-url="#{image_url}" style="--placeholder:url('data:image/svg+xml;charset=utf-8,%3Csvg%2F%3E');" class="placeholder" data-controller="image-placeholder" data-image-placeholder-placeholder-class="placeholder" data-action="load-&gt;image-placeholder#removePlaceholder error-&gt;image-placeholder#removePlaceholder">))
     end
 
     it 'still adds the placeholder class and controller when no blurhash is available, but omits the style' do

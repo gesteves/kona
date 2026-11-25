@@ -75,6 +75,7 @@ module ImagesHelper
       class: "entry__cover-image placeholder",
       data: {
         controller: "image-placeholder",
+        image_placeholder_placeholder_class: "placeholder",
         action: "load->image-placeholder#removePlaceholder error->image-placeholder#removePlaceholder"
       }
     }

@@ -26,7 +26,7 @@
   <% if concepts.any? %>
     <span>
       <%= tag_list_icon(concepts.size) %>
-      <span class="entry__tags" role="list" aria-label="Tags">
+      <span role="list" aria-label="Tags">
         <%= tag_chain_links(concepts.map { |tag| [tag.short_name, tag.path] }) %>
       </span>
     </span>

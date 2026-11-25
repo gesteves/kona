@@ -1,15 +1,18 @@
 import { Controller } from '@hotwired/stimulus';
 
 /**
- * The selectors for the page content behind the open menu. The header is absent, on purpose: it
- * contains the menu and its button, thus an inert header would leave the user with no way out.
+ * Opens and closes the navigation menu, and keeps the ARIA state of its button correct.
+ *
+ * The controller is on <body>, because an open menu changes the full page: the body takes the
+ * `open` class and becomes fixed, and the content behind the menu becomes inert. Its targets are
+ * the `nav` element, the `menu` list and its `button`, and each `background` element.
+ *
+ * ⚠️ The header is not a `background` target, on purpose: it contains the menu and its button,
+ * thus an inert header would leave the user with no way out.
  */
-const BACKGROUND_SELECTORS = ['#main-content', '.footer'];
-
-/** Opens and closes the navigation menu, and keeps the ARIA state of its button correct. */
 export default class extends Controller {
   static classes = ['open'];
-  static targets = ['button', 'menu'];
+  static targets = ['nav', 'button', 'menu', 'background'];
   static values = {
     openAriaLabel: { type: String, default: 'Open menu' },
     closeAriaLabel: { type: String, default: 'Close menu' },
@@ -25,8 +28,8 @@ export default class extends Controller {
     // The open menu makes <body> fixed, which makes the scroll height of the document zero. Keep
     // the position of the reader, thus a close puts them back and not at the top.
     this.scrollY = window.scrollY;
-    document.body.classList.add(this.openClass);
-    document.body.style.top = `-${this.scrollY}px`;
+    this.element.classList.add(this.openClass);
+    this.element.style.top = `-${this.scrollY}px`;
     this.setBackgroundInert(true);
     this.updateButtonAttributes();
     this.focusMenu();
@@ -50,7 +53,7 @@ export default class extends Controller {
    */
   closeNav() {
     const wasOpen = this.isNavOpen();
-    document.body.classList.remove(this.openClass);
+    this.element.classList.remove(this.openClass);
     this.setBackgroundInert(false);
     this.updateButtonAttributes();
 
@@ -59,22 +62,27 @@ export default class extends Controller {
 
     // Do this only while the focus is in the nav. For the two other callers, a move of the focus to
     // the menu button would be incorrect.
-    if (this.hasButtonTarget && this.element.contains(document.activeElement)) {
-      this.buttonTarget.focus();
+    if (this.hasNavTarget && this.navTarget.contains(document.activeElement)) {
+      this.focusButton();
     }
+  }
+
+  /** Gives the focus to the menu button. The search controller also calls it, as an outlet. */
+  focusButton() {
+    if (this.hasButtonTarget) this.buttonTarget.focus();
   }
 
   /** Removes each inert attribute and the fixed body when the element goes away. */
   disconnect() {
     const wasOpen = this.isNavOpen();
-    document.body.classList.remove(this.openClass);
+    this.element.classList.remove(this.openClass);
     this.setBackgroundInert(false);
     if (wasOpen) this.releaseBody();
   }
 
   /** Puts the body back at the scroll position from before the menu opened. */
   releaseBody() {
-    document.body.style.top = '';
+    this.element.style.top = '';
     window.scrollTo(0, this.scrollY ?? 0);
   }
 
@@ -84,9 +92,8 @@ export default class extends Controller {
    * content that they cannot see.
    */
   setBackgroundInert(inert) {
-    BACKGROUND_SELECTORS.forEach((selector) => {
-      const element = document.querySelector(selector);
-      if (element) element.inert = inert;
+    this.backgroundTargets.forEach((element) => {
+      element.inert = inert;
     });
   }
 
@@ -102,6 +109,6 @@ export default class extends Controller {
 
   /** @returns {boolean} True if the navigation menu is open. */
   isNavOpen() {
-    return document.body.classList.contains(this.openClass);
+    return this.element.classList.contains(this.openClass);
   }
 }

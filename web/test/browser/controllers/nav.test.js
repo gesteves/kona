@@ -3,19 +3,36 @@ import NavController from '../../../source/javascripts/stimulus/controllers/nav_
 import { flushDom, mount } from '../helpers';
 
 // A class on <body> holds the open or closed state, because the menu covers the full screen on a
-// mobile device. Thus the work of the controller is to keep that class and the ARIA state of the
-// button the same.
+// mobile device. Thus the controller is on <body>, and its work is to keep that class and the ARIA
+// state of the button the same.
 
 const MARKUP = `
-  <nav data-controller="nav" data-nav-open-class="nav-open">
+  <nav data-nav-target="nav">
     <button data-nav-target="button"
-            data-action="nav#toggleNav search:close@document->nav#closeNav"
+            data-action="nav#toggleNav"
             aria-expanded="false"
             aria-label="Open menu">Menu</button>
   </nav>
+  <main data-nav-target="background"></main>
 `;
 
-const mountNav = () => mount('nav', NavController, MARKUP);
+/** Puts the controller on <body>, as layouts/layout.erb does. `mount` writes the body content only. */
+const onBody =
+  (attributes = {}) =>
+  (document) => {
+    const all = {
+      'data-controller': 'nav',
+      'data-nav-open-class': 'nav-open',
+      'data-action': 'search:close@document->nav#closeNav',
+      ...attributes,
+    };
+    Object.entries(all).forEach(([name, value]) =>
+      document.body.setAttribute(name, value)
+    );
+  };
+
+const mountNav = (markup = MARKUP, attributes = {}) =>
+  mount('nav', NavController, markup, onBody(attributes));
 const button = () => document.querySelector('[data-nav-target="button"]');
 const isOpen = () => document.body.classList.contains('nav-open');
 
@@ -74,9 +91,7 @@ describe('nav controller', () => {
   // into page content that they cannot see.
   it('makes the page behind the menu inert while it is open', async () => {
     const { element } = await mountNav();
-    const main = document.createElement('main');
-    main.id = 'main-content';
-    document.body.appendChild(main);
+    const main = document.querySelector('main');
 
     element.querySelector('button').click();
     expect(main.inert).toBe(true);
@@ -111,7 +126,8 @@ describe('nav controller', () => {
     window.scrollTo = scrollTo;
 
     element.querySelector('button').click();
-    element.remove();
+    // <body> stays in the document, and the controller leaves it.
+    element.removeAttribute('data-controller');
     await flushDom();
 
     expect(document.body.style.top).toBe('');
@@ -129,14 +145,14 @@ describe('nav controller', () => {
   });
 
   it('uses custom ARIA labels when supplied', async () => {
-    const { element } = await mount(
-      'nav',
-      NavController,
-      `<nav data-controller="nav" data-nav-open-class="nav-open"
-            data-nav-open-aria-label-value="Abrir menú"
-            data-nav-close-aria-label-value="Cerrar menú">
+    const { element } = await mountNav(
+      `<nav data-nav-target="nav">
          <button data-nav-target="button" data-action="nav#toggleNav"></button>
-       </nav>`
+       </nav>`,
+      {
+        'data-nav-open-aria-label-value': 'Abrir menú',
+        'data-nav-close-aria-label-value': 'Cerrar menú',
+      }
     );
 
     element.querySelector('button').click();

@@ -53,6 +53,9 @@ afterEach(() => {
   document.body.innerHTML = '';
   document.head.innerHTML = '';
   document.body.className = '';
+  [...document.body.attributes].forEach((attribute) =>
+    document.body.removeAttribute(attribute.name)
+  );
 
   // Each value that the code under test puts on `window` and keeps. Without this, the second test
   // of the contact suite would use the Turnstile promise from the first test.

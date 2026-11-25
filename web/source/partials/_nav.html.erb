@@ -1,15 +1,15 @@
 <%# locals: (items:, **) %>
 <% if items.present? %>
-  <nav class="nav" id="nav" aria-label="Main" data-controller="nav" data-nav-open-class="has-nav-open" data-action="turbo:before-cache@document->nav#closeNav search:close@document->nav#closeNav keydown.esc@document->nav#closeNav">
+  <nav class="nav" id="nav" aria-label="Main" data-nav-target="nav">
     <ol class="nav__list" id="nav-menu" role="list" data-nav-target="menu">
     <% items.each do |i| %>
       <li class="nav__item">
         <%= shortcut_link(i) %>
       </li>
     <% end %>
-      <%= partial 'partials/search_trigger', locals: { wrapper_class: 'nav__item nav__item--search' } %>
+      <%= partial 'partials/search_trigger', locals: { wrapper_class: 'nav__item' } %>
     </ol>
-    <button id="nav-button" aria-expanded="false" aria-label="Open menu" aria-controls="nav-menu" class="nav__hamburger" data-nav-target="button" data-action="click->nav#toggleNav">
+    <button aria-expanded="false" aria-label="Open menu" aria-controls="nav-menu" class="nav__hamburger" data-nav-target="button" data-action="click->nav#toggleNav">
       <span class="nav__hamburger-closed" aria-hidden="true">
         <%= icon_svg "classic", "light", "bars" %>
       </span>

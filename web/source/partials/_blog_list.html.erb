@@ -2,7 +2,7 @@
 <%# The list of entries that the blog index (articles.html.erb) and each tag page (tag.html.erb)
     share. `content` is one listing-page hash from Contentful#listing_page. %>
 <% if content.items.present? %>
-  <ol class="blog__list" role="list">
+  <ol role="list">
     <%# ⚠️ The index decides the separator, and not `item == content.items.last`. Each item is a
         Hashie::Mash, thus `==` compares the full article, body included, one time for each item. %>
     <%# The blog posts only, as in partials/_collection. %>

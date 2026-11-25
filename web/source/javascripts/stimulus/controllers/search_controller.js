@@ -2,12 +2,15 @@ import { initSearchTracking } from '../lib/analytics';
 import { loadPagefind, preloadPagefindWhenIdle } from '../lib/pagefind';
 import { Controller } from '@hotwired/stimulus';
 
-// The menu button of the nav. It is the focus target when the trigger of the search is in the menu,
-// which closeNav made invisible. Refer to returnFocus.
-const NAV_BUTTON_ID = 'nav-button';
-
-/** Loads the Pagefind component UI and opens its search modal. */
+/**
+ * Loads the Pagefind component UI and opens its search modal.
+ *
+ * The `nav` outlet is the controller of the menu. Its button is the focus target when the trigger
+ * of the search is in the menu, which closeNav made invisible. Refer to returnFocus.
+ */
 export default class extends Controller {
+  static outlets = ['nav'];
+
   connect() {
     preloadPagefindWhenIdle();
   }
@@ -61,6 +64,6 @@ export default class extends Controller {
     this.element.focus();
     if (document.activeElement === this.element) return;
 
-    document.getElementById(NAV_BUTTON_ID)?.focus();
+    if (this.hasNavOutlet) this.navOutlet.focusButton();
   }
 }

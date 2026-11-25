@@ -3,7 +3,7 @@
     pointerenter action and no focus action would stop the early load on that surface, and give no
     message. It is a button, and not an <a href="#">: the search needs JavaScript, thus there is no
     destination for a browser with no JavaScript. `wrapper_class` is the list-item class of the
-    menu that contains it. %>
+    menu that contains it. The outlet is the nav controller, which is on <body>. %>
 <li class="<%= wrapper_class %>">
-  <button type="button" aria-haspopup="dialog" data-controller="search" data-action="click->search#open pointerenter->search#preload focus->search#preload">Search</button>
+  <button type="button" aria-haspopup="dialog" data-controller="search" data-search-nav-outlet="body" data-action="click->search#open pointerenter->search#preload focus->search#preload">Search</button>
 </li>

@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import NavController from '../../../source/javascripts/stimulus/controllers/nav_controller';
 import SearchController from '../../../source/javascripts/stimulus/controllers/search_controller';
 import * as analytics from '../../../source/javascripts/stimulus/lib/analytics';
 import * as pagefind from '../../../source/javascripts/stimulus/lib/pagefind';
-import { mount } from '../helpers';
+import { flushDom, mount } from '../helpers';
 
 vi.mock('../../../source/javascripts/stimulus/lib/pagefind', () => ({
   loadPagefind: vi.fn().mockResolvedValue(true),
@@ -119,10 +120,18 @@ describe('search controller', () => {
     });
 
     it('falls back to the menu button when the trigger cannot take the focus', async () => {
-      const { controller, element } = await mountSearch();
-      const navButton = document.createElement('button');
-      navButton.id = 'nav-button';
-      document.body.appendChild(navButton);
+      // The nav controller is on <body>, and the trigger names it as its outlet.
+      const { application, controller, element } = await mount(
+        'search',
+        SearchController,
+        `<button data-nav-target="button">Menu</button>
+         <a href="/search" data-controller="search" data-search-nav-outlet="body"
+            data-action="search#open">Search</a>`,
+        (document) => document.body.setAttribute('data-controller', 'nav')
+      );
+      application.register('nav', NavController);
+      await flushDom();
+      const navButton = document.querySelector('[data-nav-target="button"]');
       const dialog = await openWithDialog(controller);
       // The menu is closed, thus the trigger inside it cannot take the focus.
       element.remove();

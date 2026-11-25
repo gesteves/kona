@@ -10,9 +10,9 @@ vi.mock('../../../source/javascripts/stimulus/lib/analytics', () => ({
 const MARKUP = `
   <div data-controller="page"
        data-action="turbo:load@document->page#load turbo:before-cache@document->page#clearNotifications">
-    <div id="notifications"><wa-toast-item>Saved</wa-toast-item></div>
-    <main id="main-content" tabindex="-1">Content</main>
-    <div id="route-announcer" role="status" aria-live="polite"></div>
+    <div id="notifications" data-page-target="notifications"><wa-toast-item>Saved</wa-toast-item></div>
+    <main id="main-content" tabindex="-1" data-page-target="main">Content</main>
+    <div id="route-announcer" role="status" aria-live="polite" data-page-target="announcer"></div>
   </div>
 `;
 
