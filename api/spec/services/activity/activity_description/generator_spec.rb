@@ -112,7 +112,7 @@ RSpec.describe ActivityDescription::Generator do
   end
 
   describe "eligibility" do
-    it "skips non-swim/bike/run activities without writing" do
+    it "skips non-swim/bike/run/ski activities without writing" do
       allow(intervals).to receive(:activity!).and_return(activity.merge(type: "WeightTraining"))
 
       generator.generate!("i1")
@@ -681,6 +681,20 @@ RSpec.describe ActivityDescription::Generator do
       expect(strava).to have_received(:update_activity!).with("s1", description: "☀️ Clear · 18°C · 5 km/h S wind\n⚡️ Avg 200 W")
     end
 
+    # A ski gets no planned headline, no power line, and no headwind.
+    it "writes the weather and the Whoop strain of a nordic ski" do
+      ski = activity.merge(type: "NordicSki", trainer: false, icu_average_watts: nil)
+      allow(intervals).to receive(:activity!).and_return(ski)
+      allow(whoop).to receive(:workouts_between).and_return([ whoop_workout(9.8).merge(activity_type: "Skiing") ])
+      allow(trainer_road).to receive(:planned_workouts).and_return([ { name: "Morning Ride", sport: "Skiing", description: "Easy." } ])
+      allow(ActivityDescription::Weather).to receive(:new).and_call_original
+
+      generator.generate!("i1")
+
+      expect(ActivityDescription::Weather).to have_received(:new).with(ski, streams, unit: :celsius, headwind: false, intervals: intervals)
+      expect(strava).to have_received(:update_activity!).with("s1", description: "☀️ Clear · 18°C · 5 km/h S wind\n🔥 9.8 Whoop Strain")
+    end
+
     it "measures the headwind of a bike ride and a run only" do
       allow(ActivityDescription::Weather).to receive(:new).and_call_original
       ride = activity.merge(trainer: false)
@@ -747,6 +761,16 @@ RSpec.describe ActivityDescription::Generator do
       generator.generate!("i1")
 
       expect(strava).to have_received(:update_activity!).with("s1", description: a_string_including("🌡️ 72% heat adapted"))
+    end
+
+    it "omits the heat-adaptation score for a ski" do
+      allow(intervals).to receive(:activity!).and_return(activity.merge(type: "NordicSki", icu_average_watts: nil))
+      allow(intervals).to receive(:wellness).with(Date.new(2026, 7, 9)).and_return({ CoreHeatAdaptationScore: 72 })
+      allow(whoop).to receive(:workouts_between).and_return([ whoop_workout(9.8).merge(activity_type: "Skiing") ])
+
+      generator.generate!("i1")
+
+      expect(strava).to have_received(:update_activity!).with("s1", description: "🔥 9.8 Whoop Strain")
     end
   end
 

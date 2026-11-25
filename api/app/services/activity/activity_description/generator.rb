@@ -10,11 +10,16 @@ module ActivityDescription
     # The start of each log line of this generator, for a grep.
     LOG_PREFIX = "Description:"
 
-    # The activity types that can get a description: a swim, a bike ride, or a run only.
-    ELIGIBLE_SPORTS = %w[Cycling Running Swimming].freeze
+    # The activity types that can get a description: a swim, a bike ride, a run, or a ski of each
+    # type. ActivityMatcher puts a nordic, an alpine, and a backcountry ski in "Skiing".
+    ELIGIBLE_SPORTS = %w[Cycling Running Skiing Swimming].freeze
 
     # The sports that can get the planned-workout headline from the LLM, that is, the 🗓️ line.
     HEADLINE_SPORTS = %w[Cycling Running].freeze
+
+    # The sports that can get the 🌡️ heat line. The CORE sensor is not accurate in water, and heat
+    # adaptation has no effect on a ski.
+    HEAT_SPORTS = %w[Cycling Running].freeze
 
     # The most that a planned workout can be longer than the activity, and the code still counts
     # the workout as complete. The cooldown at the end is optional, thus a ride that stops in it is
@@ -77,7 +82,7 @@ module ActivityDescription
       # A leg of a race always gets its name, and a transition gets its name and no description.
       describe = ELIGIBLE_SPORTS.include?(sport) && activity[:pool_length].blank?
       unless describe || race_name
-        reason = ELIGIBLE_SPORTS.include?(sport) ? "is a pool swim" : "is not swim/bike/run (type=#{activity[:type] || 'unknown'})"
+        reason = ELIGIBLE_SPORTS.include?(sport) ? "is a pool swim" : "is not swim/bike/run/ski (type=#{activity[:type] || 'unknown'})"
         log_info("activity #{activity_id} #{reason} — skipping")
         return
       end
@@ -130,7 +135,7 @@ module ActivityDescription
         weather: weather_line(activity),
         water_temp: water_temp_line(activity, swim),
         power: Composer.power_block(activity),
-        heat: heat_line(activity, swim),
+        heat: heat_line(activity, sport),
         whoop: Composer.whoop_block(whoop_strain(activity, swim), swim: swim)
       )
     end
@@ -311,9 +316,9 @@ module ActivityDescription
     end
 
     # The 🌡️ heat line: the heat-adaptation score of the day.
-    # @return [String, nil]
-    def heat_line(activity, swim)
-      return if swim
+    # @return [String, nil] Nil for a sport that is not in HEAT_SPORTS.
+    def heat_line(activity, sport)
+      return unless HEAT_SPORTS.include?(sport)
 
       date = activity_date(activity)
       score = date && @intervals.wellness(date)&.dig(:CoreHeatAdaptationScore)

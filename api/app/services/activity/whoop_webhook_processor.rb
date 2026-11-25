@@ -78,15 +78,15 @@ class WhoopWebhookProcessor
     match
   end
 
-  # Adds the description job to the queue for an activity that matches, but only for a swim, a
-  # bike ride, or a run. Each other sport keeps its WhoopWorkoutStrain and gets no description. The
-  # job is separate from the metric sync, on purpose: it runs again by itself, and it continues to
-  # work without Whoop, with only the 🔥 line absent. Only the activity id goes to the job: the
+  # Adds the description job to the queue for an activity that matches, but only for a sport in
+  # Generator::ELIGIBLE_SPORTS. Each other sport keeps its WhoopWorkoutStrain and gets no
+  # description. The job is separate from the metric sync, on purpose: it runs again by itself, and
+  # it continues to work without Whoop, with only the 🔥 line absent. Only the activity id goes to the job: the
   # generator gets the strain from Whoop itself, thus the run from the Strava webhook gets it too.
   def enqueue_description(match, workout)
     match_type = ActivityMatcher.normalize_type(match[:type])
     unless ActivityDescription::Generator::ELIGIBLE_SPORTS.include?(match_type)
-      log_info("workout.updated #{workout[:id]} → activity #{match[:id]}: type=#{match_type} is not swim/bike/run — skipping auto-description")
+      log_info("workout.updated #{workout[:id]} → activity #{match[:id]}: type=#{match_type} is not swim/bike/run/ski — skipping auto-description")
       return
     end
 

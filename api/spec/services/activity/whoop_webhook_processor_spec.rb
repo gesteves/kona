@@ -75,7 +75,16 @@ RSpec.describe WhoopWebhookProcessor do
       expect(ActivityDescriptionJob.jobs).to be_empty
     end
 
-    it "writes strain but skips the description for non-swim/bike/run matches" do
+    it "enqueues the description for a ski match" do
+      allow(whoop).to receive(:get_workout).and_return(whoop_workout(start_time: workout_start, type: "Skiing"))
+      allow(intervals).to receive(:activities!).and_return([ { id: "i4", type: "NordicSki", start_date: "2026-07-09T13:31:00Z" } ])
+
+      processor.process("workout.updated", "w1")
+
+      expect(ActivityDescriptionJob).to have_enqueued_sidekiq_job("i4")
+    end
+
+    it "writes strain but skips the description for non-swim/bike/run/ski matches" do
       strength_workout = whoop_workout(start_time: workout_start, type: "Strength")
       allow(whoop).to receive(:get_workout).and_return(strength_workout)
       allow(intervals).to receive(:activities!).and_return([ { id: "i3", type: "WeightTraining", start_date: "2026-07-09T13:31:00Z" } ])

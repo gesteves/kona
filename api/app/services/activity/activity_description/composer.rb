@@ -104,7 +104,7 @@ module ActivityDescription
     end
 
     # The CORE heat line: the heat-adaptation score of the day, when it is more than zero. The
-    # code omits it for a swim, because the CORE sensor is not accurate in water. For example,
+    # generator omits it for each sport outside Generator::HEAT_SPORTS. For example,
     # "🌡️ 72% heat adapted".
     def heat_block(heat_adaptation_score:)
       return unless heat_adaptation_score.is_a?(Numeric) && heat_adaptation_score.finite?
