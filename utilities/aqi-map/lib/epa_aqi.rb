@@ -1,6 +1,6 @@
 # The PurpleAir correction of the EPA, and the conversion of PM2.5 into an AQI value.
 #
-# ⚠️ This code comes from api/app/services/purple_air.rb, without ActiveSupport. `utilities/` must
+# ⚠️ This code comes from api/app/services/weather/purple_air.rb, without ActiveSupport. `utilities/` must
 # not depend on `api/`, thus this copy is correct, on purpose. It also means that a correction in
 # the other file does not reach this copy by itself. It is in its own file, and not in app.rb, thus
 # you can compare the two files directly and spec/epa_aqi_check.rb can run it with no Sinatra. Run

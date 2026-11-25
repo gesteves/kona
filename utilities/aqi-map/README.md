@@ -84,7 +84,7 @@ URL returns to the same moment.
 - **A PurpleAir 200 isn't proof of success** — `DataInitializingError` and truncated history
   responses both return 200 with a top-level `error` field, so the body is checked, not just the
   status.
-- **The AQI math is copied from `api/app/services/purple_air.rb`** (the EPA humidity correction
+- **The AQI math is copied from `api/app/services/weather/purple_air.rb`** (the EPA humidity correction
   and the PM2.5→AQI conversion). `utilities/` must not depend on `api/`, so it's duplicated
   deliberately — ⚠️ which means a fix to the EPA correction upstream will **not** reach this
   copy, and nothing will flag the drift. If a map here disagrees with the site's own AQI widget,

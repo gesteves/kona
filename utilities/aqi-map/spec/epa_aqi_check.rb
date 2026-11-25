@@ -2,7 +2,7 @@
 #
 # ⚠️ The expected values come from the **published equation**, and not from the result of either
 # copy of the code. That is the purpose of this file: lib/epa_aqi.rb is a copy of
-# api/app/services/purple_air.rb that a person keeps correct, thus a table from the code would keep
+# api/app/services/weather/purple_air.rb that a person keeps correct, thus a table from the code would keep
 # the same error in both places. One error came through in that way: an 8.841e-4 where the equation
 # says 8.84e-4, and the spec of the api had that incorrect value in its expectation.
 #
@@ -70,7 +70,7 @@ if failures.empty?
 else
   warn "EPA AQI check FAILED:"
   failures.each { |failure| warn "  - #{failure}" }
-  warn "\nCompare lib/epa_aqi.rb against api/app/services/purple_air.rb, and both against the"
+  warn "\nCompare lib/epa_aqi.rb against api/app/services/weather/purple_air.rb, and both against the"
   warn "published equation — the vectors above come from the equation, not from either copy."
   exit 1
 end

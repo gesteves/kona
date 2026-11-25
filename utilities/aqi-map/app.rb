@@ -24,7 +24,7 @@ enable :inline_templates
 PURPLE_AIR_API_URL = 'https://api.purpleair.com/v1'
 
 # Outdoor sensors only. `confidence` is the data-quality score of PurpleAir. This uses the same
-# limit of 50 or more that api/app/services/purple_air.rb uses.
+# limit of 50 or more that api/app/services/weather/purple_air.rb uses.
 MIN_CONFIDENCE = 50
 
 # The history average interval in minutes (PurpleAir permits 0, 10, 30, 60, 360, 1440, and more),
@@ -252,7 +252,7 @@ end
 
 # --- AQI math -------------------------------------------------------------------------------
 #
-# This code is in lib/epa_aqi.rb, which is a copy of api/app/services/purple_air.rb, on purpose,
+# This code is in lib/epa_aqi.rb, which is a copy of api/app/services/weather/purple_air.rb, on purpose,
 # because utilities/ must not depend on api/. It is at the top level, thus the handlers above can
 # call apply_epa_correction and format_aqi with no prefix.
 
