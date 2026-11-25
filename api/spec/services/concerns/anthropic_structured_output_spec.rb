@@ -76,6 +76,25 @@ RSpec.describe AnthropicStructuredOutput do
     expect(messages).to have_received(:create).with(hash_including(thinking: { type: :disabled }))
   end
 
+  # ⚠️ These models give a 400 for each thinking type that turns the thinking off. For the abuse
+  # check, which fails closed, that 400 would hold each contact message in the retries.
+  %w[claude-opus-5-5 claude-fable-5-2 claude-mythos-5-2].each do |always_thinking|
+    it "refuses #{always_thinking}, which cannot turn its thinking off, and makes no request" do
+      allow(messages).to receive(:create)
+      stub_env("SPEC_ANTHROPIC_MODEL" => always_thinking)
+
+      expect { host.text_call(system: "s", content: "c") }
+        .to raise_error(AnthropicStructuredOutput::UnsupportedModel, /SPEC_ANTHROPIC_MODEL/)
+      expect(messages).not_to have_received(:create)
+    end
+  end
+
+  it "accepts each default model of the callers" do
+    [ ContactModeration, ContactSubject, ActivityDescription::Llm, AltText ].each do |caller|
+      expect(AnthropicStructuredOutput::ALWAYS_THINKING_MODELS).to all(satisfy { |pattern| !pattern.match?(caller::DEFAULT_MODEL) })
+    end
+  end
+
   it "gives nil from a plain text call with no text block" do
     allow(messages).to receive(:create).and_return(double("message", content: [ double("tool", type: :tool_use) ]))
 

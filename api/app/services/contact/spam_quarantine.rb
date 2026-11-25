@@ -72,6 +72,14 @@ class SpamQuarantine
     payload
   end
 
+  # Puts back a message that #take removed, with its id and its time. The caller uses it when it
+  # could not act on that message.
+  # @param payload [Hash] The payload that #take returned.
+  # @return [void]
+  def restore(payload)
+    records.write(payload["id"], payload)
+  end
+
   # @return [Boolean] True if the code removed a message.
   def delete(id)
     records.delete(id).positive?

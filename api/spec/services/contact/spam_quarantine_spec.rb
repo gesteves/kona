@@ -143,6 +143,18 @@ RSpec.describe SpamQuarantine do
     end
   end
 
+  describe "#restore" do
+    it "puts a taken message back with its id and its arrival time" do
+      seed(id: "abc", received_at: 1.day.ago, name: "Ivan")
+      quarantine = described_class.new
+      payload = quarantine.take("abc")
+
+      quarantine.restore(payload)
+
+      expect(quarantine.take("abc")).to eq(payload)
+    end
+  end
+
   describe "#delete" do
     it "reports whether anything was removed" do
       seed(id: "abc", received_at: 1.day.ago)

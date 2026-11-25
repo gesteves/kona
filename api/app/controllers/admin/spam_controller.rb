@@ -20,24 +20,33 @@ module Admin
     # Sends a message: the code removes it from the queue and puts it in the normal path again. For
     # an Akismet mark it also tells Akismet that the mark was incorrect. Claude has no such report.
     def not_spam
-      message = SpamQuarantine.new.take(params[:id])
+      quarantine = SpamQuarantine.new
+      message = quarantine.take(params[:id])
       return redirect_to(spam_path, status: :see_other, alert: t("admin.spam.flash.gone")) if message.nil?
 
       context = message["context"] || {}
+      enqueued = false
+
+      begin
+        ContactMailJob.perform_async(
+          message["name"],
+          message["email"],
+          message["message"],
+          # This puts the first submission time in the email. Without it, the email would give the
+          # time when the owner sent the message.
+          context.merge("received_at" => message["received_at"]),
+          true
+        )
+        enqueued = true
+      ensure
+        # ⚠️ The take already removed the message. If the enqueue did not finish, put it back, or
+        # the message goes away. This is an `ensure`, because a rack-timeout is not a StandardError.
+        quarantine.restore(message) unless enqueued
+      end
 
       if SpamQuarantine.reason_of(message) == SpamQuarantine::AKISMET
         ContactHamJob.perform_async(message["name"], message["email"], message["message"], context)
       end
-
-      ContactMailJob.perform_async(
-        message["name"],
-        message["email"],
-        message["message"],
-        # This puts the first submission time in the email. Without it, the email would give the
-        # time when the owner sent the message.
-        context.merge("received_at" => message["received_at"]),
-        true
-      )
 
       redirect_to spam_path, status: :see_other, notice: t("admin.spam.flash.released")
     end

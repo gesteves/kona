@@ -14,6 +14,14 @@ class StandardSite < ApplicationService
   include ContentfulConsumer
   include AtProto
 
+  # Raised when Contentful gives no answer for an entry. The job then retries, and no record goes
+  # away because of an upstream failure.
+  class ContentfulUnavailable < StandardError; end
+
+  # Raised inside the retries while Contentful answers with no entry. After the last attempt the
+  # entry counts as absent.
+  class EntryNotYetAvailable < StandardError; end
+
   # Makes a stable TID from a seed: the low 63 bits of its SHA-256 digest, in base32.
   # web's StandardSiteHelpers#document_rkey must use the same algorithm. If it does not, the AT
   # URI that it writes does not agree with the record that this class publishes.
@@ -130,19 +138,23 @@ class StandardSite < ApplicationService
   # API. It does not read the webhook body, because that body has an unresolved cover-image link
   # and tags with no names. The retries give Contentful time to propagate the change. A draft
   # entry, a non-publishable entry, or an absent entry causes a delete.
+  # ⚠️ A delete needs an answer from Contentful. A request that fails raises, thus the job retries.
   # @param entry_id [String] The Contentful sys.id.
   # @return [Symbol] :synced, :unchanged, :deleted, or :skipped.
+  # @raise [ContentfulUnavailable] If Contentful gives no answer after the retries.
   def sync_document(entry_id)
     return log_skip("document #{entry_id}", "no Bluesky credentials") unless connected?
     return log_skip("document #{entry_id}", "invalid entry id") unless eligible?(entry_id)
     return log_skip("document #{entry_id}", "could not authenticate with the PDS") unless create_session
 
-    item = safely do
+    item = begin
       with_retries(max: 3) do
         found = fetch_article(entry_id)
-        raise "not yet available" if found.blank?
+        raise EntryNotYetAvailable if found.blank?
         found
       end
+    rescue EntryNotYetAvailable
+      nil
     end
     post = item && decorate_post(item)
     if post.blank? || publishable_posts([ post ]).empty?
@@ -475,10 +487,14 @@ class StandardSite < ApplicationService
   # --- Contentful (delivery API) ------------------------------------------------------
 
   # @param entry_id [String] The Contentful sys.id.
-  # @return [Hash, nil] The raw article item with symbol keys, or nil if it is absent or the
-  #   request fails.
+  # @return [Hash, nil] The raw article item with symbol keys, or nil if Contentful answers with no
+  #   such entry.
+  # @raise [ContentfulUnavailable] If the request fails or there is no configuration.
   def fetch_article(entry_id)
-    query_contentful(ARTICLE_QUERY, { id: entry_id })&.dig(:articles, :items)&.first
+    data = query_contentful(ARTICLE_QUERY, { id: entry_id })
+    raise ContentfulUnavailable, "Contentful gave no answer for entry #{entry_id}" if data.nil?
+
+    data.dig(:articles, :items)&.first
   end
 
   # @return [Hash, nil] The decorated site with string keys, or nil if it is absent or the

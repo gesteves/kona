@@ -184,6 +184,36 @@ RSpec.describe "Admin spam quarantine", type: :request do
       expect(ContactMailJob.jobs.size).to eq(1)
     end
 
+    # ⚠️ The take removed the message before the enqueue. A Redis timeout there must not make the
+    # message go away.
+    it "puts the message back when the enqueue fails" do
+      allow(quarantine).to receive(:take).with("abc123").and_return(message)
+      allow(ContactMailJob).to receive(:perform_async).and_raise(RedisClient::ReadTimeoutError)
+      expect(quarantine).to receive(:restore).with(message)
+
+      expect { post "/spam/abc123/not-spam" }.to raise_error(RedisClient::ReadTimeoutError)
+      expect(ContactHamJob.jobs).to be_empty
+    end
+
+    # A rack-timeout error is not a StandardError, thus a `rescue` would not see it.
+    it "puts the message back when the request times out during the enqueue" do
+      timeout = Class.new(Exception)
+      allow(quarantine).to receive(:take).with("abc123").and_return(message)
+      allow(ContactMailJob).to receive(:perform_async).and_raise(timeout)
+      expect(quarantine).to receive(:restore).with(message)
+
+      expect { post "/spam/abc123/not-spam" }.to raise_error(timeout)
+    end
+
+    it "does not put back a message that it enqueued" do
+      allow(quarantine).to receive(:take).with("abc123").and_return(message)
+      expect(quarantine).not_to receive(:restore)
+
+      post "/spam/abc123/not-spam"
+
+      expect(ContactMailJob.jobs.size).to eq(1)
+    end
+
     # ⚠️ SpamQuarantine#take reads and deletes in one step, thus two submissions cannot send the
     # email two times.
     it "does nothing when the message is already gone" do

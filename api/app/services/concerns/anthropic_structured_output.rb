@@ -14,6 +14,12 @@ module AnthropicStructuredOutput
   # The model declined the request (`stop_reason: refusal`), thus the answer has no JSON to parse.
   class Refusal < StandardError; end
 
+  # The env var names a model that cannot turn its thinking off. The code makes no request.
+  class UnsupportedModel < StandardError; end
+
+  # The models that give a 400 for each request that turns the thinking off.
+  ALWAYS_THINKING_MODELS = [ /\Aclaude-opus-5-5\z/, /\Aclaude-fable-/, /\Aclaude-mythos-/ ].freeze
+
   # @return [Boolean] True if an API key is available. Each caller gives nil without one.
   def configured?
     ENV["ANTHROPIC_API_KEY"].present?
@@ -74,7 +80,7 @@ module AnthropicStructuredOutput
       max_tokens: self::MAX_TOKENS,
       # This is off. These short tasks do not need reasoning, and where adaptive thinking is on by
       # default it would use the small token budget and could cut the answer.
-      thinking: { type: thinking_off_type },
+      thinking: thinking_off,
       system_: system,
       messages: [ { role: "user", content: content } ],
       request_options: { timeout: self::TIMEOUT_SECONDS, max_retries: max_retries }
@@ -85,10 +91,16 @@ module AnthropicStructuredOutput
   end
 
   # ⚠️ Claude Sonnet 5.5 gives a 400 for `disabled`, and each other model gives a 400 for
-  # `between_tools`. Thus an env override to a different model needs this check.
-  # @return [Symbol] The thinking type that turns the thinking off for `model`.
-  def thinking_off_type
-    model == "claude-sonnet-5-5" ? :between_tools : :disabled
+  # `between_tools`. Claude Opus 5.5, Fable, and Mythos give a 400 for both, and their thinking
+  # would use the small token budget and cut the answer. Thus the code refuses them.
+  # @return [Hash] The thinking parameter that turns the thinking off for `model`.
+  # @raise [UnsupportedModel] If `model` cannot turn its thinking off.
+  def thinking_off
+    if ALWAYS_THINKING_MODELS.any? { |pattern| pattern.match?(model) }
+      raise UnsupportedModel, "#{model} cannot turn its thinking off. Set #{anthropic_model_env} to another model."
+    end
+
+    { type: model == "claude-sonnet-5-5" ? :between_tools : :disabled }
   end
 
   # One client for all calls. A new client reads the key and makes the connection configuration

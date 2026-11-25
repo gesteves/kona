@@ -581,6 +581,39 @@ describe StandardSite do
       expect(client.sync_document(entry_id)).to eq(:deleted)
     end
 
+    # ⚠️ A short Contentful failure during a publish must not delete the record. The job ends with
+    # success after a delete, thus nothing would retry it, and the record stays gone.
+    it "raises (so Sidekiq retries) and deletes nothing when Contentful gives no answer" do
+      allow(client).to receive(:eligible?).and_return(true)
+      allow(client).to receive(:sleep)
+      allow(client).to receive(:query_contentful).and_return(nil)
+      expect(client).not_to receive(:delete_record)
+
+      expect { client.sync_document(entry_id) }.to raise_error(StandardSite::ContentfulUnavailable)
+    end
+
+    it "deletes the record when Contentful answers with no such entry" do
+      allow(client).to receive(:eligible?).and_return(true)
+      allow(client).to receive(:sleep)
+      allow(client).to receive(:query_contentful).and_return({ articles: { items: [] } })
+      expect(client).to receive(:delete_record).with(StandardSite::DOCUMENT_COLLECTION, rkey).and_return(true)
+
+      expect(client.sync_document(entry_id)).to eq(:deleted)
+    end
+
+    it "syncs the record when Contentful answers after a failed attempt" do
+      post = { "title" => "Published" }
+      allow(client).to receive(:eligible?).and_return(true)
+      allow(client).to receive(:sleep)
+      allow(client).to receive(:query_contentful).and_return(nil, { articles: { items: [ { title: "Published" } ] } })
+      allow(client).to receive(:decorate_post).and_return(post)
+      allow(client).to receive(:publishable_posts).and_return([ post ])
+      allow(client).to receive(:do_sync_document).and_return(:synced)
+      expect(client).not_to receive(:delete_record)
+
+      expect(client.sync_document(entry_id)).to eq(:synced)
+    end
+
     # A failure that the code catches would also remove the fingerprint, thus nothing would find the
     # record that stays on the PDS.
     it "raises (so Sidekiq retries) and keeps the fingerprint when the PDS rejects the delete" do
