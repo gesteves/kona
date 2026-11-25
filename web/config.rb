@@ -81,10 +81,10 @@ if (about_page = AboutHelpers.about_page(@app.data.pages))
 end
 
 # ⚠️ This reads each blurhash placeholder from Redis one time, in the parent, before the build
-# forks. Refer to ImageHelpers#blurhash_jpeg_data_uri for the reason.
+# forks. Refer to BlurhashHelpers#blurhash_jpeg_data_uri for the reason.
 before_build do |_builder|
   require_relative "lib/utils/redis_connection"
-  found = ImageHelpers.warm_blurhashes!(app.data.assets, RedisConnection.connection)
+  found = BlurhashHelpers.warm_blurhashes!(app.data.assets, RedisConnection.connection)
   puts "== Blurhash placeholders: #{found} of #{app.data.assets.size} from the cache"
 rescue StandardError => e
   puts "== Blurhash placeholders: not warmed (#{e.class}: #{e.message})"

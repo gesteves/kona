@@ -15,10 +15,10 @@ end
 require_relative '../../../lib/data/contentful'
 
 RSpec.describe Contentful do
-  # The initializer gets all the data from Contentful. allocate does not call it, thus the specs
-  # can run the transform methods against a @content that this file makes.
+  # An importer with a @content that this file makes. Only #save_data gets data from Contentful,
+  # thus the specs can run each transform method against that content.
   def importer(content = {})
-    described_class.allocate.tap do |instance|
+    described_class.new.tap do |instance|
       instance.instance_variable_set(:@content, { site: {} }.merge(content))
     end
   end
@@ -187,7 +187,7 @@ RSpec.describe Contentful do
     # A small Sports taxonomy: Triathlon > Ironman 70.3, which has a description and synonyms, a
     # Races branch with one race, and a Running topic with no children. prefLabel, definition, and
     # altLabels are locale maps, and `conceptSchemes` gives the scheme of each concept. This is the
-    # shape of the delivery API.
+    # shape of the Preview API.
     def sports = [ { 'sys' => { 'id' => 'sports' } } ]
     def concept_fixture
       [
@@ -206,7 +206,7 @@ RSpec.describe Contentful do
     # An importer with a taxonomy fetch that gives `concepts`. An empty value means no taxonomy.
     def importer_with(concepts: concept_fixture, articles: [])
       importer(articles: articles).tap do |instance|
-        allow(instance).to receive(:fetch_taxonomy_concepts).and_return(Array(concepts))
+        allow_any_instance_of(ContentfulTaxonomy).to receive(:fetch_concepts).and_return(Array(concepts))
       end
     end
 
@@ -215,7 +215,7 @@ RSpec.describe Contentful do
       { contentful_metadata: { concepts: concept_ids.map { |id| { id: id } } } }
     end
 
-    describe '#build_taxonomy' do
+    describe '#taxonomy' do
       it 'resolves localized labels, parent from broader, and nested paths' do
         taxo = importer_with.send(:taxonomy)
         expect(taxo['ironman-703']).to include(

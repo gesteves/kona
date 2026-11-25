@@ -171,7 +171,7 @@ jobs:
       # of `deploy` measured 13s and 48s, against approximately 16s for the site build. That ratio
       # is why the blurhash generation stays here: a move into the api would remove this install
       # but would not save much time.
-      # ⚠️ BOTH `checks` and `deploy` need this. web/lib/helpers/image_helpers.rb requires 'vips'
+      # ⚠️ BOTH `checks` and `deploy` need this. web/lib/helpers/blurhash_helpers.rb requires 'vips'
       # at the top level. Thus rspec cannot load the helper without it, and the specs that stub
       # Vips::Image do not help.
       - name: Install libvips

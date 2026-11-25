@@ -2,28 +2,17 @@ require "cgi"
 require "htmlentities"
 require "nokogiri"
 
-# Renders Markdown bodies and does the HTML transformations that the Contentful editor cannot
-# do: responsive images and tables, figures, permalinks, and more.
+# Renders a Markdown body and does the HTML transformations that the Contentful editor cannot do.
+# This module holds each pipeline and the transforms of the text: units, links, tables, and
+# heading permalinks. MarkupImageHelpers holds the transforms of the images, and
+# MarkupEmbedHelpers those of the iframes.
 #
 # Each transform takes `html` as a String or as a parsed Nokogiri node, and it returns the same
 # type. Refer to #with_nokogiri_doc.
 module MarkupHelpers
-  # Includes the common emoji blocks, the variation selectors, and the skin tone modifiers.
-  EMOJI_REGEX = /([\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E6}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F900}-\u{1F9FF}]|[\u{1F018}-\u{1F270}])[\u{FE00}-\u{FE0F}\u{1F3FB}-\u{1F3FF}]?/
-  # A group of adjacent emoji, and the spaces between them.
-  EMOJI_RUN_REGEX = /((?:#{EMOJI_REGEX.source}(?:\s*#{EMOJI_REGEX.source})*))/
-  # The default title of a YouTube embed. It names the player and not the video.
-  YOUTUBE_PLAYER_TITLE = "YouTube video player".freeze
-  # The id of the video in a YouTube embed URL.
-  YOUTUBE_EMBED_REGEX = %r{\Ahttps?://(?:www\.)?youtube(?:-nocookie)?\.com/embed/([\w-]+)}
-  # A Spotify video episode embed. An audio episode embed has no `/video` segment.
-  SPOTIFY_VIDEO_EMBED_REGEX = %r{\Ahttps?://open\.spotify\.com/embed/episode/[^/?#]+/video(?:[/?#]|\z)}
-  # The embeds whose player is a 16:9 video.
-  VIDEO_EMBED_REGEXES = [ YOUTUBE_EMBED_REGEX, SPOTIFY_VIDEO_EMBED_REGEX ].freeze
-  # The inline style properties that responsivize_iframes removes.
-  IFRAME_WIDTH_PROPERTIES = %w[width max-width].freeze
   # The analytics section of a link to an article in the text of an entry.
   ARTICLE_BODY_SECTION = "Article Body".freeze
+
   # ⚠️ The permalink shape of a published article. It must match Contentful#set_article_path.
   ARTICLE_PATH_REGEX = %r{\A/\d{4}/\d{2}/\d{2}/[^/]+/?\z}
 
@@ -34,7 +23,7 @@ module MarkupHelpers
   # result names the LCP image of THIS page, thus the code renders it each time.
   # @param text [String] The Markdown text to render.
   # @param image_variant [Symbol] The name of a variant in data/srcsets.yml.
-  # @param first_image [Symbol, nil] Refer to #responsivize_images.
+  # @param first_image [Symbol, nil] Refer to MarkupImageHelpers#responsivize_images.
   # @param link_section [String, nil] The analytics section of each link to an article. With nil,
   #   the links get no analytics classes.
   # @return [String] The HTML after the transforms.
@@ -184,254 +173,6 @@ module MarkupHelpers
     end
   end
 
-  # Adds the Contentful asset id and the original URL to each <img>. The subsequent image
-  # transforms read them.
-  def add_image_data_attributes(html)
-    with_nokogiri_doc(html) do |doc|
-      doc.css("img").each do |img|
-        original_url = img["src"]
-        asset_id = get_asset_id(original_url)
-        img["data-asset-id"] = asset_id
-        img["data-original-url"] = original_url
-      end
-    end
-  end
-
-  # Puts each image in a <figure>. The other content of the same paragraph goes into a
-  # <figcaption>.
-  # @param base_class [String] The base class for the figure. The content type of the asset goes
-  #   at the end of it.
-  def add_figure_elements_to_images(html, base_class: nil)
-    with_nokogiri_doc(html) do |doc|
-      doc.css("img").each do |img|
-        parent = img.parent
-        # ⚠️ A paragraph with more than one image gets no figure. The caption is all the other
-        # content of the parent, thus the second image would go in the <figcaption> of the first,
-        # and the replace of the parent would remove it while this loop still reads it.
-        next if parent.css("img").size > 1
-
-        # Remove the image, thus the caption is the remainder of the parent. Then put it back.
-        img = img.remove
-        caption = parent.inner_html
-        parent.prepend_child(img)
-
-        asset_id = get_asset_id(img["src"])
-        content_type = get_asset_content_type(asset_id)
-
-        # Nil for an image that is not a Contentful asset. It then gets no content-type modifier.
-        figure = if base_class.present?
-          modifier = content_type&.split("/")&.last
-          figure_class = [ "#{base_class}__figure", ("#{base_class}__figure--#{modifier}" if modifier) ].compact.join(" ")
-          "<figure class=\"#{figure_class}\"></figure>"
-        else
-          "<figure></figure>"
-        end
-        img.wrap(figure)
-        img.add_next_sibling("<figcaption>#{caption}</figcaption>") if caption.present?
-        parent.replace(img.parent)
-      end
-    end
-  end
-
-  # Puts each iframe in a <figure>.
-  def add_figure_elements_to_iframes(html, base_class: nil)
-    with_nokogiri_doc(html) do |doc|
-      doc.css("iframe").each do |iframe|
-        wrap_in_figure(doc, iframe, base_class: base_class, modifier: "iframe")
-      end
-    end
-  end
-
-  # Puts each social media embed in a <figure>. A Bluesky, Instagram, or Threads embed is a
-  # blockquote and then a script.
-  def add_figure_elements_to_embeds(html, base_class: nil)
-    with_nokogiri_doc(html) do |doc|
-      doc.css("blockquote + script").each do |script|
-        blockquote = script.previous_element
-        next unless blockquote.name == "blockquote"
-
-        wrap_in_figure(doc, blockquote, base_class: base_class, modifier: "embed", trailing: script)
-      end
-    end
-  end
-
-
-  # Splits each figcaption at " | " and puts the credit at the end in a <cite>.
-  def set_caption_credit(html)
-    with_nokogiri_doc(html) do |doc|
-      doc.css("figcaption").each do |figcaption|
-        children = figcaption.children
-        found_separator = false
-        caption_nodes = []
-        credit_nodes = []
-
-        children.each do |child|
-          if found_separator
-            credit_nodes << child
-            next
-          end
-
-          # ⚠️ Split only a bare text node. `child.text` also gives the text *in* an element. If
-          # you replace that element with two text nodes, its markup goes away, and a credit
-          # written as a link loses the link.
-          if child.text? && child.text.include?(" | ")
-            before, after = child.text.split(" | ", 2)
-            caption_nodes << Nokogiri::XML::Text.new(before, doc)
-            credit_nodes << Nokogiri::XML::Text.new(after, doc)
-            found_separator = true
-          else
-            caption_nodes << child
-          end
-        end
-
-        if found_separator
-          figcaption.children.remove
-          caption_nodes.each { |node| figcaption.add_child(node) }
-          cite = Nokogiri::XML::Node.new("cite", doc)
-          credit_nodes.each { |node| cite.add_child(node) }
-          figcaption.add_child(Nokogiri::XML::Text.new(" ", doc)) unless credit_nodes.empty?
-          figcaption.add_child(cite)
-        end
-      end
-    end
-  end
-
-  # Puts each group of emoji in a figcaption in a <span class="emoji">, thus CSS can style them.
-  def wrap_figcaption_emoji(html)
-    with_nokogiri_doc(html) do |doc|
-      doc.css("figcaption").each do |figcaption|
-        figcaption.xpath(".//text()").each do |text_node|
-          text_content = text_node.content
-          next unless text_content.match?(EMOJI_REGEX)
-
-          # ⚠️ This makes nodes, and it does not parse a string as HTML. The content of a text node
-          # is plain text, thus a "<" in a caption would become an element in a parse.
-          document = text_node.document
-          add_text = lambda do |part|
-            text_node.add_previous_sibling(Nokogiri::XML::Text.new(part, document)) unless part.empty?
-          end
-
-          # `scan` with the match offsets, and not `split`: the run pattern has a group inside its
-          # group, thus `split` gives each run two times.
-          last = 0
-          text_content.scan(EMOJI_RUN_REGEX) do
-            match = Regexp.last_match
-            add_text.call(text_content[last...match.begin(0)])
-            span = Nokogiri::XML::Node.new("span", document)
-            span["class"] = "emoji"
-            span.content = match[0]
-            text_node.add_previous_sibling(span)
-            last = match.end(0)
-          end
-          add_text.call(text_content[last..])
-          text_node.remove
-        end
-      end
-    end
-  end
-
-  # Gives the LCP mark to the first image of the page that asks for it. Thus a caller can ask for
-  # each image, and one image only takes the mark.
-  #
-  # ⚠️ The flag is an instance variable, and Middleman gives each page its own template context
-  # (refer to MemoizationHelpers). Thus it covers the full page: `_body.html.erb` calls render_body
-  # for the intro and for the body, and only the first image of the two gets the mark.
-  # @return [Boolean] True one time for each page, and false after that.
-  def claim_lcp_image
-    return false if @lcp_image_claimed
-    @lcp_image_claimed = true
-  end
-
-  # Adds srcset, sizes, and the true dimensions to each asset image. A <picture> element is not
-  # necessary: the srcset asks for format=auto, thus Cloudflare selects the format from the
-  # Accept header. This also keeps each candidate to one transformation that Cloudflare bills.
-  #
-  # `first_image` gives the first asset image of the PAGE a role:
-  #   :priority  `fetchpriority="high"`, and the image stays lazy.
-  #   :eager     the same, and `loading="eager"`.
-  #
-  # ⚠️ Use `:eager` only where a measurement gives that image as the LCP element, and only with a
-  # `sizes` list that has no `auto`. Refer to the `home` variant of data/srcsets.yml. Most body
-  # images are below the fold, thus `:priority` is correct there and `:eager` would get an image
-  # that nobody sees.
-  # @param widths [Array<Integer>] The candidate widths. The width of the asset is the maximum.
-  # @param square [Boolean] True to cut the image to a square.
-  # @param first_image [Symbol, nil] :priority, :eager, or nil for no role.
-  def responsivize_images(html, widths: [ 100, 200, 300 ], sizes: "100vw", lazy: true, square: false,
-                          first_image: nil)
-    with_nokogiri_doc(html) do |doc|
-      each_asset_image(doc) do |img, asset_id, original_url|
-        width, height = get_asset_dimensions(asset_id)
-        img_widths = card_widths(widths, width)
-
-        img["loading"] = "lazy" if lazy
-        if first_image && claim_lcp_image
-          img["fetchpriority"] = "high"
-          img["loading"] = "eager" if first_image == :eager
-        end
-        # An asset with no size, or with a size of 0, gets neither attribute: `width="0"` hides it.
-        if width.to_i.positive? && height.to_i.positive?
-          img["width"] = width
-          img["height"] = square ? width : height
-        end
-
-        if gif_asset?(asset_id)
-          img["src"] = cdn_image_url(original_url)
-          next
-        end
-
-        img["sizes"] = sizes
-        img["srcset"] = srcset(url: original_url, widths: img_widths, ratio: (1 if square), options: { fm: "auto" })
-
-        # ⚠️ The src must be one of the candidates above, word for word: the same parameters, in the
-        # same order. Refer to ImageHelpers#cover_image_tag for the reason.
-        src_width = img_widths.max
-        src_query = { fm: "auto", w: src_width }
-        src_query.merge!({ h: src_width, fit: "cover" }) if square
-        img["src"] = cdn_image_url(original_url, src_query)
-      end
-    end
-  end
-
-  # Sets the src of each asset image to a transformation with the given maximum width.
-  def resize_images(html, width: 1000)
-    with_nokogiri_doc(html) do |doc|
-      each_asset_image(doc) do |img, asset_id, original_url|
-        asset_width, _ = get_asset_dimensions(asset_id)
-
-        img["src"] = if gif_asset?(asset_id)
-          cdn_image_url(original_url)
-        else
-          cdn_image_url(original_url, { w: [ width, asset_width ].compact.min })
-        end
-      end
-    end
-  end
-
-  # Adds the blurhash placeholder of each asset image as a CSS custom property. It also adds the
-  # Stimulus attributes that remove the placeholder after the image loads.
-  def add_image_placeholders(html)
-    with_nokogiri_doc(html) do |doc|
-      each_asset_image(doc) do |img, asset_id, _original_url|
-        blurhash_svg_data_uri = blurhash_svg_data_uri(asset_id)
-        img["style"] = "--placeholder:url('#{blurhash_svg_data_uri}');" unless blurhash_svg_data_uri.blank?
-        img["class"] = [ img["class"], "placeholder" ].compact.join(" ")
-        img["data-controller"] = "image-placeholder"
-        img["data-action"] = "load->image-placeholder#removePlaceholder error->image-placeholder#removePlaceholder"
-      end
-    end
-  end
-
-  # Sets the alt text of each asset image from its Contentful description.
-  def set_alt_text(html)
-    with_nokogiri_doc(html) do |doc|
-      each_asset_image(doc) do |img, asset_id, _original_url|
-        alt_text = get_asset_description(asset_id)
-        img["alt"] = alt_text if alt_text.present?
-      end
-    end
-  end
-
   # Puts each table in a <wa-scroller>, thus it scrolls horizontally at a small breakpoint.
   def responsivize_tables(html, css_class: "entry__table")
     with_nokogiri_doc(html) do |doc|
@@ -577,107 +318,6 @@ module MarkupHelpers
     end
   end
 
-  # Gives each iframe with no title an accessible name. It keeps a title that the author wrote.
-  #
-  # ⚠️ A person writes each embed by hand, as raw HTML in the Contentful body, and can omit the
-  # `title`. A screen reader announces a frame with no name as "frame" only, and that is a serious
-  # WCAG failure.
-  def set_iframe_titles(html)
-    with_nokogiri_doc(html) do |doc|
-      doc.css("iframe").each do |iframe|
-        next if iframe["title"].present?
-        iframe["title"] = iframe_title(iframe)
-      end
-    end
-  end
-
-  # Removes the width rules from the inline style of each iframe. Thus the body stylesheet gives
-  # each embed the full width of the text column. A video embed also loses its width and height
-  # attributes, thus the stylesheet gives it a 16:9 ratio at each width.
-  #
-  # ⚠️ An embed code can have its own maximum width, for example `max-width:640px` from Apple
-  # Podcasts. An inline style has more importance than the stylesheet.
-  # ⚠️ Keep the height of each other embed. An audio player has a fixed height, and a ratio would
-  # make it too short on a phone.
-  def responsivize_iframes(html)
-    with_nokogiri_doc(html) do |doc|
-      doc.css("iframe").each do |iframe|
-        if VIDEO_EMBED_REGEXES.any? { |regex| iframe["src"].to_s.match?(regex) }
-          iframe.remove_attribute("width")
-          iframe.remove_attribute("height")
-        end
-        next if iframe["style"].nil?
-
-        declarations = iframe["style"].split(";").map(&:strip).reject do |declaration|
-          declaration.blank? || IFRAME_WIDTH_PROPERTIES.include?(declaration.split(":", 2).first.strip.downcase)
-        end
-        if declarations.empty?
-          iframe.remove_attribute("style")
-        else
-          iframe["style"] = declarations.join(";")
-        end
-      end
-    end
-  end
-
-  # Marks each iframe to load only when it is necessary.
-  def lazy_load_iframes(html)
-    with_nokogiri_doc(html) do |doc|
-      doc.css("iframe").each do |iframe|
-        iframe["loading"] = "lazy"
-      end
-    end
-  end
-
-  private
-
-  # The name for an iframe with no title: the caption of its figure, or the host that it embeds.
-  def iframe_title(iframe)
-    caption = iframe.parent&.at_css("figcaption")&.text.to_s.strip
-    return caption if caption.present?
-
-    host = begin
-      URI.parse(iframe["src"].to_s).host
-    rescue URI::InvalidURIError
-      nil
-    end
-    host.present? ? "Embedded content from #{host.sub(/\Awww\./, '')}" : "Embedded content"
-  end
-
-  # Puts a node in a <figure>, but not if its parent is already a <figure>. Then it adds the
-  # figure classes.
-  #
-  # ⚠️ A node that is alone in a paragraph replaces that paragraph, and the other content of the
-  # paragraph goes into a <figcaption>. A <figure> inside a <p> is not valid HTML: the browser
-  # closes the paragraph at the figure, and the text after it becomes a sibling. A paragraph with
-  # more than one such node keeps its figures in place.
-  # @param modifier [String] The modifier at the end of the figure class.
-  # @param trailing [Nokogiri::XML::Node, nil] A sibling to move into the figure after the node.
-  def wrap_in_figure(doc, node, base_class:, modifier:, trailing: nil)
-    parent = node.parent
-
-    if parent.name != "figure"
-      figure = Nokogiri::XML::Node.new("figure", doc)
-      caption = nil
-
-      if parent.name == "p" && parent.css(node.name).size == 1
-        node.remove
-        trailing&.remove
-        caption = parent.inner_html.strip
-        parent.replace(figure)
-      else
-        node.replace(figure)
-      end
-
-      figure.add_child(node)
-      figure.add_child(trailing) if trailing
-      figure.add_child("<figcaption>#{caption}</figcaption>") if caption.present?
-      parent = figure
-    end
-
-    parent["class"] = "#{base_class}__figure #{base_class}__figure--#{modifier}" if base_class.present?
-  end
-
   # The intro and the body of an entry, rendered and parsed one time for each entry. The word
   # count, the affiliate scan, and the CSP embed origins each read it, and none of them renders
   # the Markdown again.
@@ -692,12 +332,6 @@ module MarkupHelpers
     memoize_entry(:entry_fragments, id, data.articles, data.pages) { parse_entry_fragment(entry) }
   end
 
-  # @see #entry_fragment
-  def parse_entry_fragment(entry)
-    text = [ entry.intro, entry.body ].reject(&:blank?).join("\n\n")
-    Nokogiri::HTML::DocumentFragment.parse(markdown_to_html(text))
-  end
-
   # The shared shape of the render_*_body pipelines: render the Markdown, parse it one time, give
   # the fragment to the transform steps of the variant, then serialize it.
   # @param degrees [Boolean] True to correct the degree notation first.
@@ -709,30 +343,6 @@ module MarkupHelpers
     yield doc
     strip_scratch_attributes(doc)
     doc.to_html
-  end
-
-  # Removes the attributes that add_image_data_attributes writes for the transforms. ⚠️ They must
-  # not reach the build: `data-original-url` names the Contentful host, which the image mirror
-  # exists to keep off the page and out of the feed.
-  # @param doc [Nokogiri::XML::Node] The parsed body.
-  def strip_scratch_attributes(doc)
-    doc.css("img[data-asset-id], img[data-original-url]").each do |img|
-      img.remove_attribute("data-asset-id")
-      img.remove_attribute("data-original-url")
-    end
-  end
-
-  # Gives each <img> that add_image_data_attributes marked. It does not give an <img> that has
-  # no asset.
-  # @param doc [Nokogiri::XML::Node] The parsed body.
-  # @yield [img, asset_id, original_url]
-  def each_asset_image(doc)
-    doc.css("img").each do |img|
-      asset_id = img["data-asset-id"]
-      next if asset_id.blank?
-
-      yield img, asset_id, img["data-original-url"]
-    end
   end
 
   # Lets a transform take an HTML string or a parsed node. It gives a document for both, and it
@@ -749,6 +359,25 @@ module MarkupHelpers
       doc = Nokogiri::HTML::DocumentFragment.parse(html)
       yield doc
       doc.to_html
+    end
+  end
+
+  private
+
+  # @see #entry_fragment
+  def parse_entry_fragment(entry)
+    text = [ entry.intro, entry.body ].reject(&:blank?).join("\n\n")
+    Nokogiri::HTML::DocumentFragment.parse(markdown_to_html(text))
+  end
+
+  # Removes the attributes that add_image_data_attributes writes for the transforms. ⚠️ They must
+  # not reach the build: `data-original-url` names the Contentful host, which the image mirror
+  # exists to keep off the page and out of the feed.
+  # @param doc [Nokogiri::XML::Node] The parsed body.
+  def strip_scratch_attributes(doc)
+    doc.css("img[data-asset-id], img[data-original-url]").each do |img|
+      img.remove_attribute("data-asset-id")
+      img.remove_attribute("data-original-url")
     end
   end
 end

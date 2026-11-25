@@ -77,13 +77,13 @@ module MarkdownDocumentHelpers
   # A link to the content of an iframe. A YouTube embed links to the watch page of its video.
   def iframe_link(doc, iframe)
     src = iframe["src"].to_s
-    youtube_id = src[MarkupHelpers::YOUTUBE_EMBED_REGEX, 1]
+    youtube_id = src[MarkupEmbedHelpers::YOUTUBE_EMBED_REGEX, 1]
     title = iframe["title"].presence || iframe_title(iframe)
 
     a = Nokogiri::XML::Node.new("a", doc)
     if youtube_id
       a["href"] = "https://www.youtube.com/watch?v=#{youtube_id}"
-      a.content = title == MarkupHelpers::YOUTUBE_PLAYER_TITLE ? "Watch on YouTube" : title
+      a.content = title == MarkupEmbedHelpers::YOUTUBE_PLAYER_TITLE ? "Watch on YouTube" : title
     else
       a["href"] = src
       a.content = title

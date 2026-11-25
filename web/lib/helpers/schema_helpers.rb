@@ -1,5 +1,5 @@
 # The JSON-LD of the site: the sitewide @graph, the blog and the archive pages, the breadcrumbs,
-# and the author. ArticleHelpers holds the schema of one article.
+# the author, and one article.
 module SchemaHelpers
   # Makes a stable URL @id for a sitewide schema.org entity. Thus other nodes can refer to it and
   # do not repeat it.
@@ -181,5 +181,64 @@ module SchemaHelpers
       "@type": "ProfilePage",
       "mainEntity": { "@id": schema_entity_id("person", path: "/about") }
     }.to_json
+  end
+
+  # Makes the JSON-LD BlogPosting schema for an article.
+  # @see https://developers.google.com/search/docs/appearance/structured-data/article
+  # @return [String, nil] The JSON-LD, or nil for a draft.
+  def article_schema(content)
+    return if content.draft
+    schema = {
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      "headline": sanitize(content.title),
+      "description": sanitize(content_summary(content)),
+      "datePublished": published_datetime(content).iso8601,
+      "dateModified": DateTime.parse(content.sys.published_at).iso8601,
+      "inLanguage": "en-US",
+      "isAccessibleForFree": true,
+      "wordCount": article_word_count(content),
+      "timeRequired": "PT#{reading_time_minutes(content)}M",
+      # @id points to them, thus a consumer finds the one sitewide entity for each.
+      "author": { "@id": schema_entity_id("person", path: "/about") },
+      "publisher": { "@id": schema_entity_id("organization") },
+      "isPartOf": { "@id": schema_entity_id("website") },
+      "mainEntityOfPage": {
+        "@type": "WebPage",
+        "@id": canonical_url
+      }
+    }
+    tags = Array(content.contentful_metadata&.tags)
+    if tags.present?
+      schema["keywords"] = tags.flat_map { |t| [ t.name, *Array(t.synonyms) ] }.uniq
+      # Use the content-type concept first, then a Topics concept, then the first concept.
+      section = tags.find { |t| %w[race-reports news reviews].include?(t.id) } ||
+                tags.find { |t| t.scheme == "topics" } || tags.first
+      schema["articleSection"] = section.name
+    end
+    if content&.cover_image&.url.present?
+      schema["image"] = [ "1000x1000", "1600x900", "1600x1200" ].map do |s|
+        w, h = s.split("x").map(&:to_i)
+        image_object(cdn_image_url(content.cover_image.url, { w: w, h: h, fit: "cover" }), w, h)
+      end
+    else
+      # There is no cover image. Use the Open Graph card that the app makes, thus the
+      # BlogPosting still has an image.
+      card_url = generate_open_graph_image_url(current_page.url, content.sys&.published_version)
+      schema["image"] = [ image_object(card_url, 1200, 630) ]
+    end
+    schema.to_json
+  end
+
+  # Makes the JSON-LD BreadcrumbList for an article: Home › Blog › its chain of topics › the
+  # article.
+  # @see https://developers.google.com/search/docs/appearance/structured-data/breadcrumb
+  # @return [String, nil] The JSON-LD, or nil if the entry is not a published post.
+  def breadcrumb_schema(content)
+    return unless published_post?(content)
+
+    crumbs = taxonomy_trail(content).map { |node| [ sanitize(node[:name]), full_url(node[:path]) ] }
+    crumbs << [ sanitize(content.title), canonical_url ]
+    breadcrumb_list_schema(crumbs)
   end
 end

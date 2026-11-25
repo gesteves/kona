@@ -64,7 +64,7 @@ change one:
 | `units_tag` / `add_unit_data_attributes` | `helpers/markup_helper.rb` | `lib/helpers/markup_helpers.rb` |
 | `fix_degrees` | `helpers/text_helper.rb` | `lib/helpers/text_helpers.rb` |
 | Cover image URL and its `<img>` | `helpers/images_helper.rb` | `lib/helpers/image_helpers.rb` |
-| The blurhash placeholder | `services/contentful/blurhash_placeholder.rb` | `lib/helpers/image_helpers.rb` |
+| The blurhash placeholder | `services/contentful/blurhash_placeholder.rb` | `lib/helpers/blurhash_helpers.rb` |
 | The card `sizes` and its widths | `config/srcsets.yml` | `data/srcsets.yml` |
 | `article_click_classes` + `ARTICLE_CLICK_EVENT` | `helpers/plausible_helper.rb` | `lib/helpers/site_helpers.rb` |
 | `upcoming_races`, `event_collection_variant`, `event_timestamp_tag`, `parse_event_date` | `helpers/events_helper.rb` | `lib/helpers/event_helpers.rb` |

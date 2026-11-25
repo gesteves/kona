@@ -99,18 +99,18 @@ One row for each feature, and each file that it goes through. A helper is a modu
 
 | Feature | Data | Helpers | Templates | Site JavaScript | Worker |
 | --- | --- | --- | --- | --- | --- |
-| Article page | `articles.json` | `article_helpers`, `markup_helpers` (the body), `image_helpers` | `article.html.erb` → `article/_full`, `article/_meta`, `article/_body`, `_share` | `publish_date`, `units`, `image_placeholder`, `lib/eager_print_images` | — |
+| Article page | `articles.json` | `article_helpers`, `markup_helpers` (the body, with `markup_image_helpers` and `markup_embed_helpers`), `taxonomy_helpers` (the tags) | `article.html.erb` → `article/_full`, `article/_meta`, `article/_body`, `_share` | `publish_date`, `units`, `image_placeholder`, `lib/eager_print_images` | — |
 | Short | `articles.json` | the same | `short.html.erb` → `article/_short` | the same | — |
 | Page, and the home page | `pages.json` | `markup_helpers`, `site_helpers` | `page.html.erb`, `home.html.erb` → `article/_page`, `article/_body` | — | — |
-| Blog index and tag archives | `blog.json`, `tags.json` | `article_helpers` (the taxonomy) | `articles.html.erb`, `tag.html.erb` → `_blog_list` → `article/_compact`, `article/_short` | — | — |
-| Recirculation ("More Reports From This Race", "You May Also Like", Previous and Next) | `related.json`, `articles.json` | `article_helpers` (`recirculation_sections`, `related_articles`, `adjacent_articles`) | `_recirculation`, `_related`, `_read_next` → `_collection` → `article/_summary` | — | — |
-| Cover images and placeholders | `assets.json`, `srcsets.yml` | `image_helpers` (`cover_image_tag`, `srcset`, the blurhash), `markup_helpers` (the images of a body) | `article/_summary`, `article/_compact` | `image_placeholder` | — |
+| Blog index and tag archives | `blog.json`, `tags.json` | `taxonomy_helpers` | `articles.html.erb`, `tag.html.erb` → `_blog_list` → `article/_compact`, `article/_short` | — | — |
+| Recirculation ("More Reports From This Race", "You May Also Like", Previous and Next) | `related.json`, `articles.json` | `recirculation_helpers` | `_recirculation`, `_related`, `_read_next` → `_collection` → `article/_summary` | — | — |
+| Cover images and placeholders | `assets.json`, `srcsets.yml` | `image_helpers` (`cover_image_tag`, `srcset`), `blurhash_helpers`, `markup_image_helpers` (the images of a body) | `article/_summary`, `article/_compact` | `image_placeholder` | — |
 | Live widgets (stats, Whoop, weather, trending, upcoming races) | `events.json` for the races | `site_helpers` (`render_widget`, `live_update_attrs`), `event_helpers` | `placeholders/*`, `_upcoming_races` | `live_update` | `api-proxy.ts` (`/widgets/*`) |
 | Contact form | — | `site_helpers` (`turnstile_site_key`) | `_contact_form`, from `article/_body` on the page with the slug `contact` | `contact`, `lib/utils` (the toast) | `api-proxy.ts` (`POST /api/contact`) |
 | Search | The Pagefind index in `build/pagefind/` | — | `_search_trigger`, `_nav`, `_footer` | `search`, `lib/pagefind` | — |
 | Analytics | — | `site_helpers` (`plausible_*`, `article_click_classes`), `csp_helpers` | `_analytics` | `lib/analytics`, which `page`, `search`, `share`, and `clipboard` call | `plausible.ts` (`/pa/*`) |
 | Open Graph image | `assets.json` | `image_helpers` (`open_graph_image_url`, `generate_open_graph_image_url`) | `_open_graph_and_social` | — | `og.ts`, `og-render.ts` (a page with no cover image) |
-| Structured data (JSON-LD) | — | `schema_helpers`, `article_helpers` (`article_schema`, `breadcrumb_schema`), `event_helpers` | `schema/*`, from `_head` | — | — |
+| Structured data (JSON-LD) | — | `schema_helpers`, `event_helpers` | `schema/*`, from `_head` | — | — |
 | Feeds | `articles.json`, `tags.json` | `article_helpers` (`feed_articles`), `markup_helpers` (`render_feed_body`), `site_helpers` (`feed_title`) | `feed.xml.erb`, `tag_feed.xml.erb` → `_feed` | — | — |
 | Markdown copies | `articles.json`, `pages.json` | `entry_markdown_helpers`, `about_helpers`, `markdown_document_helpers` | `entry_md.txt.erb`, `about_md.txt.erb` | — | — |
 | Share buttons | — | `share_helpers` | `_share` | `share`, `clipboard` | — |

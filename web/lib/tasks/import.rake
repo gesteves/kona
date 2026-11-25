@@ -194,7 +194,7 @@ def import_standard_site
 end
 
 # Gets the related-article ids of each entry from the api and writes them to data/related.json.
-# ArticleHelpers#related_articles renders that data as the "You May Also Like" section of each
+# RecirculationHelpers#related_articles renders that data as the "You May Also Like" section of each
 # article.
 #
 # On a failure it writes nothing, as import_standard_site does, and the section is then absent.
