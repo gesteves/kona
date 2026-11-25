@@ -85,8 +85,9 @@
   --color-table-header-background:        var(--color-alice-blue);
   --color-text-secondary:                 var(--color-granite-gray);
 
-  // Do not use spanish-gray (#999): it gives 2.85:1 on white, and this token colors the meta line
-  // of an entry and the fill of a light icon. It is not decoration only.
+  // Do not use spanish-gray (#999): it gives 2.85:1 on white, and this token colors the separator
+  // of the tags in the meta line of an entry, and the fill of a light icon. It is not decoration
+  // only.
   --color-text-tertiary:                  var(--color-dim-gray);
   --color-text:                           var(--color-jet);
 

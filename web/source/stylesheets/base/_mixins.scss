@@ -61,13 +61,11 @@
   }
 }
 
-// Gives a new color to an SVG. It needs the two element names, because the icon set puts each
-// path in a group.
+// Gives a new color to an SVG.
 // ⚠️ An icon from the sprite is a <use>, and its paths are in a shadow tree that no selector can
 // reach. Those paths keep fill="currentColor", thus the `color` of the svg host is their fill.
-// The two element names stay for the inline SVGs: the api fragments render theirs inline.
+// The `path` rule is for the inline SVGs: the api fragments render theirs inline.
 @mixin svg-fill($fill) {
-  g,
   path {
     fill: $fill;
   }
@@ -132,7 +130,8 @@
   box-shadow: 0 2px 0 $color;
 }
 
-// The line, and the center alignment at the medium breakpoint, that the section headers share.
+// The line below a section header, and below the description of the blog. section-rule-header
+// adds the center alignment at the medium breakpoint.
 @mixin section-rule {
   border-bottom: 1px solid var(--color-border);
   margin-bottom: var(--padding);

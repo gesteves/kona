@@ -13,8 +13,8 @@
 // `background-color: var(--pf-text-*)` gives it its color. Thus a new color for a variable also
 // gives a new color to the icons, and no separate rule for an icon is necessary.
 
-// The code imports this partial with NO layer, as it does for skeleton and toast, and after the
-// position of the Pagefind stylesheet, on purpose. A cascade layer always loses to an unlayered
+// The code imports this partial with NO layer, and after the position of the Pagefind
+// stylesheet, on purpose. A cascade layer always loses to an unlayered
 // rule, thus a `:root` rule in a layer could never win over the unlayered `:root` defaults of
 // Pagefind. With no layer and a later position in the source, these rules win in the dark mode.
 // ⚠️ That order is why lib/pagefind.js puts the Pagefind `<link>` BEFORE the first stylesheet in

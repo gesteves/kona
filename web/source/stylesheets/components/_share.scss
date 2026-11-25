@@ -72,8 +72,8 @@
 
 // The one hidden state of this component. The native-share <button> has it, and the share controller
 // removes it when navigator.share exists. The link icon span and the check icon span of the
-// clipboard button also exchange it at a copy. It is below .share__button, thus it wins over the
-// display of the button and over the `span, svg { display: block }` rule above.
+// clipboard button also exchange it at a copy. Each selector below has two classes, thus it wins
+// over the display of the button and over the `span, svg { display: block }` rule above.
 .share__button.share__hidden,
 .share__button .share__hidden {
   display: none;

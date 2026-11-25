@@ -2,15 +2,15 @@
 // elements. These rules change the `--wa-*` defaults of Web Awesome into the placeholder colors of
 // the site.
 // ⚠️ The rules that reach the shadow tree win because of the ENCAPSULATION CONTEXT, and not because
-// of the specificity or the layers: the `--color` and `--sheen-color` tokens, `min-height`, and each
-// `::part(indicator)` rule. CSS Cascade 5 §6.1 compares the context before the other two, and for a
+// of the specificity or the layers: the `--color` and `--sheen-color` tokens, `display`, `width`,
+// `height`, `min-height`, and each `::part(indicator)` rule. CSS Cascade 5 §6.1 compares the context before the other two, and for a
 // normal declaration the outer context, which is the document, wins over a `:host` rule in a shadow
 // tree, at each specificity and in each layer. The shadow stylesheet of `<wa-skeleton>` has no
 // `!important`, thus this file is safe in `@layer components`. The `:root ` prefixes are extra
-// protection only: they apply against an `!important` in the shadow tree, which changes the context
-// rule.
-// ⚠️ site.css.scss imports this file LAST in `@layer components`. Each other rule here is a plain
-// document rule, and at the same specificity the later rule wins.
+// protection only, against another document rule. They cannot help against an `!important` in the
+// shadow tree, which wins over each normal document rule.
+// ⚠️ site.css.scss imports this file after each other component file but `toast`. Each other rule
+// here is a plain document rule, and at the same specificity the later rule wins.
 
 // The inline meta skeletons: one short line at the font size of the eyebrow and the footer, with a
 // height for one text line. Each use sets the width, and each other value is the same.
@@ -125,9 +125,8 @@
   width: 16ch;
 }
 
-// The summary card of an entry, for the upcoming races. The trending articles and the recent
-// articles also use it. This is the same as the `.entry__meta` eyebrow, the `.entry__hed` heading,
-// and the `.entry__body` body lines.
+// The summary card of an entry, for the trending articles. This is the same as the
+// `.entry__meta` eyebrow, the `.entry__hed` heading, and the `.entry__body` body lines.
 .entry__meta .entry-skeleton-eyebrow {
   @extend %skeleton-inline-meta;
 

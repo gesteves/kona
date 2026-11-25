@@ -4,13 +4,6 @@
 
   display: grid;
   gap: var(--column-gap);
-
-  // The live-update element is empty at the start and it has no size, thus it shows no border and no
-  // padding, until the API puts the weather markup in it. It stays hidden when there is no current
-  // weather.
-  &:empty {
-    display: none;
-  }
 }
 
 .weather__icon {

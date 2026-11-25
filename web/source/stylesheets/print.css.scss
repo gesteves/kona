@@ -1,8 +1,9 @@
 // ⚠️ Set the type scale and the spacing here. `bp-medium` is a `min-width` query, and in print it
 // applies to the page box. Thus the paper size and the margin setting of the reader decide if the
 // page reaches 768px. Safari reaches it on US Letter and Firefox does not, thus one browser prints
-// the same article at 24px and the other at 16px: 25 pages against 12. These are the values below
-// the breakpoint, and they stay the same. Thus paper never depends on that difference.
+// the same article at 24px and the other at 16px: 25 pages against 12. These values are fixed: the
+// sizes below the breakpoint, with the largest value of each fluid size, and with no outdent of a
+// picture. Thus paper never depends on that difference.
 :root {
   --column-gap:          1rem;
   --font-large:          48px;
@@ -21,10 +22,11 @@
 }
 
 // The interface, and each module that sends the reader to another page. None of them has a meaning
-// on paper. ⚠️ `.collection` covers each such module: Related, Trending, More Reports From This
-// Race, Read Next, and Upcoming Races. partials/_collection makes them with an id that it
-// calculates, thus the class is the only way to match all of them. They are also live-update
-// widgets, thus a print before the swap would give rows of empty skeleton boxes.
+// on paper. ⚠️ `.collection` covers each such module: You May Also Like, Trending, More Reports
+// From This Race, Read Next, and Upcoming Races. Their ids come from more than one partial, and
+// the sections of Read Next have none, thus the class is the only way to match all of them.
+// Trending is also a live-update placeholder, thus a print before the swap would give rows of
+// empty skeleton boxes.
 #header,
 #nav,
 #social-sharing,
@@ -78,9 +80,8 @@ tr {
   break-inside: avoid;
 }
 
-// ⚠️ A print engine removes the background colors and the box shadows, and those are the only things
-// that make an aside or a blockquote different from the body text. Use a border, which the print
-// engine keeps.
+// ⚠️ A print engine removes the background colors and the box shadows, which show the box of an
+// aside or of a blockquote on the screen. Use a border, which the print engine keeps.
 .entry__body {
   aside,
   blockquote {
@@ -131,9 +132,9 @@ tr {
   }
 }
 
-// ⚠️ The inset of the caption is for the outdent of the figure on the screen. With no outdent, the
-// print would put the image at the full width and the caption at --picture-outdent from the
-// edge.
+// The inset of the caption is for the outdent of the figure on the screen. `--picture-outdent` is
+// 0 at the top of this file, which already removes both. These two rules do the same thing with
+// no variable.
 .entry__figure {
   margin-inline: 0;
 

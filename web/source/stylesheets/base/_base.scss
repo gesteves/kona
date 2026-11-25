@@ -74,8 +74,8 @@ svg {
 
 // The defaults for the Web Awesome elements. Each token below keeps its light value on a black
 // page, because the dark values of Web Awesome need a `.wa-dark` class that the app never sets
-// (refer to the note at the top of base/_props.scss). These rules use the element name only, thus
-// a rule with a class in `@layer components` wins.
+// (refer to the note at the top of base/_props.scss). These rules are in `@layer base`, thus a
+// rule in `@layer components` wins at each specificity.
 
 // ⚠️ <wa-scroller> paints a fade at each scroll edge, and its color is the light surface of Web
 // Awesome. Thus a scroller with no value here gets a white haze over its content at night. Each
@@ -85,8 +85,8 @@ wa-scroller {
 }
 
 // ⚠️ A <wa-button> with no `variant` and no `appearance` gets the neutral colors of Web Awesome.
-// `--wa-color-neutral-fill-loud` is the one token that inverts between the two modes, thus such a
-// button gives 1.65:1 against a black page and only its label is visible. `plain` and `outlined`
+// Its fill is `--wa-color-neutral-fill-loud`, which keeps its light value, a dark gray. Thus such
+// a button gives 1.65:1 against a black page and only its label is visible. `plain` and `outlined`
 // give 2.97:1, which fails WCAG AA. The button of the contact form sets `variant` and `appearance`,
 // thus these values protect a future button only.
 wa-button {

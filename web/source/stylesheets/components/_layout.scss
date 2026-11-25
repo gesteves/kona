@@ -2,7 +2,7 @@
 // The code imports this file first in the components layer: @extend writes the joined selectors
 // here, thus the shared declarations stay in the same cascade layer as the components that use
 // them.
-// ⚠️ That is true for THIS file only. base/_extends.scss writes into `@layer base`.
+// ⚠️ base/_extends.scss is different: it writes into `@layer base`.
 
 // A block that covers the full page grid and gives its columns to its children.
 %subgrid-full {

@@ -1,12 +1,13 @@
-// The Web Awesome `<wa-toast>` messages. The app loads only the color theme tokens of Web Awesome
-// (in stimulus/index.js), and not its font tokens. The toast stack renders in the top layer, where
-// its shadow text takes the document default, which is a serif font, and not the font of the site.
+// The Web Awesome `<wa-toast>` messages. The theme of Web Awesome sets a font on the root, in
+// `@layer wa-theme`, and the reset of the site, which is in a later layer, removes it. No rule of
+// the site sets a font on <html> or <body>. Thus the toast stack, which is a child of <body>,
+// takes the default font of the browser, which is a serif font, and not the font of the site.
 // `<wa-toast-item>` sets no font of its own, thus a font family on the host elements goes into the
 // shadow DOM of the item.
 // ⚠️ The `--wa-color-*` tokens below are in the `@layer wa-theme` of Web Awesome, on a
 // `:where(:root)` rule. That rule matches `<html>`, and not these elements, thus it is not a
 // competitor: a declaration on the element wins over an inherited value. No other rule of the site
-// matches `wa-toast`. Thus the `:root ` prefix is extra protection only.
+// sets one of these properties on `wa-toast`. Thus the `:root ` prefix is extra protection only.
 
 :root wa-toast,
 :root wa-toast-item {
@@ -20,8 +21,8 @@
   // site controls the dark mode with `prefers-color-scheme`. Thus the toast would
   // stay light, with a white panel and almost black text, on a dark page. This code
   // sets them to the same dark values that the dark theme of Web Awesome uses. The
-  // variant colors only the accent line and the icon, which is a `-50` shade that
-  // looks the same in both modes, thus this code does not change it.
+  // variant colors only the accent line and the progress indicator, which use a
+  // `-50` shade that looks the same in both modes, thus this code does not change it.
   @include dark-mode {
     --wa-color-surface-raised:    var(--wa-color-neutral-10);
     --wa-color-surface-border:    var(--wa-color-neutral-20);

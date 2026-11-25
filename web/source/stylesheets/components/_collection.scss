@@ -5,8 +5,9 @@
   display: grid;
 }
 
-// The live-update element around one collection or more, for example the "Today's Race" section
-// and the "Upcoming Races" section of the races widget. display:contents gives this element no box,
+// The element around one collection or more: the live-update element of the races widget, with
+// its "Today's Race" section and its "Upcoming Races" section, and the <nav> of the read-next
+// cards. display:contents gives this element no box,
 // thus each collection still uses the page grid as its subgrid.
 .collection-group {
   display: contents;

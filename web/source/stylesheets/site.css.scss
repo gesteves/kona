@@ -42,8 +42,9 @@
   @import 'components/share';
   @import 'components/weather';
 
-  // ⚠️ These two are LAST, on purpose. Each rule in them must win over a rule with the same
-  // specificity in a file above. Refer to the header of each file.
+  // ⚠️ `skeleton` is after each file above, on purpose. Each plain document rule in it must win
+  // over a rule with the same specificity in a file above. Refer to its header. No other rule of
+  // the site sets a property that `toast` sets, thus the position of `toast` is not important.
   @import 'components/skeleton';
   @import 'components/toast';
 }

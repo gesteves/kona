@@ -30,12 +30,6 @@
     color: var(--color-link-hover);
   }
 
-  // This uses :focus-visible, and not :focus, on purpose. With :focus, it also removed the
-  // underline for a mouse user, and each link in an entry then had no mark after a click.
-  a:focus-visible {
-    text-decoration: none;
-  }
-
   // The / character between two concepts in a chain, and between two chains. It is not
   // prominent.
   .entry__tag-separator {
@@ -71,10 +65,6 @@
     &:focus-visible {
       text-decoration: none;
     }
-  }
-
-  &::after {
-    font-weight: normal;
   }
 
   svg {
@@ -318,7 +308,7 @@
 // Three rows, and the order is different in the two. .entry--compact is the header, the cover
 // image, then the body. .entry--summary is the cover image, the header, then the body. The body
 // takes the free height, thus the headers of two cards beside each other align. A card with no
-// cover image, that is a Short, puts its two children in the first two rows and the last row is
+// cover image, for example a Short, puts its children in the first rows, and the last row is
 // empty.
 .entry--compact,
 .entry--summary {
