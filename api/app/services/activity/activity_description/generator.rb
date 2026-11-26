@@ -126,11 +126,11 @@ module ActivityDescription
     # @return [String, nil]
     def compose_description(activity, sport, current)
       swim = sport == "Swimming"
-      # The map line of a Zwift activity goes at the top of the stat lines, and not in the headline.
+      # The lines of a Zwift activity go at the top of the stat lines, and not in the headline.
       zwift = self.class.zwift?(activity)
       Composer.compose(
-        headline: Composer.headline(current[:description], map: zwift),
-        map: (Composer.map_line(current[:description]) if zwift),
+        headline: Composer.headline(current[:description], zwift: zwift),
+        zwift: (Composer.zwift_lines(current[:description]) if zwift),
         planned: planned_summary_line(activity, sport, current[:name]),
         weather: weather_line(activity),
         water_temp: water_temp_line(activity, swim),

@@ -551,7 +551,7 @@ RSpec.describe ActivityDescription::Generator do
     end
   end
 
-  describe "the map line of Zwift" do
+  describe "the lines of Zwift" do
     let(:zwift_ride) { activity.merge(type: "VirtualRide", source: "ZWIFT") }
 
     before { allow(intervals).to receive(:activity!).and_return(zwift_ride) }
@@ -562,6 +562,14 @@ RSpec.describe ActivityDescription::Generator do
       generator.generate!("i1")
 
       expect(strava).to have_received(:update_activity!).with("s1", description: "🗺️ Waisted 8 in Watopia\n⚡️ Avg 200 W")
+    end
+
+    it "moves the level-up line into the stat lines" do
+      allow(strava).to receive(:activity).and_return(name: "Zwift - Pacer Group Ride", description: "🎉 Leveled up today")
+
+      generator.generate!("i1")
+
+      expect(strava).to have_received(:update_activity!).with("s1", description: "🎉 Leveled up today\n⚡️ Avg 200 W")
     end
 
     it "keeps the text of the owner above it" do
