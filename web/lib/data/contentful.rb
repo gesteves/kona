@@ -182,7 +182,7 @@ class Contentful
   # the R2 key. The api writes each object at this same path. Neither side checks the other, and
   # a difference makes each image on the site 404 with no message. A value in IMAGE_HOST also
   # says that the mirror is complete. Run the `rake assets:backfill` of the api first. Refer to
-  # the root CLAUDE.md.
+  # docs/cloudflare.md.
   # @raise [ImageHostMissing] If IMAGE_HOST has no value.
   def rewrite_image_urls(item)
     raise ImageHostMissing if ENV["IMAGE_HOST"].blank?

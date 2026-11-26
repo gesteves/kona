@@ -41,7 +41,7 @@
     // ⚠️ Keep the ".png". The Cache Rule of the zone applies only to a path with no ".", thus the
     // extension keeps the cards off the HTML edge TTL of one year, which ignores Cache-Control. A
     // path with no extension (/og, /og/*) needs an exclusion in that rule first, in the dashboard.
-    // Refer to the root CLAUDE.md.
+    // Refer to docs/cloudflare.md.
     //
     // No /cdn-cgi/* entry is necessary: Cloudflare answers the image transformations at its edge.
     "run_worker_first": [

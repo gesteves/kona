@@ -4,10 +4,6 @@ The Middleman site, and the `kona-web` Cloudflare Worker that serves it. The roo
 [`CLAUDE.md`](../CLAUDE.md) has the contract between web and api. Read it before you change the
 markup of a widget.
 
-⚠️ **Write each comment, all the inline documentation, and each change to a `CLAUDE.md` file in
-ASD-STE100 Simplified Technical English, and keep it short.** The root
-[`CLAUDE.md`](../CLAUDE.md) has the full rule.
-
 ## Setup
 
 Run `nvm use` before each `npm` command.
@@ -29,11 +25,11 @@ network.
 
 **Before each commit** (these are necessary): `bundle exec rake test`, `npm test`,
 `npm run check`, and `npm run check:worker` pass. Then `bundle exec rubocop`, `npm run lint:js`,
-`npm run lint:scss`, and `npm run format:check` are clean. Then `bundle exec rake build:verbose` is successful. ⚠️ **`rake
-build` does NOT run the tests**, and it is the one check that renders the templates: a bad partial
-passes each other check and then stops the deploy. ⚠️ Run it with the same environment as CI
-(`READING_TIME_WPM="" TIME_ZONE=""`). A GitHub Actions **variable** with no value arrives as an
-empty string, and not as an absent value. Thus a local `.env` that omits a key tests a different
+`npm run lint:scss`, and `npm run format:check` are clean. Then `bundle exec rake build:verbose`
+is successful. ⚠️ **`rake build` does NOT run the tests**, and it is the one check that renders the
+templates: a bad partial passes each other check and then stops the deploy. ⚠️ Run it with the
+same environment as CI (`READING_TIME_WPM="" TIME_ZONE=""`). A GitHub Actions **variable** with no
+value arrives as an empty string, and not as an absent value. Thus a local `.env` that omits a key tests a different
 path than production. Obey `.editorconfig`.
 
 **`dependencies` against `devDependencies`**: the deploy job of CI installs with
@@ -78,8 +74,6 @@ purges again.
 
 ## The Markdown documents: `/.well-known/about.md` and the `index.md` of each post
 
-- ⚠️ A new kind of markup in a body goes out as its text only. Add a step for it to
-  `normalize_for_markdown`.
 - ⚠️ **The front matter must be the first line of the file.** Thus each template is one ERB tag
   with no comment and no newline.
 

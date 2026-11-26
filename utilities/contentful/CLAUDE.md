@@ -3,10 +3,6 @@
 Node scripts that write the content **in Contentful** through the CMA. Refer to the root
 [`CLAUDE.md`](../../CLAUDE.md), which also has the rules for a comment.
 
-⚠️ **Write each comment, all the inline documentation, and each change to a `CLAUDE.md` file in
-ASD-STE100 Simplified Technical English, and keep it short.** The root
-[`CLAUDE.md`](../../CLAUDE.md) has the full rule.
-
 ⚠️ [`README.md`](README.md) gives the use of each script, its flags, and the full taxonomy
 **runbook**. **Keep it correct** each time that you add, change, or remove a script.
 

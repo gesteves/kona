@@ -111,7 +111,7 @@ Rails.application.routes.draw do
     # ⚠️ Thus the admin pages use top-level paths on this host. Check a new page against the
     # scanner-noise custom rule of the zone before you add it. That rule blocks full prefix
     # families (`/config/`, `/home/`, `/analytics/`, `/deploy/`, and more) in the full zone, and
-    # it would 403 a page with one of those names. Refer to the root CLAUDE.md.
+    # it would 403 a page with one of those names. Refer to docs/cloudflare.md.
     scope module: "admin" do
       root to: "home#show"
       get    "connected-apps"       => "connected_apps#show",  as: :connected_apps
@@ -185,7 +185,7 @@ Rails.application.routes.draw do
       # ⚠️ It is a POST, and not a GET: a draft is much larger than a query string should carry.
       post "social/preview/text"  => "social#preview_text",  as: :social_preview_text
       # The picture of the link card. It is a proxy, and not a link to the other host: the CSP of
-      # the admin has `img-src :self`. Refer to **The Social media page** in CLAUDE.md.
+      # the admin has `img-src :self`. Refer to .claude/rules/admin-social.md.
       get "social/preview/image" => "social#preview_image", as: :social_preview_image
       # The card of the link that the owner pasted.
       get "social/preview"       => "social#preview",       as: :social_preview

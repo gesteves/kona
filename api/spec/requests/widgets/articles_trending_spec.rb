@@ -135,7 +135,7 @@ RSpec.describe "Widgets::Articles trending", type: :request do
 
     # ⚠️ The tracking script of the static page reads these class names off the link itself. It
     # walks four nodes up from the click at the most, thus the classes cannot move to the card.
-    # Refer to the root CLAUDE.md.
+    # Refer to .claude/rules/card-analytics.md.
     it "tags each link into an article with the trending section, for the analytics" do
       stub_env("IMAGES_URL" => "https://site.example", "IMAGE_HOST" => "images.example")
 

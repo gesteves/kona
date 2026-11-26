@@ -503,7 +503,7 @@ jobs:
       # wrangler deploy does not purge the Cloudflare edge cache. Without this step, the edge
       # continues to serve the HTML and the feeds from before the deploy (cf-cache-status: HIT,
       # then old 304s) until the entries expire. A zone Cache Response Rule for this host gives
-      # each asset-layer response the tag `Cache-Tag: site` (refer to the root CLAUDE.md). A purge
+      # each asset-layer response the tag `Cache-Tag: site` (refer to docs/cloudflare.md). A purge
       # of that tag alone removes the pages and the feeds of the site, and it keeps the image
       # transformations (/cdn-cgi/image/*, which have no tag). The second part of the same rule
       # gives the tag to the Contentful widget fragments on the api host, thus this purge also
@@ -516,7 +516,7 @@ jobs:
       # removes the stale-while-revalidate and stale-if-error copies of a fragment with the fresh
       # copy, and those copies keep the live-data widgets in operation through a fly failure. A
       # Contentful publish starts this workflow. Thus with `widgets` here, a publish during a
-      # failure would remove each widget on the full site. The root CLAUDE.md has the full
+      # failure would remove each widget on the full site. docs/cloudflare.md has the full
       # explanation.
       # --fail-with-body makes the CI red if the purge gives a 4xx. It uses CLOUDFLARE_API_TOKEN,
       # which now also has the Zone → Cache Purge permission.

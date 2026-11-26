@@ -5,7 +5,7 @@
 #
 # ⚠️ The three networks write a mention in three different forms, and one person has a different
 # handle at each one, or no account. Thus the owner writes a short token, and the composer asks
-# what that person is called at each network. Refer to "The Social media page" in api/CLAUDE.md.
+# what that person is called at each network. Refer to .claude/rules/admin-social.md.
 class SocialMentions
   # A mention token in the body of a post.
   #

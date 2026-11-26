@@ -2,7 +2,7 @@
 <%# `id_scope` puts a section slug at the start of each DOM id of this card. Use it for a section
     that can list an entry that another section on the same page also lists.
     `tracking_section` is the heading of the section that holds this card, word for word. The
-    collection partial reads it from its own title. Refer to the root CLAUDE.md.
+    collection partial reads it from its own title. Refer to .claude/rules/card-analytics.md.
     ⚠️ With no value the card sends no event, and nothing shows that. %>
 <article class="entry entry--summary" id="<%= entry_dom_id(article, scope: id_scope) %>" aria-labelledby="<%= entry_heading_id(article, scope: id_scope) %>">
   <%# ⚠️ The link is aria-hidden and it is not a tab stop, and the image has an empty alt. The

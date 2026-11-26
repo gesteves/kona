@@ -6,7 +6,7 @@ require "tempfile"
 # that the URL names, and a source outside the zone cannot use Tiered Cache or Cache Reserve.
 # Without the mirror, each PoP gets the full-size original from Contentful after each eviction.
 #
-# ⚠️ The key of each object is a contract with web. Refer to #object_key and the root CLAUDE.md.
+# ⚠️ The key of each object is a contract with web. Refer to #object_key and docs/cloudflare.md.
 #
 # Contentful webhooks and the `assets:backfill` rake task start this. It does nothing without the
 # R2 credentials.

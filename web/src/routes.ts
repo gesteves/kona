@@ -2,8 +2,8 @@
 //
 // ⚠️ `run_worker_first` in wrangler.jsonc must hold the same list, and no code can import that
 // file. test/browser/worker_routes.test.js compares the two.
-// ⚠️ A new entry also needs an exclusion in the Cache Rule of the zone. Refer to the root
-// CLAUDE.md.
+// ⚠️ A new entry also needs an exclusion in the Cache Rule of the zone. Refer to
+// docs/cloudflare.md.
 
 /** The widget fragments of the api. The path after the prefix goes to the origin with no change. */
 export const WIDGETS_PREFIX = '/widgets/';
