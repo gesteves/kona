@@ -23,10 +23,10 @@
     "esbuild": "^0.28.2",
     "pagefind": "^1.6.0",
     "satori": "^0.32.0",
-    "wrangler": "^4.166.0"
+    "wrangler": "^4.168.0"
   },
   "devDependencies": {
-    "@cloudflare/vitest-plugin": "^1.9.0",
+    "@cloudflare/vitest-plugin": "^1.9.2",
     "@cloudflare/workers-types": "^5.20261014.1",
     "@eslint/js": "^10.0.1",
     "axe-core": "4.14.1",
