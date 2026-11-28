@@ -10,8 +10,8 @@
 # private registry. CI passes it with `flyctl deploy --build-secret`.
 
 ARG RUBY_VERSION=4.0.10
-# ⚠️ Keep this in step with .nvmrc (`lts/*`), which is what CI and local dev resolve.
-ARG NODE_VERSION=24
+# ⚠️ Keep this the same as .nvmrc. CI and local development read that file.
+ARG NODE_VERSION=26
 
 # Node comes from the official image rather than apt (Debian's is far too old) or a source build
 # (minutes per deploy). Only the build stage borrows from it; the final image stays Ruby-only.
